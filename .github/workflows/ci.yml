@@ -33,6 +33,9 @@ jobs:
       - name: Test
         run: pnpm test
 
+      - name: Headless demo
+        run: pnpm demo:headless > /tmp/headless-battle-demo.json
+
       - name: Lint
         run: pnpm lint
 
