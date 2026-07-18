@@ -1,3 +1,5 @@
+import type { SkillId } from './skill-definition'
+
 export type SpeciesId = string
 
 export type MonsterRarity = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10
@@ -16,6 +18,7 @@ export interface MonsterSpecies {
   readonly primarySpeciesId: string
   readonly tagIds: readonly string[]
   readonly stats: MonsterStats
+  readonly innateSkillId: SkillId
 }
 
 function assertNonEmptyString(value: string, fieldName: string): void {
@@ -34,6 +37,7 @@ export function assertValidMonsterSpecies(species: MonsterSpecies): void {
   assertNonEmptyString(species.id, 'species.id')
   assertNonEmptyString(species.attributeId, 'species.attributeId')
   assertNonEmptyString(species.primarySpeciesId, 'species.primarySpeciesId')
+  assertNonEmptyString(species.innateSkillId, 'species.innateSkillId')
   assertIntegerAtLeast(species.rarity, 1, 'species.rarity')
 
   if (species.rarity > 10) {
