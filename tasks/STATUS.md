@@ -13,7 +13,7 @@
 - [x] T011 — [通常移動](T011_NORMAL_MOVEMENT.md)
 - [x] T012 — [直線射程と遮蔽](T012_DIRECT_RANGE_AND_COVER.md)
 - [x] T013 — [最小オートAI](T013_MINIMAL_AUTO_AI.md)
-- [ ] T014 — [ヘッドレス戦闘デモ](T014_HEADLESS_BATTLE_DEMO.md)
+- [x] T014 — [ヘッドレス戦闘デモ](T014_HEADLESS_BATTLE_DEMO.md)
 - [ ] T015 — [最小盤面UI](T015_MINIMAL_BATTLE_UI.md)
 
 原則として上から一件ずつ実装・レビュー・マージします。
