@@ -15,6 +15,6 @@
 - [x] T013 — [最小オートAI](T013_MINIMAL_AUTO_AI.md)
 - [x] T014 — [ヘッドレス戦闘デモ](T014_HEADLESS_BATTLE_DEMO.md)
 - [x] T015 — [最小盤面UI](T015_MINIMAL_BATTLE_UI.md)
-- [ ] T016 — [効果フレームワーク骨格](T016_EFFECT_FRAMEWORK.md)
+- [x] T016 — [効果フレームワーク骨格](T016_EFFECT_FRAMEWORK.md)
 
-T016 in progress.
+T001～T016 complete. Next: T017.
