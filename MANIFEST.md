@@ -1,0 +1,46 @@
+# Package Manifest
+
+Files: 42
+
+- `.github/ISSUE_TEMPLATE/implementation-task.md`
+- `.github/PULL_REQUEST_TEMPLATE.md`
+- `AGENTS.md`
+- `README.md`
+- `docs/00_GAME_VISION.md`
+- `docs/01_CORE_LOOP.md`
+- `docs/02_BATTLE_RULES.md`
+- `docs/03_TIMELINE_SYSTEM.md`
+- `docs/04_BOARD_AND_TARGETING.md`
+- `docs/05_MONSTER_SYSTEM.md`
+- `docs/06_SKILL_SYSTEM.md`
+- `docs/07_BATTLE_EFFECTS.md`
+- `docs/08_AI_SYSTEM.md`
+- `docs/09_RESEARCH_SYSTEM.md`
+- `docs/10_PROGRESSION_AND_ECONOMY.md`
+- `docs/11_SAVE_AND_COMPATIBILITY.md`
+- `docs/12_UI_UX.md`
+- `docs/13_CONTENT_AUTHORING_RULES.md`
+- `docs/14_VERTICAL_SLICE.md`
+- `docs/15_BALANCE_GUIDELINES.md`
+- `docs/16_DATA_SCHEMAS.md`
+- `docs/17_IMPLEMENTATION_ROADMAP.md`
+- `docs/DECISIONS.md`
+- `docs/GLOSSARY.md`
+- `docs/INDEX.md`
+- `tasks/STATUS.md`
+- `tasks/T001_REPOSITORY_DOCUMENTATION.md`
+- `tasks/T002_TOOLCHAIN_CI_VERCEL.md`
+- `tasks/T003_BOARD_COORDINATES.md`
+- `tasks/T004_BATTLE_UNIT_STATE.md`
+- `tasks/T005_TIMELINE_QUEUE.md`
+- `tasks/T006_ACTION_SCHEDULING.md`
+- `tasks/T007_SINGLE_TARGET_DAMAGE.md`
+- `tasks/T008_DEFEAT_AND_VICTORY.md`
+- `tasks/T009_EVENT_LOG.md`
+- `tasks/T010_DETERMINISM_TESTS.md`
+- `tasks/T011_NORMAL_MOVEMENT.md`
+- `tasks/T012_DIRECT_RANGE_AND_COVER.md`
+- `tasks/T013_MINIMAL_AUTO_AI.md`
+- `tasks/T014_HEADLESS_BATTLE_DEMO.md`
+- `tasks/T015_MINIMAL_BATTLE_UI.md`
+- `tasks/TASK_TEMPLATE.md`
