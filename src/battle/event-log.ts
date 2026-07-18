@@ -2,6 +2,13 @@ import type { SkillId } from '../content/skill-definition'
 import { areAdjacent, getBoardPositionId, type BoardPosition } from './board'
 import type { BattleTime } from './action-scheduling'
 import type { BattleOutcome, BattleState, DefeatRecord } from './defeat-and-victory'
+import {
+  EFFECT_DURATION_UNITS,
+  type ActiveEffectMutation,
+  type ActiveEffectState,
+  type EffectDurationUnit,
+  type EffectRemovalReason,
+} from './effect-framework'
 import type { BattleUnitId } from './unit-state'
 
 export const BATTLE_EVENT_KINDS = [
@@ -10,6 +17,9 @@ export const BATTLE_EVENT_KINDS = [
   'unit_moved',
   'skill_used',
   'damage_applied',
+  'effect_applied',
+  'effect_merged',
+  'effect_removed',
   'unit_defeated',
   'battle_ended',
 ] as const
@@ -48,6 +58,29 @@ export interface DamageAppliedPayload {
   readonly hpAfter: number
 }
 
+export interface EffectAppliedPayload {
+  readonly activeEffectId: string
+  readonly effectId: string
+  readonly sourceBattleUnitId: BattleUnitId | null
+  readonly targetBattleUnitId: BattleUnitId
+  readonly strength: number
+  readonly stacks: number
+  readonly stackLimit: number
+  readonly durationUnit: EffectDurationUnit
+  readonly durationRemaining: number | null
+}
+
+export interface EffectMergedPayload extends EffectAppliedPayload {
+  readonly previousSourceBattleUnitId: BattleUnitId | null
+  readonly previousStrength: number
+  readonly previousStacks: number
+  readonly previousDurationRemaining: number | null
+}
+
+export interface EffectRemovedPayload extends EffectAppliedPayload {
+  readonly reason: EffectRemovalReason
+}
+
 export interface UnitDefeatedPayload {
   readonly defeatedBattleUnitId: BattleUnitId
   readonly killerBattleUnitId: BattleUnitId | null
@@ -70,6 +103,9 @@ export type TurnStartedEvent = BattleEventBase<'turn_started', TurnStartedPayloa
 export type UnitMovedEvent = BattleEventBase<'unit_moved', UnitMovedPayload>
 export type SkillUsedEvent = BattleEventBase<'skill_used', SkillUsedPayload>
 export type DamageAppliedEvent = BattleEventBase<'damage_applied', DamageAppliedPayload>
+export type EffectAppliedEvent = BattleEventBase<'effect_applied', EffectAppliedPayload>
+export type EffectMergedEvent = BattleEventBase<'effect_merged', EffectMergedPayload>
+export type EffectRemovedEvent = BattleEventBase<'effect_removed', EffectRemovedPayload>
 export type UnitDefeatedEvent = BattleEventBase<'unit_defeated', UnitDefeatedPayload>
 export type BattleEndedEvent = BattleEventBase<'battle_ended', BattleEndedPayload>
 
@@ -79,6 +115,9 @@ export type BattleEvent =
   | UnitMovedEvent
   | SkillUsedEvent
   | DamageAppliedEvent
+  | EffectAppliedEvent
+  | EffectMergedEvent
+  | EffectRemovedEvent
   | UnitDefeatedEvent
   | BattleEndedEvent
 
@@ -183,6 +222,46 @@ function parseBoardPositionId(positionId: string, field: string): BoardPosition 
   }
 }
 
+function assertValidEffectDurationFields(
+  unit: EffectDurationUnit,
+  remaining: number | null,
+  field: string,
+): void {
+  if (!EFFECT_DURATION_UNITS.includes(unit)) {
+    throw new Error(`${field}.unit is invalid`)
+  }
+  if (unit === 'BATTLE') {
+    if (remaining !== null) {
+      throw new Error(`${field}.remaining must be null for BATTLE`)
+    }
+    return
+  }
+  if (remaining === null) {
+    throw new Error(`${field}.remaining must be present for counted duration`)
+  }
+  assertSafeIntegerAtLeast(remaining, 1, `${field}.remaining`)
+}
+
+function assertValidEffectSnapshot(payload: EffectAppliedPayload, field = 'effect'): void {
+  assertNonEmptyId(payload.activeEffectId, `${field}.activeEffectId`)
+  assertNonEmptyId(payload.effectId, `${field}.effectId`)
+  if (payload.sourceBattleUnitId !== null) {
+    assertNonEmptyId(payload.sourceBattleUnitId, `${field}.sourceBattleUnitId`)
+  }
+  assertNonEmptyId(payload.targetBattleUnitId, `${field}.targetBattleUnitId`)
+  assertSafeIntegerAtLeast(payload.strength, 0, `${field}.strength`)
+  assertSafeIntegerAtLeast(payload.stacks, 1, `${field}.stacks`)
+  assertSafeIntegerAtLeast(payload.stackLimit, 1, `${field}.stackLimit`)
+  if (payload.stacks > payload.stackLimit) {
+    throw new Error(`${field}.stacks must not exceed ${field}.stackLimit`)
+  }
+  assertValidEffectDurationFields(
+    payload.durationUnit,
+    payload.durationRemaining,
+    `${field}.duration`,
+  )
+}
+
 export function assertValidBattleEvent(event: BattleEvent): void {
   assertSafeIntegerAtLeast(event.sequence, 0, 'event.sequence')
   assertSafeIntegerAtLeast(event.virtualTime, 0, 'event.virtualTime')
@@ -255,6 +334,38 @@ export function assertValidBattleEvent(event: BattleEvent): void {
       }
       return
     }
+    case 'effect_applied':
+      assertValidEffectSnapshot(event.payload)
+      return
+    case 'effect_merged':
+      assertValidEffectSnapshot(event.payload)
+      if (event.payload.previousSourceBattleUnitId !== null) {
+        assertNonEmptyId(
+          event.payload.previousSourceBattleUnitId,
+          'effect.previousSourceBattleUnitId',
+        )
+      }
+      assertSafeIntegerAtLeast(event.payload.previousStrength, 0, 'effect.previousStrength')
+      assertSafeIntegerAtLeast(event.payload.previousStacks, 1, 'effect.previousStacks')
+      if (event.payload.previousStacks > event.payload.stackLimit) {
+        throw new Error('effect.previousStacks must not exceed effect.stackLimit')
+      }
+      assertValidEffectDurationFields(
+        event.payload.durationUnit,
+        event.payload.previousDurationRemaining,
+        'effect.previousDuration',
+      )
+      return
+    case 'effect_removed':
+      assertValidEffectSnapshot(event.payload)
+      if (
+        !['EXPIRED', 'DISPELLED', 'REPLACED', 'BATTLE_ENDED', 'SCRIPT'].includes(
+          event.payload.reason,
+        )
+      ) {
+        throw new Error('effect removal reason is invalid')
+      }
+      return
     case 'unit_defeated':
       assertNonEmptyId(event.payload.defeatedBattleUnitId, 'defeatedBattleUnitId')
       if (event.payload.killerBattleUnitId !== null) {
@@ -380,6 +491,58 @@ export function recordUnitMoved(
       toPositionId: getBoardPositionId(input.to),
     },
   })
+}
+
+function getEffectSnapshot(effect: ActiveEffectState): EffectAppliedPayload {
+  return {
+    activeEffectId: effect.activeEffectId,
+    effectId: effect.effectId,
+    sourceBattleUnitId: effect.sourceBattleUnitId,
+    targetBattleUnitId: effect.targetBattleUnitId,
+    strength: effect.strength,
+    stacks: effect.stacks,
+    stackLimit: effect.stackLimit,
+    durationUnit: effect.duration.unit,
+    durationRemaining: effect.duration.remaining,
+  }
+}
+
+export function recordActiveEffectMutation(
+  log: BattleEventLog,
+  mutation: ActiveEffectMutation,
+  virtualTime: BattleTime,
+): BattleEventLog {
+  assertSafeIntegerAtLeast(virtualTime, 0, 'virtualTime')
+
+  switch (mutation.kind) {
+    case 'APPLIED':
+      return appendBattleEvent(log, {
+        kind: 'effect_applied',
+        virtualTime,
+        payload: getEffectSnapshot(mutation.after),
+      })
+    case 'MERGED':
+      return appendBattleEvent(log, {
+        kind: 'effect_merged',
+        virtualTime,
+        payload: {
+          ...getEffectSnapshot(mutation.after),
+          previousSourceBattleUnitId: mutation.before.sourceBattleUnitId,
+          previousStrength: mutation.before.strength,
+          previousStacks: mutation.before.stacks,
+          previousDurationRemaining: mutation.before.duration.remaining,
+        },
+      })
+    case 'REMOVED':
+      return appendBattleEvent(log, {
+        kind: 'effect_removed',
+        virtualTime,
+        payload: {
+          ...getEffectSnapshot(mutation.before),
+          reason: mutation.reason,
+        },
+      })
+  }
 }
 
 export function recordUnitDefeated(
