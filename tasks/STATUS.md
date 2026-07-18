@@ -5,7 +5,7 @@
 - [x] T003 — [盤面座標と陣営モデル](T003_BOARD_COORDINATES.md)
 - [x] T004 — [ユニット戦闘状態モデル](T004_BATTLE_UNIT_STATE.md)
 - [x] T005 — [安定順序を持つタイムラインキュー](T005_TIMELINE_QUEUE.md)
-- [ ] T006 — [行動コストと次回行動計算](T006_ACTION_SCHEDULING.md)
+- [x] T006 — [行動コストと次回行動計算](T006_ACTION_SCHEDULING.md)
 - [ ] T007 — [単体技とダメージ計算](T007_SINGLE_TARGET_DAMAGE.md)
 - [ ] T008 — [戦闘不能と勝敗判定](T008_DEFEAT_AND_VICTORY.md)
 - [ ] T009 — [戦闘イベントログ](T009_EVENT_LOG.md)
