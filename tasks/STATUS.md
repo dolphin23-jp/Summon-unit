@@ -2,7 +2,7 @@
 
 - [x] T001 — [リポジトリ文書構成を作る](T001_REPOSITORY_DOCUMENTATION.md)
 - [x] T002 — [開発環境・テスト・CI・Vercelを整える](T002_TOOLCHAIN_CI_VERCEL.md)
-- [ ] T003 — [盤面座標と陣営モデル](T003_BOARD_COORDINATES.md)
+- [x] T003 — [盤面座標と陣営モデル](T003_BOARD_COORDINATES.md)
 - [ ] T004 — [ユニット戦闘状態モデル](T004_BATTLE_UNIT_STATE.md)
 - [ ] T005 — [安定順序を持つタイムラインキュー](T005_TIMELINE_QUEUE.md)
 - [ ] T006 — [行動コストと次回行動計算](T006_ACTION_SCHEDULING.md)
