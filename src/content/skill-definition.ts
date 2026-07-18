@@ -1,0 +1,42 @@
+export type SkillId = string
+
+export const DAMAGE_MULTIPLIER_SCALE = 1000
+
+export interface SkillDefinition {
+  readonly id: SkillId
+  readonly slotType: 'INNATE'
+  readonly actionCost: number
+  readonly targetType: 'SINGLE_ENEMY'
+  readonly damageMultiplierPermille: number
+}
+
+function assertNonEmptyString(value: string, field: string): void {
+  if (value.trim().length === 0) {
+    throw new Error(`${field} must be a non-empty string`)
+  }
+}
+
+function assertSafeIntegerAtLeast(value: number, minimum: number, field: string): void {
+  if (!Number.isSafeInteger(value) || value < minimum) {
+    throw new Error(`${field} must be a safe integer greater than or equal to ${minimum}`)
+  }
+}
+
+export function assertValidSkillDefinition(skill: SkillDefinition): void {
+  assertNonEmptyString(skill.id, 'skill.id')
+
+  if (skill.slotType !== 'INNATE') {
+    throw new Error('skill.slotType must be INNATE')
+  }
+
+  if (skill.targetType !== 'SINGLE_ENEMY') {
+    throw new Error('skill.targetType must be SINGLE_ENEMY')
+  }
+
+  assertSafeIntegerAtLeast(skill.actionCost, 1, 'skill.actionCost')
+  assertSafeIntegerAtLeast(
+    skill.damageMultiplierPermille,
+    1,
+    'skill.damageMultiplierPermille',
+  )
+}

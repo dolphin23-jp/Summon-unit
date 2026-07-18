@@ -25,6 +25,7 @@ const species: MonsterSpecies = {
   primarySpeciesId: 'species-group.beast',
   tagIds: ['tag.beast'],
   stats: { hp: 90, attack: 20, defense: 15, speed: 3 },
+  innateSkillId: 'skill.clock-kick',
 }
 
 function createUnit(battleUnitId: string) {

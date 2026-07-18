@@ -20,6 +20,7 @@ const species: MonsterSpecies = Object.freeze({
     defense: 20,
     speed: 3,
   }),
+  innateSkillId: 'skill.razor-claw',
 })
 
 const allyFrontCenter: BoardPosition = Object.freeze({ side: 'ALLY', row: 0, column: 1 })

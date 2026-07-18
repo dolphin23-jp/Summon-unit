@@ -8,6 +8,7 @@ const validSpecies: MonsterSpecies = {
   primarySpeciesId: 'species-group.beast',
   tagIds: ['tag.beast'],
   stats: { hp: 120, attack: 30, defense: 20, speed: 3 },
+  innateSkillId: 'skill.razor-claw',
 }
 
 const invalidCases: readonly (readonly [MonsterSpecies, string])[] = [
@@ -25,6 +26,10 @@ const invalidCases: readonly (readonly [MonsterSpecies, string])[] = [
     'species.stats.speed must be an integer greater than or equal to 1',
   ],
   [{ ...validSpecies, tagIds: [''] }, 'species.tagIds[] must be a non-empty string'],
+  [
+    { ...validSpecies, innateSkillId: '' },
+    'species.innateSkillId must be a non-empty string',
+  ],
 ]
 
 describe('monster species validation', () => {
