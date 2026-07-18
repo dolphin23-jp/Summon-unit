@@ -1,6 +1,6 @@
 # Monster Research Tactics
 
-ブラウザで動作する、モンスター収集・研究・編成型タクティクスゲームの実装前仕様パッケージです。
+ブラウザで動作する、モンスター収集・研究・編成型タクティクスゲームです。
 
 本企画は、3×3陣形、モンスター研究、新種発見という着想を持ちつつ、戦闘は独自の決定論的タイムライン方式を採用します。オート戦闘を基本とし、必要な一手だけ手動介入できます。
 
@@ -15,19 +15,36 @@
 
 ## 技術基盤
 
-既存プロジェクトで採用した方法を踏襲し、初期基盤は以下を標準とします。
-
 - Vite
 - React 18
 - TypeScript strict
-- pnpm
+- pnpm 10.13.1
 - Vitest
 - ESLint
 - Prettier
 - GitHub Actions (`test`, `lint`, `build`)
 - Vercel（静的SPA）
 
-技術的な理由で変更する場合は、実装前に `docs/17_IMPLEMENTATION_ROADMAP.md` と ADR を更新します。
+依存パッケージは `package.json` で固定バージョンを指定します。技術的な理由で変更する場合は、実装前に `docs/17_IMPLEMENTATION_ROADMAP.md` とADRを更新します。
+
+## ローカル開発
+
+Node.js 20以上を使用します。
+
+```bash
+corepack enable
+corepack prepare pnpm@10.13.1 --activate
+pnpm install --no-frozen-lockfile
+pnpm dev
+```
+
+検証:
+
+```bash
+pnpm test
+pnpm lint
+pnpm build
+```
 
 ## 文書の読み順
 
@@ -40,13 +57,14 @@
 7. `docs/16_DATA_SCHEMAS.md`
 8. `docs/17_IMPLEMENTATION_ROADMAP.md`
 9. `AGENTS.md`
-10. `tasks/T001_*.md` から順に実装
+10. `tasks/STATUS.md` の未完了タスクを上から実装
 
 ## 現在の状態
 
 - 設計基準：確定
 - 数値バランス：仮置き
-- 実装：未開始
-- 最初の実装対象：Task 001～015
+- 開発環境・CI・Vercel設定：完了
+- 戦闘ロジック：未実装
+- 次の実装対象：T003「盤面座標と陣営モデル」
 
 詳細な確定・暫定区分は `docs/DECISIONS.md` を参照してください。
