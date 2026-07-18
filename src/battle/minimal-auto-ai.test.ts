@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { MonsterSpecies } from '../content/monster-species'
 import type { SkillDefinition } from '../content/skill-definition'
-import { createBattleState, type BattleState } from './defeat-and-victory'
+import { createBattleState } from './defeat-and-victory'
 import {
   enumerateMinimalAiAttackCandidates,
   enumerateMinimalAiMovementCandidates,
@@ -264,7 +264,10 @@ describe('minimal auto AI determinism and validation', () => {
     const expected = selectMinimalAutoAiAction(canonical)
 
     for (let runIndex = 0; runIndex < 100; runIndex += 1) {
-      const input = runIndex % 2 === 0 ? createSameColumnBattle(20) : reverseBattleUnitOrder(createSameColumnBattle(20))
+      const input =
+        runIndex % 2 === 0
+          ? createSameColumnBattle(20)
+          : reverseBattleUnitOrder(createSameColumnBattle(20))
       expect(selectMinimalAutoAiAction(input)).toEqual(expected)
     }
   })
