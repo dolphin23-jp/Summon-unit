@@ -8,7 +8,7 @@
 - [x] T006 — [行動コストと次回行動計算](T006_ACTION_SCHEDULING.md)
 - [x] T007 — [単体技とダメージ計算](T007_SINGLE_TARGET_DAMAGE.md)
 - [x] T008 — [戦闘不能と勝敗判定](T008_DEFEAT_AND_VICTORY.md)
-- [ ] T009 — [戦闘イベントログ](T009_EVENT_LOG.md)
+- [x] T009 — [戦闘イベントログ](T009_EVENT_LOG.md)
 - [ ] T010 — [決定論リファレンステスト](T010_DETERMINISM_TESTS.md)
 - [ ] T011 — [通常移動](T011_NORMAL_MOVEMENT.md)
 - [ ] T012 — [直線射程と遮蔽](T012_DIRECT_RANGE_AND_COVER.md)
