@@ -1,5 +1,12 @@
-import type { HeadlessBattleDefinition, HeadlessBattleRunResult } from '../battle/headless-battle-runner'
-import { ALL_BOARD_POSITIONS, getBoardPositionId, type BoardPosition } from '../battle/board'
+import type {
+  HeadlessBattleDefinition,
+  HeadlessBattleRunResult,
+} from '../battle/headless-battle-runner'
+import {
+  ALL_BOARD_POSITIONS,
+  getBoardPositionId,
+  type BoardPosition,
+} from '../battle/board'
 import type { BattleEvent } from '../battle/event-log'
 import type { BattleOutcome } from '../battle/defeat-and-victory'
 
@@ -70,7 +77,9 @@ function parsePositionId(positionId: string): BoardPosition {
   })
 }
 
-function createSpeciesHpMap(definition: HeadlessBattleDefinition): Readonly<Record<string, number>> {
+function createSpeciesHpMap(
+  definition: HeadlessBattleDefinition,
+): Readonly<Record<string, number>> {
   const hpBySpeciesId: Record<string, number> = {}
   for (const species of definition.species) {
     if (hpBySpeciesId[species.id] !== undefined) {
@@ -88,7 +97,9 @@ export function createInitialBattleReplayFrame(
   const seenUnitIds = new Set<string>()
   const units = definition.units.map((unitDefinition) => {
     if (seenUnitIds.has(unitDefinition.battleUnitId)) {
-      throw new Error(`battleUnitId must be unique: ${unitDefinition.battleUnitId}`)
+      throw new Error(
+        `battleUnitId must be unique: ${unitDefinition.battleUnitId}`,
+      )
     }
     seenUnitIds.add(unitDefinition.battleUnitId)
 
@@ -110,7 +121,9 @@ export function createInitialBattleReplayFrame(
     })
   })
 
-  units.sort((left, right) => compareIds(left.battleUnitId, right.battleUnitId))
+  units.sort((left, right) =>
+    compareIds(left.battleUnitId, right.battleUnitId),
+  )
   return freezeFrame({
     eventIndex: 0,
     virtualTime: 0,
@@ -183,6 +196,9 @@ export function applyBattleEventToReplayFrame(
     case 'battle_started':
     case 'turn_started':
     case 'skill_used':
+    case 'effect_applied':
+    case 'effect_merged':
+    case 'effect_removed':
       break
   }
 
@@ -216,14 +232,18 @@ function assertReplayMatchesResult(
       (candidate) => candidate.battleUnitId === summaryUnit.battleUnitId,
     )
     if (replayUnit === undefined) {
-      throw new Error(`final replay unit is missing: ${summaryUnit.battleUnitId}`)
+      throw new Error(
+        `final replay unit is missing: ${summaryUnit.battleUnitId}`,
+      )
     }
     if (
       replayUnit.hp !== summaryUnit.hp ||
       replayUnit.defeated !== summaryUnit.defeated ||
       replayUnit.positionId !== summaryUnit.positionId
     ) {
-      throw new Error(`final replay unit state does not match: ${summaryUnit.battleUnitId}`)
+      throw new Error(
+        `final replay unit state does not match: ${summaryUnit.battleUnitId}`,
+      )
     }
   }
 }
@@ -232,7 +252,9 @@ export function createBattleReplay(
   definition: HeadlessBattleDefinition,
   result: HeadlessBattleRunResult,
 ): BattleReplay {
-  const frames: BattleReplayFrame[] = [createInitialBattleReplayFrame(definition)]
+  const frames: BattleReplayFrame[] = [
+    createInitialBattleReplayFrame(definition),
+  ]
   for (const event of result.log.events) {
     const currentFrame = frames.at(-1)
     if (currentFrame === undefined) {
@@ -261,7 +283,8 @@ export function getBattleReplayBoardCells(
       const positionId = getBoardPositionId(position)
       const unit =
         frame.units.find(
-          (candidate) => !candidate.defeated && candidate.positionId === positionId,
+          (candidate) =>
+            !candidate.defeated && candidate.positionId === positionId,
         ) ?? null
       return Object.freeze({
         position: freezePosition(position),
@@ -288,6 +311,12 @@ export function formatBattleEventForDisplay(event: BattleEvent): string {
       return `${shortId(event.payload.actorBattleUnitId)}が${shortId(event.payload.skillId)}を${shortId(event.payload.targetBattleUnitId)}へ使用`
     case 'damage_applied':
       return `${shortId(event.payload.targetBattleUnitId)}に${event.payload.appliedDamage}ダメージ（HP ${event.payload.hpAfter}）`
+    case 'effect_applied':
+      return `${shortId(event.payload.targetBattleUnitId)}に${shortId(event.payload.effectId)}を付与`
+    case 'effect_merged':
+      return `${shortId(event.payload.targetBattleUnitId)}の${shortId(event.payload.effectId)}を更新`
+    case 'effect_removed':
+      return `${shortId(event.payload.targetBattleUnitId)}の${shortId(event.payload.effectId)}を解除`
     case 'unit_defeated':
       return `${shortId(event.payload.defeatedBattleUnitId)}が戦闘不能`
     case 'battle_ended':
