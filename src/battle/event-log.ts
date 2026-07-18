@@ -1,4 +1,5 @@
 import type { SkillId } from '../content/skill-definition'
+import { areAdjacent, getBoardPositionId, type BoardPosition } from './board'
 import type { BattleTime } from './action-scheduling'
 import type { BattleOutcome, BattleState, DefeatRecord } from './defeat-and-victory'
 import type { BattleUnitId } from './unit-state'
@@ -6,6 +7,7 @@ import type { BattleUnitId } from './unit-state'
 export const BATTLE_EVENT_KINDS = [
   'battle_started',
   'turn_started',
+  'unit_moved',
   'skill_used',
   'damage_applied',
   'unit_defeated',
@@ -22,6 +24,12 @@ export interface BattleStartedPayload {
 
 export interface TurnStartedPayload {
   readonly battleUnitId: BattleUnitId
+}
+
+export interface UnitMovedPayload {
+  readonly battleUnitId: BattleUnitId
+  readonly fromPositionId: string
+  readonly toPositionId: string
 }
 
 export interface SkillUsedPayload {
@@ -59,6 +67,7 @@ interface BattleEventBase<TKind extends BattleEventKind, TPayload> {
 
 export type BattleStartedEvent = BattleEventBase<'battle_started', BattleStartedPayload>
 export type TurnStartedEvent = BattleEventBase<'turn_started', TurnStartedPayload>
+export type UnitMovedEvent = BattleEventBase<'unit_moved', UnitMovedPayload>
 export type SkillUsedEvent = BattleEventBase<'skill_used', SkillUsedPayload>
 export type DamageAppliedEvent = BattleEventBase<'damage_applied', DamageAppliedPayload>
 export type UnitDefeatedEvent = BattleEventBase<'unit_defeated', UnitDefeatedPayload>
@@ -67,6 +76,7 @@ export type BattleEndedEvent = BattleEventBase<'battle_ended', BattleEndedPayloa
 export type BattleEvent =
   | BattleStartedEvent
   | TurnStartedEvent
+  | UnitMovedEvent
   | SkillUsedEvent
   | DamageAppliedEvent
   | UnitDefeatedEvent
@@ -81,6 +91,13 @@ export type BattleEventInput = BattleEvent extends infer TEvent
 export interface BattleEventLog {
   readonly events: readonly BattleEvent[]
   readonly nextSequence: number
+}
+
+export interface RecordUnitMovedInput {
+  readonly virtualTime: BattleTime
+  readonly battleUnitId: BattleUnitId
+  readonly from: BoardPosition
+  readonly to: BoardPosition
 }
 
 export interface RecordSingleTargetSkillResolutionInput {
@@ -153,6 +170,19 @@ function assertUniqueUnitIds(ids: readonly BattleUnitId[], field: string): void 
   }
 }
 
+function parseBoardPositionId(positionId: string, field: string): BoardPosition {
+  const match = /^(ALLY|ENEMY):([0-2]):([0-2])$/.exec(positionId)
+  if (match === null) {
+    throw new Error(`${field} must be a valid board position id`)
+  }
+
+  return {
+    side: match[1] as BoardPosition['side'],
+    row: Number(match[2]) as BoardPosition['row'],
+    column: Number(match[3]) as BoardPosition['column'],
+  }
+}
+
 export function assertValidBattleEvent(event: BattleEvent): void {
   assertSafeIntegerAtLeast(event.sequence, 0, 'event.sequence')
   assertSafeIntegerAtLeast(event.virtualTime, 0, 'event.virtualTime')
@@ -187,6 +217,15 @@ export function assertValidBattleEvent(event: BattleEvent): void {
     case 'turn_started':
       assertNonEmptyId(event.payload.battleUnitId, 'battleUnitId')
       return
+    case 'unit_moved': {
+      assertNonEmptyId(event.payload.battleUnitId, 'battleUnitId')
+      const from = parseBoardPositionId(event.payload.fromPositionId, 'fromPositionId')
+      const to = parseBoardPositionId(event.payload.toPositionId, 'toPositionId')
+      if (!areAdjacent(from, to)) {
+        throw new Error('unit_moved positions must be adjacent on the same side')
+      }
+      return
+    }
     case 'skill_used':
       assertNonEmptyId(event.payload.actorBattleUnitId, 'actorBattleUnitId')
       assertNonEmptyId(event.payload.targetBattleUnitId, 'targetBattleUnitId')
@@ -322,6 +361,24 @@ export function recordTurnStarted(
     kind: 'turn_started',
     virtualTime,
     payload: { battleUnitId },
+  })
+}
+
+export function recordUnitMoved(
+  log: BattleEventLog,
+  input: RecordUnitMovedInput,
+): BattleEventLog {
+  assertNonEmptyId(input.battleUnitId, 'battleUnitId')
+  assertSafeIntegerAtLeast(input.virtualTime, 0, 'virtualTime')
+
+  return appendBattleEvent(log, {
+    kind: 'unit_moved',
+    virtualTime: input.virtualTime,
+    payload: {
+      battleUnitId: input.battleUnitId,
+      fromPositionId: getBoardPositionId(input.from),
+      toPositionId: getBoardPositionId(input.to),
+    },
   })
 }
 
