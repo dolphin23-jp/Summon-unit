@@ -4,6 +4,16 @@ import {
   type MonsterSpecies,
   type SpeciesId,
 } from '../content/monster-species'
+import {
+  assertValidActiveEffectCollection,
+  freezeActiveEffectCollection,
+  registerActiveEffect,
+  removeActiveEffect,
+  type ActiveEffectMutation,
+  type ActiveEffectState,
+  type EffectRemovalReason,
+  type RegisterActiveEffectInput,
+} from './effect-framework'
 
 export type BattleUnitId = string
 export type UnitInstanceId = string
@@ -15,6 +25,7 @@ export interface BattleUnitState {
   readonly side: Side
   readonly position: BoardPosition
   readonly hp: number
+  readonly effects: readonly ActiveEffectState[]
   readonly defeated: boolean
 }
 
@@ -23,6 +34,12 @@ export interface CreateBattleUnitStateInput {
   readonly sourceInstanceId?: UnitInstanceId | null
   readonly position: BoardPosition
   readonly initialHp?: number
+  readonly initialEffects?: readonly ActiveEffectState[]
+}
+
+export interface BattleUnitEffectUpdate {
+  readonly state: BattleUnitState
+  readonly mutation: ActiveEffectMutation | null
 }
 
 function assertNonEmptyId(value: string, fieldName: string): void {
@@ -57,6 +74,7 @@ export function assertValidBattleUnitState(
   }
 
   assertValidHp(state.hp, species.stats.hp)
+  assertValidActiveEffectCollection(state.effects, state.battleUnitId)
 
   if (state.defeated !== (state.hp === 0)) {
     throw new Error('state.defeated must be true exactly when state.hp is 0')
@@ -85,6 +103,7 @@ export function createBattleUnitState(
     side: input.position.side,
     position: { ...input.position },
     hp,
+    effects: freezeActiveEffectCollection(input.initialEffects ?? [], input.battleUnitId),
     defeated: hp === 0,
   }
 
@@ -108,4 +127,43 @@ export function withBattleUnitHp(
 
   assertValidBattleUnitState(nextState, species)
   return nextState
+}
+
+export function withRegisteredBattleUnitEffect(
+  state: BattleUnitState,
+  species: MonsterSpecies,
+  input: RegisterActiveEffectInput,
+): BattleUnitEffectUpdate {
+  assertValidBattleUnitState(state, species)
+  if (input.targetBattleUnitId !== state.battleUnitId) {
+    throw new Error('effect target must match the owning battle unit')
+  }
+
+  const update = registerActiveEffect(state.effects, input)
+  const nextState: BattleUnitState = {
+    ...state,
+    effects: update.effects,
+  }
+  assertValidBattleUnitState(nextState, species)
+  return Object.freeze({ state: nextState, mutation: update.mutation })
+}
+
+export function withoutBattleUnitEffect(
+  state: BattleUnitState,
+  species: MonsterSpecies,
+  activeEffectId: string,
+  reason: EffectRemovalReason = 'SCRIPT',
+): BattleUnitEffectUpdate {
+  assertValidBattleUnitState(state, species)
+  const update = removeActiveEffect(state.effects, activeEffectId, reason)
+  if (update.mutation === null) {
+    return Object.freeze({ state, mutation: null })
+  }
+
+  const nextState: BattleUnitState = {
+    ...state,
+    effects: update.effects,
+  }
+  assertValidBattleUnitState(nextState, species)
+  return Object.freeze({ state: nextState, mutation: update.mutation })
 }
