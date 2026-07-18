@@ -4,6 +4,8 @@ import {
   assertValidBattleUnitState,
   createBattleUnitState,
   withBattleUnitHp,
+  withRegisteredBattleUnitEffect,
+  withoutBattleUnitEffect,
   type BattleUnitState,
 } from './unit-state'
 import type { MonsterSpecies } from '../content/monster-species'
@@ -40,9 +42,39 @@ describe('battle unit state', () => {
       side: 'ALLY',
       position: allyFrontCenter,
       hp: 120,
+      effects: [],
       defeated: false,
     })
     expect(state.position).not.toBe(allyFrontCenter)
+    expect(Object.isFrozen(state.effects)).toBe(true)
+  })
+
+  it('registers and removes active effects without mutating the previous unit state', () => {
+    const initial = createBattleUnitState(species, {
+      battleUnitId: 'battle-unit.ally.001',
+      position: allyFrontCenter,
+    })
+    const registered = withRegisteredBattleUnitEffect(initial, species, {
+      effectId: 'effect.attack-up',
+      sourceBattleUnitId: 'battle-unit.ally.002',
+      targetBattleUnitId: initial.battleUnitId,
+      strength: 20,
+      duration: { unit: 'TARGET_ACTIONS', remaining: 3 },
+      appliedAt: 100,
+      applicationSequence: 4,
+    })
+    const removed = withoutBattleUnitEffect(
+      registered.state,
+      species,
+      registered.state.effects[0].activeEffectId,
+      'DISPELLED',
+    )
+
+    expect(initial.effects).toEqual([])
+    expect(registered.state.effects).toHaveLength(1)
+    expect(registered.mutation?.kind).toBe('APPLIED')
+    expect(removed.state.effects).toEqual([])
+    expect(removed.mutation).toMatchObject({ kind: 'REMOVED', reason: 'DISPELLED' })
   })
 
   it('keeps multiple units of the same species separate through explicit fixed IDs', () => {
@@ -132,6 +164,25 @@ describe('battle unit state', () => {
     expect(() => assertValidBattleUnitState(speciesMismatch, species)).toThrow(
       'state.speciesId must match species.id',
     )
+  })
+
+  it('rejects an effect owned by another battle unit', () => {
+    const initial = createBattleUnitState(species, {
+      battleUnitId: 'battle-unit.ally.001',
+      position: allyFrontCenter,
+    })
+
+    expect(() =>
+      withRegisteredBattleUnitEffect(initial, species, {
+        effectId: 'effect.attack-up',
+        sourceBattleUnitId: 'battle-unit.ally.002',
+        targetBattleUnitId: 'battle-unit.ally.other',
+        strength: 20,
+        duration: { unit: 'TARGET_ACTIONS', remaining: 3 },
+        appliedAt: 100,
+        applicationSequence: 4,
+      }),
+    ).toThrow('effect target must match the owning battle unit')
   })
 
   it('rejects empty persistent IDs and invalid master HP', () => {
