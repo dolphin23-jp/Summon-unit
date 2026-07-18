@@ -4,7 +4,7 @@
 - [x] T002 — [開発環境・テスト・CI・Vercelを整える](T002_TOOLCHAIN_CI_VERCEL.md)
 - [x] T003 — [盤面座標と陣営モデル](T003_BOARD_COORDINATES.md)
 - [x] T004 — [ユニット戦闘状態モデル](T004_BATTLE_UNIT_STATE.md)
-- [ ] T005 — [安定順序を持つタイムラインキュー](T005_TIMELINE_QUEUE.md)
+- [x] T005 — [安定順序を持つタイムラインキュー](T005_TIMELINE_QUEUE.md)
 - [ ] T006 — [行動コストと次回行動計算](T006_ACTION_SCHEDULING.md)
 - [ ] T007 — [単体技とダメージ計算](T007_SINGLE_TARGET_DAMAGE.md)
 - [ ] T008 — [戦闘不能と勝敗判定](T008_DEFEAT_AND_VICTORY.md)
