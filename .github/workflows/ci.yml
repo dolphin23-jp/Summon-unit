@@ -34,7 +34,20 @@ jobs:
         run: pnpm test
 
       - name: Lint
-        run: pnpm lint
+        id: lint
+        continue-on-error: true
+        run: pnpm lint > lint-report.txt 2>&1
+
+      - name: Upload lint report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-report
+          path: lint-report.txt
+
+      - name: Enforce lint result
+        if: steps.lint.outcome == 'failure'
+        run: exit 1
 
       - name: Build
         run: pnpm build
