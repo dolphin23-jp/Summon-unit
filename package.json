@@ -15,7 +15,8 @@
     "test:watch": "vitest",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "demo:headless": "tsc -p tsconfig.headless.json && node -e \"require('fs').writeFileSync('.headless-dist/package.json', '{\\\"type\\\":\\\"commonjs\\\"}')\" && node .headless-dist/scripts/headless-battle-demo.js && node -e \"require('fs').rmSync('.headless-dist', { recursive: true, force: true })\""
   },
   "dependencies": {
     "react": "18.3.1",
