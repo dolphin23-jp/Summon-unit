@@ -122,7 +122,10 @@ function freezeEvent(event: BattleEvent): BattleEvent {
     })
   }
 
-  return Object.freeze({ ...event, payload: Object.freeze({ ...event.payload }) })
+  return Object.freeze({
+    ...event,
+    payload: Object.freeze({ ...event.payload }),
+  }) as BattleEvent
 }
 
 function freezeLog(events: readonly BattleEvent[]): BattleEventLog {
