@@ -18,6 +18,7 @@ import type { ResearchNodeDefinition } from './research-model'
 import type { ResearchNodeDefinition } from './research-model'
 import type { ResearchNodeDefinition } from './research-model'
 import type { ResearchNodeDefinition } from './research-model'
+import type { ResearchNodeDefinition } from './research-model'
 import type { T036ProgressionCatalog } from './t036-progression-model'
 import {
   assertResearchFacilityAllowsRarity,
