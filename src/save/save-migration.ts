@@ -1,20 +1,5 @@
 import type { PlayerData, PlayerDataContentCatalog } from '../progression/player-data'
 import { createStagePlayerData } from '../progression/stage-reward'
-import {
-  SAVE_SLOT_IDS,
-  createEmptySaveSlotSummary,
-  createSaveSlotSummary,
-  validateSaveGenerationEnvelope,
-  validateSaveGenerationRecord,
-  type SaveGenerationRecord,
-  type SaveSlotId,
-  type SaveSlotSummary,
-} from './save-model'
-import {
-  savePlayerDataAtomic,
-  type LoadSaveSlotResult,
-  type SaveRepository,
-} from './save-repository'
 
 export const CURRENT_PLAYER_DATA_SCHEMA_VERSION = 6
 
@@ -49,30 +34,6 @@ export interface MigratePlayerDataToCurrentResult {
   readonly appliedMigrations: readonly AppliedPlayerDataMigration[]
 }
 
-export interface SaveMigrationRuntime {
-  readonly plan?: PlayerDataMigrationPlan
-  readonly now?: () => number
-  readonly createGenerationId: (input: {
-    readonly slotId: SaveSlotId
-    readonly savedAtEpochMs: number
-    readonly sourceGenerationId: string
-    readonly fromSchemaVersion: number
-    readonly toSchemaVersion: number
-  }) => string
-}
-
-export interface SaveSlotMigrationReceipt {
-  readonly sourceGenerationId: string
-  readonly backupGenerationId: string
-  readonly fromSchemaVersion: number
-  readonly toSchemaVersion: number
-  readonly appliedMigrations: readonly AppliedPlayerDataMigration[]
-}
-
-export interface LoadSaveSlotWithMigrationResult extends LoadSaveSlotResult {
-  readonly migration: SaveSlotMigrationReceipt | null
-}
-
 function assertSafeSchemaVersion(value: unknown, field: string): asserts value is number {
   if (!Number.isSafeInteger(value) || (value as number) < 1) {
     throw new Error(`${field} must be a positive safe integer`)
@@ -101,7 +62,9 @@ export function getPlayerDataSchemaVersion(playerData: unknown): number {
   return playerData.schemaVersion
 }
 
-export function createPlayerDataMigrationPlan(input: PlayerDataMigrationPlan): PlayerDataMigrationPlan {
+export function createPlayerDataMigrationPlan(
+  input: PlayerDataMigrationPlan,
+): PlayerDataMigrationPlan {
   assertSafeSchemaVersion(input.targetSchemaVersion, 'migration targetSchemaVersion')
   const byFromVersion = new Map<number, PlayerDataMigrationStep>()
   for (const step of input.steps) {
@@ -122,7 +85,11 @@ export function createPlayerDataMigrationPlan(input: PlayerDataMigrationPlan): P
   }
   return Object.freeze({
     targetSchemaVersion: input.targetSchemaVersion,
-    steps: Object.freeze([...byFromVersion.values()].sort((left, right) => left.fromVersion - right.fromVersion)),
+    steps: Object.freeze(
+      [...byFromVersion.values()].sort(
+        (left, right) => left.fromVersion - right.fromVersion,
+      ),
+    ),
   })
 }
 
@@ -238,7 +205,10 @@ export function migratePlayerDataToCurrent(
     )
   }
   const migration = applyPlayerDataMigrations(input, migrationPlan)
-  const playerData = createStagePlayerData(migration.playerData as unknown as PlayerData, catalog)
+  const playerData = createStagePlayerData(
+    migration.playerData as unknown as PlayerData,
+    catalog,
+  )
   if (playerData.schemaVersion !== CURRENT_PLAYER_DATA_SCHEMA_VERSION) {
     throw new Error(
       `migrated PlayerData must use schema ${CURRENT_PLAYER_DATA_SCHEMA_VERSION}`,
@@ -249,108 +219,4 @@ export function migratePlayerDataToCurrent(
     originalSchemaVersion: migration.originalSchemaVersion,
     appliedMigrations: migration.appliedMigrations,
   })
-}
-
-function validateCommittedEnvelope(
-  record: SaveGenerationRecord,
-  slotId: SaveSlotId,
-): SaveGenerationRecord {
-  const envelope = validateSaveGenerationEnvelope(record)
-  if (envelope.state !== 'COMMITTED') throw new Error('not committed')
-  if (envelope.slotId !== slotId) throw new Error(`belongs to ${envelope.slotId}`)
-  return envelope
-}
-
-export async function loadSaveSlotWithMigration(
-  repository: SaveRepository,
-  slotId: SaveSlotId,
-  catalog: PlayerDataContentCatalog,
-  runtime: SaveMigrationRuntime,
-): Promise<LoadSaveSlotWithMigrationResult | null> {
-  const pointer = await repository.readSlotPointer(slotId)
-  if (pointer === null) return null
-  const migrationPlan = runtime.plan ?? DEFAULT_PLAYER_DATA_MIGRATION_PLAN
-  const now = runtime.now ?? Date.now
-  const generationIds = [pointer.currentGenerationId, ...pointer.backupGenerationIds]
-  const failures: string[] = []
-
-  for (let index = 0; index < generationIds.length; index += 1) {
-    const generationId = generationIds[index]
-    const stored = await repository.readGeneration(generationId)
-    if (stored === null) {
-      failures.push(`${generationId}: missing`)
-      continue
-    }
-    try {
-      const envelope = validateCommittedEnvelope(stored, slotId)
-      const sourceSchemaVersion = getPlayerDataSchemaVersion(envelope.playerData)
-      if (sourceSchemaVersion === migrationPlan.targetSchemaVersion) {
-        const validated = validateSaveGenerationRecord(envelope, catalog)
-        return Object.freeze({
-          playerData: validated.playerData,
-          record: validated,
-          pointer,
-          recoveredFromBackup: index > 0,
-          migration: null,
-        })
-      }
-
-      const migrated = migratePlayerDataToCurrent(envelope.playerData, catalog, migrationPlan)
-      const savedAtEpochMs = now()
-      const saved = await savePlayerDataAtomic(
-        repository,
-        migrated.playerData,
-        catalog,
-        {
-          slotId,
-          generationId: runtime.createGenerationId({
-            slotId,
-            savedAtEpochMs,
-            sourceGenerationId: envelope.generationId,
-            fromSchemaVersion: migrated.originalSchemaVersion,
-            toSchemaVersion: migrationPlan.targetSchemaVersion,
-          }),
-          savedAtEpochMs,
-          preferredBackupGenerationId: envelope.generationId,
-        },
-      )
-      return Object.freeze({
-        playerData: saved.playerData,
-        record: saved.record,
-        pointer: saved.pointer,
-        recoveredFromBackup: index > 0,
-        migration: Object.freeze({
-          sourceGenerationId: envelope.generationId,
-          backupGenerationId: envelope.generationId,
-          fromSchemaVersion: migrated.originalSchemaVersion,
-          toSchemaVersion: migrationPlan.targetSchemaVersion,
-          appliedMigrations: migrated.appliedMigrations,
-        }),
-      })
-    } catch (error) {
-      failures.push(`${generationId}: ${error instanceof Error ? error.message : String(error)}`)
-    }
-  }
-
-  throw new Error(`save slot ${slotId} has no valid generation (${failures.join('; ')})`)
-}
-
-export async function listSaveSlotSummariesWithMigration(
-  repository: SaveRepository,
-  catalog: PlayerDataContentCatalog,
-  runtime: SaveMigrationRuntime,
-): Promise<readonly SaveSlotSummary[]> {
-  const summaries = await Promise.all(
-    SAVE_SLOT_IDS.map(async (slotId) => {
-      const loaded = await loadSaveSlotWithMigration(repository, slotId, catalog, runtime)
-      return loaded === null
-        ? createEmptySaveSlotSummary(slotId)
-        : createSaveSlotSummary({
-            pointer: loaded.pointer,
-            record: loaded.record,
-            recoveredFromBackup: loaded.recoveredFromBackup,
-          })
-    }),
-  )
-  return Object.freeze(summaries)
 }
