@@ -1,85 +1,10 @@
 
 [1m[46m RUN [49m[22m [36mv3.2.7 [39m[90m/home/runner/work/Summon-unit/Summon-unit[39m
 
- [31m❯[39m src/battle/interactive-battle-stable-snapshot.test.ts [2m([22m[2m3 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[32m 196[2mms[22m[39m
-   [32m✓[39m interactive battle stable snapshots[2m > [22mround-trips through JSON and resumes to the same deterministic result[32m 161[2mms[22m[39m
-[31m   [31m×[31m interactive battle stable snapshots[2m > [22mpreserves a pending request for the next ally manual action[39m[32m 28[2mms[22m[39m
-[31m     → expected { …(9) } to deeply equal { …(9) }[39m
-   [32m✓[39m interactive battle stable snapshots[2m > [22mrefuses to capture the partially processed manual selection state[32m 6[2mms[22m[39m
+ [32m✓[39m src/battle/interactive-battle-stable-snapshot.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 156[2mms[22m[39m
 
-[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m3 passed[39m[22m[90m (3)[39m
+[2m   Start at [22m 17:36:52
+[2m   Duration [22m 926ms[2m (transform 387ms, setup 0ms, collect 457ms, tests 156ms, environment 0ms, prepare 83ms)[22m
 
-[41m[1m FAIL [22m[49m src/battle/interactive-battle-stable-snapshot.test.ts[2m > [22minteractive battle stable snapshots[2m > [22mpreserves a pending request for the next ally manual action
-[31m[1mAssertionError[22m: expected { …(9) } to deeply equal { …(9) }[39m
-
-[32m- Expected[39m
-[31m+ Received[39m
-
-[33m@@ -278,26 +278,26 @@[39m
-[2m          "value": 0,[22m
-[2m        },[22m
-[2m        {[22m
-[2m          "id": "attack.overkill-penalty",[22m
-[2m          "priority": 12,[22m
-[32m-         "value": -0,[39m
-[31m+         "value": 0,[39m
-[2m        },[22m
-[2m        {[22m
-[2m          "id": "attack.heavy-skill-waste-penalty",[22m
-[2m          "priority": 13,[22m
-[32m-         "value": -0,[39m
-[31m+         "value": 0,[39m
-[2m        },[22m
-[2m        {[22m
-[2m          "id": "support.actual-healing",[22m
-[2m          "priority": 20,[22m
-[2m          "value": 0,[22m
-[2m        },[22m
-[2m        {[22m
-[2m          "id": "support.overheal-penalty",[22m
-[2m          "priority": 21,[22m
-[32m-         "value": -0,[39m
-[31m+         "value": 0,[39m
-[2m        },[22m
-[2m        {[22m
-[2m          "id": "support.rescue-before-enemy-action",[22m
-[2m          "priority": 22,[22m
-[2m          "value": 0,[22m
-[33m@@ -328,16 +328,16 @@[39m
-[2m          "value": 0,[22m
-[2m        },[22m
-[2m        {[22m
-[2m          "id": "position.static-danger-penalty",[22m
-[2m          "priority": 33,[22m
-[32m-         "value": -0,[39m
-[31m+         "value": 0,[39m
-[2m        },[22m
-[2m        {[22m
-[2m          "id": "position.backtrack-penalty",[22m
-[2m          "priority": 34,[22m
-[32m-         "value": -0,[39m
-[31m+         "value": 0,[39m
-[2m        },[22m
-[2m        {[22m
-[2m          "id": "telegraph.response",[22m
-[2m          "priority": 40,[22m
-[2m          "value": 0,[22m
-
-[36m [2m❯[22m src/battle/interactive-battle-stable-snapshot.test.ts:[2m42:19[22m[39m
-    [90m 40| [39m    }
-    [90m 41| [39m
-    [90m 42| [39m    [34mexpect[39m(right)[33m.[39m[34mtoEqual[39m(left)
-    [90m   | [39m                  [31m^[39m
-    [90m 43| [39m    [34mexpect[39m(right[33m.[39mstatus)[33m.[39m[34mtoBe[39m([32m'AWAITING_MANUAL_ACTION'[39m)
-    [90m 44| [39m  })
-
-[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
-
-
-[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
-[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m2 passed[39m[22m[90m (3)[39m
-[2m   Start at [22m 17:35:29
-[2m   Duration [22m 999ms[2m (transform 388ms, setup 0ms, collect 459ms, tests 196ms, environment 0ms, prepare 112ms)[22m
-
-
-::error file=/home/runner/work/Summon-unit/Summon-unit/src/battle/interactive-battle-stable-snapshot.test.ts,title=src/battle/interactive-battle-stable-snapshot.test.ts > interactive battle stable snapshots > preserves a pending request for the next ally manual action,line=42,column=19::AssertionError: expected { …(9) } to deeply equal { …(9) }%0A%0A- Expected%0A+ Received%0A%0A@@ -278,26 +278,26 @@%0A          "value": 0,%0A        },%0A        {%0A          "id": "attack.overkill-penalty",%0A          "priority": 12,%0A-         "value": -0,%0A+         "value": 0,%0A        },%0A        {%0A          "id": "attack.heavy-skill-waste-penalty",%0A          "priority": 13,%0A-         "value": -0,%0A+         "value": 0,%0A        },%0A        {%0A          "id": "support.actual-healing",%0A          "priority": 20,%0A          "value": 0,%0A        },%0A        {%0A          "id": "support.overheal-penalty",%0A          "priority": 21,%0A-         "value": -0,%0A+         "value": 0,%0A        },%0A        {%0A          "id": "support.rescue-before-enemy-action",%0A          "priority": 22,%0A          "value": 0,%0A@@ -328,16 +328,16 @@%0A          "value": 0,%0A        },%0A        {%0A          "id": "position.static-danger-penalty",%0A          "priority": 33,%0A-         "value": -0,%0A+         "value": 0,%0A        },%0A        {%0A          "id": "position.backtrack-penalty",%0A          "priority": 34,%0A-         "value": -0,%0A+         "value": 0,%0A        },%0A        {%0A          "id": "telegraph.response",%0A          "priority": 40,%0A          "value": 0,%0A%0A ❯ src/battle/interactive-battle-stable-snapshot.test.ts:42:19%0A%0A
