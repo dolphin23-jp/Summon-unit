@@ -24,5 +24,6 @@
 - [x] T022 — [予兆・設置物・領域](T022_TELEGRAPH_OBJECTS_REGIONS.md)
 - [x] T023 — [召喚・蘇生](T023_SUMMON_REVIVE.md)
 - [x] T024 — [決定論リファレンスv2](T024_DETERMINISM_REFERENCE_V2.md)
+- [x] T025 — [AI評価基盤](T025_AI_EVALUATION_FOUNDATION.md)
 
-T001～T024 complete. Next: T025.
+T001～T025 complete. Next: T026.
