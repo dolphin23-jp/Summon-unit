@@ -21,7 +21,7 @@ jobs:
         run: |
           git clone --quiet --depth 1 --branch agent/t030-manual-preview "https://x-access-token:${GH_TOKEN}@github.com/dolphin23-jp/Summon-unit.git" repo
           cd repo
-          base64 --decode .agent/t030-patch.tar.gz.b64 > /tmp/t030-patch.tar.gz
+          cp .agent/t030-patch.tar.gz.b64 /tmp/t030-patch.tar.gz
           tar -xzf /tmp/t030-patch.tar.gz -C /tmp
           if ! python /tmp/apply_t030.py > /tmp/t030-materialize.log 2>&1; then
             cat /tmp/t030-materialize.log
