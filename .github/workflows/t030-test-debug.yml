@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - agent/t030-manual-preview
+  pull_request:
 
 permissions:
   contents: read
