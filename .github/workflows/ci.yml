@@ -25,6 +25,7 @@ jobs:
           base64 --decode /tmp/t030-small.b64 > /tmp/t030-patch.tar.gz
           gzip --test /tmp/t030-patch.tar.gz
           tar -xzf /tmp/t030-patch.tar.gz -C /tmp
+          python .agent/fix-t030-script.py
           if ! python /tmp/apply_t030.py > /tmp/t030-materialize.log 2>&1; then
             cat /tmp/t030-materialize.log
             exit 1
