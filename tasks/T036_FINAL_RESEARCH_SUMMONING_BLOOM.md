@@ -6,7 +6,7 @@ T035で`known`となった研究ノードを、研究データ・触媒・必要
 
 ## 参照仕様
 
-- `docs/06_MONSTERS_AND_GROWTH.md`
+- `docs/06_SKILL_SYSTEM.md`
 - `docs/09_RESEARCH_SYSTEM.md`
 - `docs/10_PROGRESSION_AND_ECONOMY.md`
 - `docs/11_SAVE_AND_COMPATIBILITY.md`
