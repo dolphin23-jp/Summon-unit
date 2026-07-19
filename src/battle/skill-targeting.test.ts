@@ -29,7 +29,7 @@ function createSkill(targetType: SkillTargetType): SkillDefinition {
 function createBattle() {
   const actor = createBattleUnitState(species, {
     battleUnitId: 'ally.actor',
-    position: { side: 'ALLY', row: 1, column: 1 },
+    position: { side: 'ALLY', row: 0, column: 0 },
   })
   const allyAdjacentA = createBattleUnitState(species, {
     battleUnitId: 'ally.a',
@@ -37,11 +37,11 @@ function createBattle() {
   })
   const allyAdjacentB = createBattleUnitState(species, {
     battleUnitId: 'ally.b',
-    position: { side: 'ALLY', row: 1, column: 2 },
+    position: { side: 'ALLY', row: 1, column: 0 },
   })
   const allyFar = createBattleUnitState(species, {
     battleUnitId: 'ally.far',
-    position: { side: 'ALLY', row: 2, column: 0 },
+    position: { side: 'ALLY', row: 2, column: 2 },
   })
   const enemyA = createBattleUnitState(species, {
     battleUnitId: 'enemy.a',
