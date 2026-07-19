@@ -95,6 +95,11 @@ function getEffectContribution(
     direction = rule.buffDirection
   } else if (effect.effectId === rule.debuffEffectId) {
     direction = -rule.buffDirection
+  } else if (
+    rule.stat === 'HEALING_RECEIVED' &&
+    effect.effectId === 'effect.status.healing-inhibition'
+  ) {
+    direction = -1
   }
   if (direction === 0) {
     return 0n
