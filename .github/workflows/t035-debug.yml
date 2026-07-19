@@ -11,7 +11,6 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          echo "head=$GITHUB_HEAD_REF repo=$GITHUB_REPOSITORY"
           git clone --depth=1 --branch "$GITHUB_HEAD_REF" "https://github.com/$GITHUB_REPOSITORY.git" repo
       - name: Enable pnpm
         shell: bash
@@ -23,7 +22,7 @@ jobs:
       - name: Install dependencies
         shell: bash
         working-directory: repo
-        run: pnpm install --frozen-lockfile --reporter=append-only
+        run: pnpm install --no-frozen-lockfile --reporter=silent
       - name: Run concise test output
         shell: bash
         working-directory: repo
