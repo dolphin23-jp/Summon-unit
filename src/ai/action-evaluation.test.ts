@@ -11,6 +11,7 @@ import {
   evaluateAiActionPreview,
   previewAiActionCandidate,
   selectBestAiActionEvaluation,
+  type AiActionResultPreview,
   type AiEvaluationInput,
   type AiPreviewScorer,
   type AiSkillActionCandidate,
@@ -289,13 +290,13 @@ describe('AI action evaluation foundation', () => {
       Object.freeze({
         id: 'immediate-damage',
         priority: 20,
-        score: (preview) =>
+        score: (preview: AiActionResultPreview) =>
           preview.kind === 'USE_SKILL' ? preview.totalAppliedDamage : 0,
       }),
       Object.freeze({
         id: 'action-cost',
         priority: 10,
-        score: (preview) => -preview.actionCost,
+        score: (preview: AiActionResultPreview) => -preview.actionCost,
       }),
     ])
     const best = selectBestAiActionEvaluation(input, scorers)
@@ -324,7 +325,7 @@ describe('AI action evaluation foundation', () => {
     const scorer: AiPreviewScorer = Object.freeze({
       id: 'damage-minus-cost',
       priority: 0,
-      score: (preview) =>
+      score: (preview: AiActionResultPreview) =>
         (preview.kind === 'USE_SKILL' ? preview.totalAppliedDamage : 0) -
         preview.actionCost,
     })
