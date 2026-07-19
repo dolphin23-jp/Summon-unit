@@ -21,7 +21,7 @@ jobs:
         run: |
           git clone --quiet --depth 1 --branch agent/t030-manual-preview-v2 "https://x-access-token:${GH_TOKEN}@github.com/dolphin23-jp/Summon-unit.git" repo
           cd repo
-          cat .agent/t030-small-00.b64 .agent/t030-small-01.b64 .agent/t030-small-02.b64 .agent/t030-small-03.b64 .agent/t030-small-04.b64 > /tmp/t030-small.b64
+          cat .agent/t030-small-00.b64 .agent/t030-small-01.b64 .agent/t030-small-02.b64 .agent/t030-small-03a.b64 .agent/t030-small-03b.b64 .agent/t030-small-04.b64 > /tmp/t030-small.b64
           base64 --decode /tmp/t030-small.b64 > /tmp/t030-patch.tar.gz
           gzip --test /tmp/t030-patch.tar.gz
           tar -xzf /tmp/t030-patch.tar.gz -C /tmp
