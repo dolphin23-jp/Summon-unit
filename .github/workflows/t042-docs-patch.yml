@@ -1,0 +1,24 @@
+name: Apply T042 documentation
+
+on:
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/t042-export-import-battle-resume
+      - name: Patch documentation
+        run: python tools/t042_patch_docs.py
+      - name: Commit documentation
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add docs/11_SAVE_AND_COMPATIBILITY.md docs/12_UI_UX.md docs/16_DATA_SCHEMAS.md
+          git commit -m "Document T042 save transfer and battle resume"
+          git push
