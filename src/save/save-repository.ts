@@ -2,6 +2,7 @@ import type { PlayerData, PlayerDataContentCatalog } from '../progression/player
 import {
   MAX_SAVE_BACKUP_GENERATIONS,
   SAVE_SLOT_IDS,
+  createCommittedSaveGeneration,
   createEmptySaveSlotSummary,
   createSaveGenerationRecord,
   createSaveSlotSummary,
@@ -78,14 +79,10 @@ export async function savePlayerDataAtomic(
       maximumBackupGenerations: MAX_SAVE_BACKUP_GENERATIONS,
     })
     committed = true
-    const current = await repository.readGeneration(pointer.currentGenerationId)
-    if (current === null) {
-      throw new Error(`committed save generation is missing: ${pointer.currentGenerationId}`)
+    if (pointer.currentGenerationId !== verified.generationId) {
+      throw new Error('save repository committed a different generation')
     }
-    const record = validateSaveGenerationRecord(current, catalog)
-    if (record.state !== 'COMMITTED') {
-      throw new Error(`committed save generation has invalid state: ${record.generationId}`)
-    }
+    const record = createCommittedSaveGeneration(verified)
     return Object.freeze({ playerData: record.playerData, record, pointer })
   } finally {
     if (!committed) {
