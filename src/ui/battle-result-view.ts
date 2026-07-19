@@ -4,14 +4,21 @@ import type {
 } from '../battle/headless-battle-runner'
 import type { BattleOutcome } from '../battle/defeat-and-victory'
 import type { Side } from '../battle/board'
+import type { StageBattleSettlement } from '../progression/stage-reward'
 
 export type BattleResultTone = 'VICTORY' | 'DEFEAT' | 'DRAW' | 'LIMIT'
+
+export interface BattleResultCatalystView {
+  readonly catalystId: string
+  readonly amount: number
+}
 
 export interface BattleResultRewardView {
   readonly currency: number
   readonly researchData: number
   readonly catalyst: number
-  readonly stub: true
+  readonly catalysts: readonly BattleResultCatalystView[]
+  readonly stub: boolean
 }
 
 export interface BattleResultAnalysisView {
@@ -47,6 +54,7 @@ export interface BattleResultView {
   readonly repairCost: number
   readonly analysisChanges: readonly BattleResultAnalysisView[]
   readonly notifications: readonly string[]
+  readonly regionalPoints: { readonly before: number; readonly after: number } | null
   readonly unitStats: readonly BattleResultUnitStatsView[]
 }
 
@@ -99,16 +107,47 @@ function presentationForTone(tone: BattleResultTone): {
   }
 }
 
-function rewardForTone(tone: BattleResultTone): BattleResultRewardView {
+function stubRewardForTone(tone: BattleResultTone): BattleResultRewardView {
   switch (tone) {
     case 'VICTORY':
-      return Object.freeze({ currency: 120, researchData: 35, catalyst: 1, stub: true })
+      return Object.freeze({
+        currency: 120,
+        researchData: 35,
+        catalyst: 1,
+        catalysts: Object.freeze([{ catalystId: 'stub.catalyst', amount: 1 }]),
+        stub: true,
+      })
     case 'DRAW':
-      return Object.freeze({ currency: 45, researchData: 12, catalyst: 0, stub: true })
+      return Object.freeze({
+        currency: 45,
+        researchData: 12,
+        catalyst: 0,
+        catalysts: Object.freeze([]),
+        stub: true,
+      })
     case 'DEFEAT':
     case 'LIMIT':
-      return Object.freeze({ currency: 20, researchData: 6, catalyst: 0, stub: true })
+      return Object.freeze({
+        currency: 20,
+        researchData: 6,
+        catalyst: 0,
+        catalysts: Object.freeze([]),
+        stub: true,
+      })
   }
+}
+
+function settledReward(settlement: StageBattleSettlement): BattleResultRewardView {
+  const catalysts = Object.freeze(
+    settlement.rewards.total.catalysts.map((catalyst) => Object.freeze({ ...catalyst })),
+  )
+  return Object.freeze({
+    currency: settlement.rewards.total.currency,
+    researchData: settlement.rewards.total.researchData,
+    catalyst: catalysts.reduce((total, catalyst) => total + catalyst.amount, 0),
+    catalysts,
+    stub: false,
+  })
 }
 
 function analysisChangeForTone(tone: BattleResultTone): number {
@@ -145,10 +184,10 @@ function notificationsForTone(
   return Object.freeze(['戦闘観察記録が研究ノートへ追加されました（スタブ）'])
 }
 
-export function createBattleResultView(
+function createUnitStats(
   definition: HeadlessBattleDefinition,
   result: HeadlessBattleRunResult,
-): BattleResultView {
+): readonly BattleResultUnitStatsView[] {
   const speciesMaxHp = new Map(definition.species.map((species) => [species.id, species.stats.hp]))
   const statsById = new Map<string, MutableUnitStats>()
 
@@ -177,44 +216,32 @@ export function createBattleResultView(
     switch (event.kind) {
       case 'turn_started': {
         const stats = statsById.get(event.payload.battleUnitId)
-        if (stats !== undefined) {
-          stats.actionCount += 1
-        }
+        if (stats !== undefined) stats.actionCount += 1
         break
       }
       case 'skill_used': {
         const stats = statsById.get(event.payload.actorBattleUnitId)
-        if (stats !== undefined) {
-          stats.skillUseCount += 1
-        }
+        if (stats !== undefined) stats.skillUseCount += 1
         break
       }
       case 'damage_applied': {
         const target = statsById.get(event.payload.targetBattleUnitId)
-        if (target !== undefined) {
-          target.damageTaken += event.payload.appliedDamage
-        }
+        if (target !== undefined) target.damageTaken += event.payload.appliedDamage
         if (event.payload.sourceBattleUnitId !== null) {
           const source = statsById.get(event.payload.sourceBattleUnitId)
-          if (source !== undefined) {
-            source.damageDealt += event.payload.appliedDamage
-          }
+          if (source !== undefined) source.damageDealt += event.payload.appliedDamage
         }
         break
       }
       case 'barrier_absorbed': {
         const target = statsById.get(event.payload.targetBattleUnitId)
-        if (target !== undefined) {
-          target.barrierAbsorbed += event.payload.absorbedDamage
-        }
+        if (target !== undefined) target.barrierAbsorbed += event.payload.absorbedDamage
         break
       }
       case 'unit_defeated': {
         if (event.payload.killerBattleUnitId !== null) {
           const killer = statsById.get(event.payload.killerBattleUnitId)
-          if (killer !== undefined) {
-            killer.defeatCount += 1
-          }
+          if (killer !== undefined) killer.defeatCount += 1
         }
         break
       }
@@ -223,24 +250,37 @@ export function createBattleResultView(
     }
   }
 
-  const unitStats = [...statsById.values()]
-    .sort((left, right) => {
-      if (left.side !== right.side) {
-        return left.side === 'ALLY' ? -1 : 1
-      }
-      return compareIds(left.battleUnitId, right.battleUnitId)
-    })
-    .map((stats) => Object.freeze({ ...stats }))
-  const frozenUnitStats = Object.freeze(unitStats)
+  return Object.freeze(
+    [...statsById.values()]
+      .sort((left, right) => {
+        if (left.side !== right.side) return left.side === 'ALLY' ? -1 : 1
+        return compareIds(left.battleUnitId, right.battleUnitId)
+      })
+      .map((stats) => Object.freeze({ ...stats })),
+  )
+}
 
+export function createBattleResultView(
+  definition: HeadlessBattleDefinition,
+  result: HeadlessBattleRunResult,
+  settlement?: StageBattleSettlement | null,
+): BattleResultView {
+  const unitStats = createUnitStats(definition, result)
   const tone = toneForOutcome(result.summary.outcome)
   const presentation = presentationForTone(tone)
-  const analysisChange = analysisChangeForTone(tone)
-  const analysisChanges = [...new Set(result.summary.units.map((unit) => unit.speciesId))]
-    .sort(compareIds)
-    .map((speciesId) => Object.freeze({ speciesId, change: analysisChange }))
+  const stubAnalysisChange = analysisChangeForTone(tone)
+  const analysisChanges =
+    settlement === undefined || settlement === null
+      ? [...new Set(result.summary.units.map((unit) => unit.speciesId))]
+          .sort(compareIds)
+          .map((speciesId) => Object.freeze({ speciesId, change: stubAnalysisChange }))
+      : settlement.analysisChanges
+          .filter((change) => change.appliedAmount > 0)
+          .map((change) =>
+            Object.freeze({ speciesId: change.speciesId, change: change.appliedAmount }),
+          )
 
-  const allyStats = frozenUnitStats.filter((unit) => unit.side === 'ALLY')
+  const allyStats = unitStats.filter((unit) => unit.side === 'ALLY')
   const missingAllyHp = allyStats.reduce((total, unit) => total + (unit.maxHp - unit.hp), 0)
   const defeatedAllyCount = allyStats.filter((unit) => unit.defeated).length
   const repairCost = Math.ceil(missingAllyHp / 10) * 5 + defeatedAllyCount * 20
@@ -255,10 +295,23 @@ export function createBattleResultView(
       result.summary.termination === 'ACTION_LIMIT_REACHED' ? '行動上限' : '勝敗確定',
     finalVirtualTime: result.summary.finalVirtualTime,
     totalActions: result.summary.totalActions,
-    rewards: rewardForTone(tone),
+    rewards:
+      settlement === undefined || settlement === null
+        ? stubRewardForTone(tone)
+        : settledReward(settlement),
     repairCost,
     analysisChanges: Object.freeze(analysisChanges),
-    notifications: notificationsForTone(tone, allyStats),
-    unitStats: frozenUnitStats,
+    notifications:
+      settlement === undefined || settlement === null
+        ? notificationsForTone(tone, allyStats)
+        : settlement.notifications,
+    regionalPoints:
+      settlement === undefined || settlement === null
+        ? null
+        : Object.freeze({
+            before: settlement.regionalPointsBefore,
+            after: settlement.regionalPointsAfter,
+          }),
+    unitStats,
   })
 }
