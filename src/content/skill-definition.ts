@@ -53,10 +53,7 @@ export function assertValidSkillDefinition(skill: SkillDefinition): void {
   )
 }
 
-export function resolveSkillAttributeId(
-  skill: SkillDefinition,
-  actorAttributeId: AttributeInputId,
-): AttributeId {
+export function resolveSkillAttributeId(skill: SkillDefinition): AttributeId {
   assertValidSkillDefinition(skill)
-  return normalizeAttributeId(skill.attributeId ?? actorAttributeId)
+  return normalizeAttributeId(skill.attributeId ?? 'attribute.neutral')
 }
