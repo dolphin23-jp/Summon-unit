@@ -17,6 +17,8 @@ export interface StageAccessDefinition {
   readonly order: number
   readonly requirement: ProgressRequirement
   readonly hideUntilUnlocked: boolean
+  readonly regionRequirement?: ProgressRequirement
+  readonly regionHideUntilUnlocked?: boolean
 }
 
 export interface RegionDefinition {
@@ -194,9 +196,12 @@ export function normalizeRegionProgression(
   })
   regions.sort((left, right) => left.order - right.order || compareIds(left.regionId, right.regionId))
 
+  const regionById = new Map(regions.map((region) => [region.regionId, region]))
   const stageOrdersByRegion = new Map<RegionId, Set<number>>()
   const normalizedStages = stages.map((stage) => {
     const rawAccess = stage.access ?? DEFAULT_STAGE_ACCESS
+    const region = regionById.get(stage.regionId)
+    if (region === undefined) throw new Error(`stage region is not defined: ${stage.regionId}`)
     assertSafeIntegerInRange(
       rawAccess.order,
       1,
@@ -221,6 +226,8 @@ export function normalizeRegionProgression(
           stage.stageId,
         ),
         hideUntilUnlocked: rawAccess.hideUntilUnlocked,
+        regionRequirement: region.requirement,
+        regionHideUntilUnlocked: region.hideUntilUnlocked,
       }),
     })
   })
@@ -291,12 +298,20 @@ export function getStageAccessState(
   stage: StageDefinition,
 ): ProgressAccessState {
   const access = stage.access ?? DEFAULT_STAGE_ACCESS
-  const unlocked = isProgressRequirementMet(playerData, access.requirement)
-  return Object.freeze({
-    unlocked,
-    visible: unlocked || !access.hideUntilUnlocked,
-    reason: unlocked ? null : describeProgressRequirement(access.requirement),
-  })
+  const regionUnlocked =
+    access.regionRequirement === undefined ||
+    isProgressRequirementMet(playerData, access.regionRequirement)
+  const stageUnlocked = isProgressRequirementMet(playerData, access.requirement)
+  const unlocked = regionUnlocked && stageUnlocked
+  const visible =
+    (regionUnlocked || access.regionHideUntilUnlocked !== true) &&
+    (stageUnlocked || !access.hideUntilUnlocked)
+  const reason = !regionUnlocked
+    ? describeProgressRequirement(access.regionRequirement ?? { type: 'ALWAYS' })
+    : !stageUnlocked
+      ? describeProgressRequirement(access.requirement)
+      : null
+  return Object.freeze({ unlocked, visible, reason })
 }
 
 export function getUnlockedStageIds(
@@ -304,17 +319,9 @@ export function getUnlockedStageIds(
   catalog: Pick<PlayerDataContentCatalog, 'species' | 'skills' | 'stages' | 'regions'>,
 ): readonly StageId[] {
   const normalized = normalizeRegionProgression(catalog)
-  const unlockedRegions = new Set(
-    normalized.regions
-      .filter((region) => getRegionAccessState(playerData, region).unlocked)
-      .map((region) => region.regionId),
-  )
   return Object.freeze(
     normalized.stages
-      .filter(
-        (stage) =>
-          unlockedRegions.has(stage.regionId) && getStageAccessState(playerData, stage).unlocked,
-      )
+      .filter((stage) => getStageAccessState(playerData, stage).unlocked)
       .map((stage) => stage.stageId),
   )
 }
