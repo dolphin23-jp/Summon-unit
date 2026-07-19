@@ -3,8 +3,9 @@ import {
   T039_FOREST_NORMAL,
   T039_INITIAL_PLAYER_DATA,
   T039_PLAYER_CATALOG,
+  T039_RUINS_NORMAL,
 } from '../demo/region-ui-demo'
-import { runInstantStageSimulation } from './stage-battle'
+import { createStageBattleDefinition, runInstantStageSimulation } from './stage-battle'
 
 const CLEARED_PLAYER = Object.freeze({
   ...T039_INITIAL_PLAYER_DATA,
@@ -21,6 +22,19 @@ const CLEARED_PLAYER = Object.freeze({
   }),
 })
 
+describe('stage battle access', () => {
+  it('rejects a stage whose region is still locked', () => {
+    expect(() =>
+      createStageBattleDefinition(
+        T039_INITIAL_PLAYER_DATA,
+        T039_RUINS_NORMAL.stageId,
+        'formation.main',
+        T039_PLAYER_CATALOG,
+      ),
+    ).toThrow('stage.demo-forest-boss')
+  })
+})
+
 describe('instant stage simulation', () => {
   it('rejects stages that have not been cleared', () => {
     expect(() =>
@@ -35,15 +49,20 @@ describe('instant stage simulation', () => {
 
   it('reuses the headless runner and produces byte-identical deterministic results', () => {
     const run = () =>
-      runInstantStageSimulation(CLEARED_PLAYER, T039_PLAYER_CATALOG, {
-        stageId: T039_FOREST_NORMAL.stageId,
-        formationId: 'formation.main',
-        settlementId: 'simulation.demo-1',
-        bonusRollBasisPoints: 1_234,
-      }, {
-        initialActionCost: 100,
-        maxActions: 300,
-      })
+      runInstantStageSimulation(
+        CLEARED_PLAYER,
+        T039_PLAYER_CATALOG,
+        {
+          stageId: T039_FOREST_NORMAL.stageId,
+          formationId: 'formation.main',
+          settlementId: 'simulation.demo-1',
+          bonusRollBasisPoints: 1_234,
+        },
+        {
+          initialActionCost: 100,
+          maxActions: 300,
+        },
+      )
 
     const first = run()
     const firstJson = JSON.stringify(first)
