@@ -19,31 +19,24 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: agent/t030-manual-preview
-      - name: Apply T030 implementation
-        id: apply
-        continue-on-error: true
+      - name: Apply and commit T030 implementation
         run: |
           base64 --decode .agent/t030-patch.tar.gz.b64 > /tmp/t030-patch.tar.gz
           tar -xzf /tmp/t030-patch.tar.gz -C /tmp
           set +e
           python /tmp/apply_t030.py > /tmp/t030-materialize.log 2>&1
           status=$?
-          echo "$status" > /tmp/t030-materialize.status
-          cat /tmp/t030-materialize.log
-          exit 0
-      - name: Upload materialization log
-        uses: actions/upload-artifact@v4
-        with:
-          name: t030-materialize-log
-          path: /tmp/t030-materialize.log
-      - name: Stop on materialization failure
-        run: |
-          test "$(cat /tmp/t030-materialize.status)" = "0"
-      - name: Commit implementation
-        run: |
-          rm -rf .agent
+          set -e
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ "$status" -ne 0 ]; then
+            cp /tmp/t030-materialize.log .agent/t030-error.log
+            git add .agent/t030-error.log
+            git commit -m "chore: capture T030 materialization error"
+            git push origin HEAD:agent/t030-manual-preview
+            exit 0
+          fi
+          rm -rf .agent
           git add -A
           git commit -m "T030 add manual action confirmed previews"
           git push origin HEAD:agent/t030-manual-preview
