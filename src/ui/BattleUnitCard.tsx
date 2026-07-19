@@ -31,6 +31,9 @@ export function BattleUnitCard({ unit }: { readonly unit: BattleReplayUnit }) {
       <span className="unit-card__hp">
         HP {unit.hp} / {unit.maxHp}
       </span>
+      {unit.barrierTotal > 0 && (
+        <span className="unit-card__barrier">障壁 {unit.barrierTotal}</span>
+      )}
     </article>
   )
 }
