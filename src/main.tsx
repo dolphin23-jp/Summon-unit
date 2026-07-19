@@ -1,6 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App'
+import './content/runtime-content-validation'
 import './index.css'
 import './t031.css'
 import './t033.css'
