@@ -25,5 +25,6 @@
 - [x] T023 — [召喚・蘇生](T023_SUMMON_REVIVE.md)
 - [x] T024 — [決定論リファレンスv2](T024_DETERMINISM_REFERENCE_V2.md)
 - [x] T025 — [AI評価基盤](T025_AI_EVALUATION_FOUNDATION.md)
+- [x] T026 — [評価スコア一式](T026_STANDARD_AI_SCORERS.md)
 
-T001～T025 complete. Next: T026.
+T001～T026 complete. Next: T027.
