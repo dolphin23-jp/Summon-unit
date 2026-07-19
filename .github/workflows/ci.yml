@@ -43,4 +43,17 @@ jobs:
         run: pnpm lint
 
       - name: Build
-        run: pnpm build
+        id: build
+        continue-on-error: true
+        run: pnpm build 2>&1 | tee build.log
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: t029-build-log
+          path: build.log
+
+      - name: Fail when build failed
+        if: steps.build.outcome == 'failure'
+        run: exit 1
