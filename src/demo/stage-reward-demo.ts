@@ -40,7 +40,7 @@ export const T038_STAGE: StageDefinition = Object.freeze({
     aiConfigurations: Object.freeze({
       'enemy.delta': Object.freeze({
         individualStrategy: 'STANDARD',
-        teamStrategy: 'FOCUS_FIRE',
+        teamStrategy: 'FAST_KILL',
       }),
       'enemy.alpha': Object.freeze({
         individualStrategy: 'STANDARD',
@@ -110,7 +110,7 @@ export const T038_BOSS_STAGE: StageDefinition = Object.freeze({
     aiConfigurations: Object.freeze({
       'enemy.forest-boss': Object.freeze({
         individualStrategy: 'STANDARD',
-        teamStrategy: 'FOCUS_FIRE',
+        teamStrategy: 'FAST_KILL',
       }),
     }),
   }),
