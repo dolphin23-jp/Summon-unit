@@ -153,6 +153,7 @@ export function canUseSingleTargetInnateSkill(input: SingleTargetSkillUseInput):
     !input.actor.defeated &&
     !input.target.defeated &&
     input.actor.side !== input.target.side &&
+    input.skill.slotType === 'INNATE' &&
     input.actorSpecies.innateSkillId === input.skill.id &&
     input.actorSchedule.battleUnitId === input.actor.battleUnitId &&
     input.currentTime === input.actorSchedule.nextActionTime
@@ -170,6 +171,10 @@ function assertCanUseSingleTargetInnateSkill(input: SingleTargetSkillUseInput): 
 
   if (input.actor.side === input.target.side) {
     throw new Error('single-target damage skill requires an enemy target')
+  }
+
+  if (input.skill.slotType !== 'INNATE') {
+    throw new Error('single-target innate skill requires INNATE slotType')
   }
 
   if (input.actorSpecies.innateSkillId !== input.skill.id) {
