@@ -45,7 +45,7 @@ import {
 } from './save/save-repository'
 import { CollectionScreen } from './ui/CollectionScreen'
 import { MinimalBattleScreen } from './ui/MinimalBattleScreen'
-import { RegionScreen } from './ui/RegionScreen'
+import { T040RegionScreen as RegionScreen } from './ui/T040RegionScreen'
 import { ResearchScreen } from './ui/ResearchScreen'
 import { SaveSlotScreen } from './ui/SaveSlotScreen'
 
