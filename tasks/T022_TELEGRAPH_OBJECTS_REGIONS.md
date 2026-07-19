@@ -68,10 +68,12 @@
 - [x] 通常移動・強制移動・召喚の領域侵入
 - [x] 領域内移動、作成前、期限境界、重複領域順
 - [x] 100回再実行の決定論テスト
-- [ ] 既存テスト全件
-- [ ] `pnpm demo:headless`
-- [ ] `pnpm lint`
-- [ ] `pnpm build`
+- [x] 既存テスト全件
+- [x] `pnpm demo:headless`
+- [x] `pnpm lint`
+- [x] `pnpm build`
+
+GitHub Actions CI run 95で全工程成功。
 
 ## データ・セーブ互換性
 
@@ -92,6 +94,7 @@
 - 予兆技を予約イベント化し、対象マスを固定した着弾対象解決を追加した。
 - 撃破可能な占有型設置物と、設置物を含むDIRECT遮蔽解決を追加した。
 - 通常移動・強制移動・召喚に共通する非占有領域の侵入判定を追加した。
+- GitHub Actionsでtest、headless demo、lint、buildが成功した。
 
 ## 次のタスク
 
