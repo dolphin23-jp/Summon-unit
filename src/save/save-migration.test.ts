@@ -16,10 +16,9 @@ import {
   CURRENT_PLAYER_DATA_SCHEMA_VERSION,
   applyPlayerDataMigrations,
   createPlayerDataMigrationPlan,
-  loadSaveSlotWithMigration,
   migratePlayerDataToCurrent,
 } from './save-migration'
-import type { SaveRepository } from './save-repository'
+import { loadSaveSlot, type SaveRepository } from './save-repository'
 
 class MigrationTestRepository implements SaveRepository {
   readonly generations = new Map<string, SaveGenerationRecord>()
@@ -150,9 +149,9 @@ function installPointer(
   )
 }
 
-const runtime = Object.freeze({
+const loadOptions = Object.freeze({
   now: () => 500,
-  createGenerationId: () => 'migration-generation',
+  createMigrationGenerationId: () => 'migration-generation',
 })
 
 describe('PlayerData migration framework', () => {
@@ -225,11 +224,11 @@ describe('persistent save migration', () => {
     repository.generations.set(legacy.generationId, legacy)
     installPointer(repository, legacy.generationId)
 
-    const loaded = await loadSaveSlotWithMigration(
+    const loaded = await loadSaveSlot(
       repository,
       'slot-1',
       T039_PLAYER_CATALOG,
-      runtime,
+      loadOptions,
     )
 
     expect(loaded?.record.generationId).toBe('migration-generation')
@@ -248,7 +247,7 @@ describe('persistent save migration', () => {
     repository.failNextCommit = true
 
     await expect(
-      loadSaveSlotWithMigration(repository, 'slot-1', T039_PLAYER_CATALOG, runtime),
+      loadSaveSlot(repository, 'slot-1', T039_PLAYER_CATALOG, loadOptions),
     ).rejects.toThrow('no valid generation')
     expect(repository.pointers.get('slot-1')?.currentGenerationId).toBe('legacy-current')
     expect(repository.generations.has('migration-generation')).toBe(false)
@@ -275,11 +274,11 @@ describe('persistent save migration', () => {
       legacyBackup.generationId,
     ])
 
-    const loaded = await loadSaveSlotWithMigration(
+    const loaded = await loadSaveSlot(
       repository,
       'slot-1',
       T039_PLAYER_CATALOG,
-      runtime,
+      loadOptions,
     )
 
     expect(loaded?.recoveredFromBackup).toBe(true)
