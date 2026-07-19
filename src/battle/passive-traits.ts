@@ -177,7 +177,6 @@ function appendPendingEffect(
 ): PassiveTraitPipelineContext {
   const effect: RegisterActiveEffectInput = Object.freeze({
     ...input,
-    duration: Object.freeze({ ...input.duration }),
     applicationSequence: context.nextApplicationSequence,
   })
   return freezeContext({
@@ -235,7 +234,7 @@ export function compilePassiveTraitHooks(
           id,
           stage: 'DAMAGE_HEALING_MODIFIERS',
           priority: 100,
-          apply: (context) =>
+          apply: (context: PassiveTraitPipelineContext) =>
             context.phase !== 'INITIALIZE'
               ? context
               : appendPendingEffect(context, {
@@ -258,7 +257,7 @@ export function compilePassiveTraitHooks(
           id,
           stage: 'POST_HIT_HEAL_REACTIONS',
           priority: 100,
-          apply: (context) =>
+          apply: (context: PassiveTraitPipelineContext) =>
             context.phase !== 'ON_HIT'
               ? context
               : appendPendingEffect(context, {
@@ -283,7 +282,7 @@ export function compilePassiveTraitHooks(
         id,
         stage: 'STATUS_CHANGES',
         priority: 100,
-        apply: (context) => applyStatusOverride(context, ability),
+        apply: (context: PassiveTraitPipelineContext) => applyStatusOverride(context, ability),
       })
       hooks.push(hook)
     })
