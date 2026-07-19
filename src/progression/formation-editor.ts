@@ -176,32 +176,35 @@ export function updateFormationMemberLoadout(
   const normalized = createPlayerData(playerData, catalog)
   const formation = getRequiredFormation(normalized, formationId)
   const member = getRequiredMember(formation, instanceId)
-  const nextMember: FormationMember = { ...member, loadout: { ...loadout } }
-  const provisional = replaceFormation(
+  const instance = normalized.collection.unitInstances.find(
+    (candidate) => candidate.instanceId === instanceId,
+  )
+  if (instance === undefined) {
+    throw new Error(`unit instance does not exist: ${instanceId}`)
+  }
+  const species = catalog.species.find((candidate) => candidate.id === instance.speciesId)
+  if (species === undefined) {
+    throw new Error(`unknown species id: ${instance.speciesId}`)
+  }
+  const available = new Set<SkillId>([
+    species.innateSkillId,
+    ...(loadout.genericSkillId === null ? [] : [loadout.genericSkillId]),
+    ...(loadout.bloomSkillId === null ? [] : [loadout.bloomSkillId]),
+  ])
+  const filteredPolicies = (member.ai.skillPolicies ?? []).filter((setting) =>
+    available.has(setting.skillId),
+  )
+  return replaceFormation(
     normalized,
     {
       ...formation,
       members: formation.members.map((candidate) =>
-        candidate.instanceId === instanceId ? nextMember : candidate,
-      ),
-    },
-    catalog,
-  )
-  const provisionalFormation = getRequiredFormation(provisional, formationId)
-  const provisionalMember = getRequiredMember(provisionalFormation, instanceId)
-  const available = new Set(
-    equippedSkillIdsForMember(provisional, formationId, provisionalMember, catalog),
-  )
-  const filteredPolicies = (provisionalMember.ai.skillPolicies ?? []).filter((setting) =>
-    available.has(setting.skillId),
-  )
-  return replaceFormation(
-    provisional,
-    {
-      ...provisionalFormation,
-      members: provisionalFormation.members.map((candidate) =>
         candidate.instanceId === instanceId
-          ? { ...candidate, ai: { ...candidate.ai, skillPolicies: filteredPolicies } }
+          ? {
+              ...candidate,
+              loadout: { ...loadout },
+              ai: { ...candidate.ai, skillPolicies: filteredPolicies },
+            }
           : candidate,
       ),
     },
@@ -277,7 +280,8 @@ export function moveFormationMemberPriority(
   const normalized = createPlayerData(playerData, catalog)
   const formation = getRequiredFormation(normalized, formationId)
   const ordered = [...formation.members].sort(
-    (left, right) => left.tiePriority - right.tiePriority || compareIds(left.instanceId, right.instanceId),
+    (left, right) =>
+      left.tiePriority - right.tiePriority || compareIds(left.instanceId, right.instanceId),
   )
   const index = ordered.findIndex((member) => member.instanceId === instanceId)
   if (index < 0) {
@@ -315,7 +319,11 @@ export function saveFormationPreset(
 ): PlayerData {
   const normalized = createPlayerData(playerData, catalog)
   const source = getRequiredFormation(normalized, sourceFormationId)
-  if (normalized.formations.formations.some((formation) => formation.formationId === newFormationId)) {
+  if (
+    normalized.formations.formations.some(
+      (formation) => formation.formationId === newFormationId,
+    )
+  ) {
     throw new Error(`formation id already exists: ${newFormationId}`)
   }
   return createPlayerData(
@@ -334,7 +342,9 @@ export function saveFormationPreset(
               loadout: { ...member.loadout },
               ai: {
                 ...member.ai,
-                skillPolicies: (member.ai.skillPolicies ?? []).map((setting) => ({ ...setting })),
+                skillPolicies: (member.ai.skillPolicies ?? []).map((setting) => ({
+                  ...setting,
+                })),
               },
             })),
           },
@@ -369,7 +379,12 @@ export function createFormationBattleDefinition(
       speciesId: instance.speciesId,
       position: Object.freeze({ side: 'ALLY' as const, ...member.position }),
       equippedSkillIds: Object.freeze(
-        getFormationMemberEquippedSkillIds(normalized, formationId, member.instanceId, catalog).slice(1),
+        getFormationMemberEquippedSkillIds(
+          normalized,
+          formationId,
+          member.instanceId,
+          catalog,
+        ).slice(1),
       ),
       tiePriority: member.tiePriority,
     })
@@ -380,7 +395,9 @@ export function createFormationBattleDefinition(
   }
   const enemyIds = new Set(enemyUnits.map((unit) => unit.battleUnitId))
   const aiConfigurations: Record<string, FormationMember['ai']> = {}
-  for (const [battleUnitId, configuration] of Object.entries(baseBattle.aiConfigurations ?? {})) {
+  for (const [battleUnitId, configuration] of Object.entries(
+    baseBattle.aiConfigurations ?? {},
+  )) {
     if (enemyIds.has(battleUnitId)) {
       aiConfigurations[battleUnitId] = configuration
     }
