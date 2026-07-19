@@ -1,3 +1,3 @@
-import { serializeVerticalSliceBalanceBenchmark } from '../src/balance/vertical-slice-benchmark'
+import { serializeVerticalSliceT046BalanceBenchmark } from '../src/balance/vertical-slice-t046-benchmark'
 
-console.log(serializeVerticalSliceBalanceBenchmark())
+console.log(serializeVerticalSliceT046BalanceBenchmark())
