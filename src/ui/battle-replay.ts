@@ -7,6 +7,7 @@ import {
   getBoardPositionId,
   type BoardPosition,
 } from '../battle/board'
+import { getTotalBarrierCapacity } from '../battle/barrier'
 import type { BattleEvent } from '../battle/event-log'
 import type { BattleOutcome } from '../battle/defeat-and-victory'
 
@@ -18,6 +19,7 @@ export interface BattleReplayUnit {
   readonly positionId: string
   readonly hp: number
   readonly maxHp: number
+  readonly barrierTotal: number
   readonly defeated: boolean
 }
 
@@ -69,7 +71,6 @@ function parsePositionId(positionId: string): BoardPosition {
   if (match === null) {
     throw new Error(`invalid board position id: ${positionId}`)
   }
-
   return Object.freeze({
     side: match[1] as BoardPosition['side'],
     row: Number(match[2]) as BoardPosition['row'],
@@ -108,7 +109,6 @@ export function createInitialBattleReplayFrame(
       throw new Error(`species master is missing: ${unitDefinition.speciesId}`)
     }
     const hp = unitDefinition.initialHp ?? maxHp
-
     return freezeUnit({
       battleUnitId: unitDefinition.battleUnitId,
       speciesId: unitDefinition.speciesId,
@@ -117,13 +117,12 @@ export function createInitialBattleReplayFrame(
       positionId: getBoardPositionId(unitDefinition.position),
       hp,
       maxHp,
+      barrierTotal: getTotalBarrierCapacity(unitDefinition.initialBarriers ?? []),
       defeated: hp === 0,
     })
   })
 
-  units.sort((left, right) =>
-    compareIds(left.battleUnitId, right.battleUnitId),
-  )
+  units.sort((left, right) => compareIds(left.battleUnitId, right.battleUnitId))
   return freezeFrame({
     eventIndex: 0,
     virtualTime: 0,
@@ -145,7 +144,6 @@ function updateUnit(
     found = true
     return freezeUnit(update(unit))
   })
-
   if (!found) {
     throw new Error(`replay unit is missing: ${battleUnitId}`)
   }
@@ -165,7 +163,6 @@ export function applyBattleEventToReplayFrame(
 
   let units = frame.units
   let outcome = frame.outcome
-
   switch (event.kind) {
     case 'unit_moved': {
       const position = parsePositionId(event.payload.toPositionId)
@@ -177,6 +174,12 @@ export function applyBattleEventToReplayFrame(
       }))
       break
     }
+    case 'barrier_absorbed':
+      units = updateUnit(units, event.payload.targetBattleUnitId, (unit) => ({
+        ...unit,
+        barrierTotal: Math.max(0, unit.barrierTotal - event.payload.absorbedDamage),
+      }))
+      break
     case 'damage_applied':
       units = updateUnit(units, event.payload.targetBattleUnitId, (unit) => ({
         ...unit,
@@ -196,6 +199,7 @@ export function applyBattleEventToReplayFrame(
     case 'battle_started':
     case 'turn_started':
     case 'skill_used':
+    case 'guard_shared':
     case 'effect_applied':
     case 'effect_merged':
     case 'effect_removed':
@@ -232,18 +236,15 @@ function assertReplayMatchesResult(
       (candidate) => candidate.battleUnitId === summaryUnit.battleUnitId,
     )
     if (replayUnit === undefined) {
-      throw new Error(
-        `final replay unit is missing: ${summaryUnit.battleUnitId}`,
-      )
+      throw new Error(`final replay unit is missing: ${summaryUnit.battleUnitId}`)
     }
     if (
       replayUnit.hp !== summaryUnit.hp ||
+      replayUnit.barrierTotal !== summaryUnit.barrierTotal ||
       replayUnit.defeated !== summaryUnit.defeated ||
       replayUnit.positionId !== summaryUnit.positionId
     ) {
-      throw new Error(
-        `final replay unit state does not match: ${summaryUnit.battleUnitId}`,
-      )
+      throw new Error(`final replay unit state does not match: ${summaryUnit.battleUnitId}`)
     }
   }
 }
@@ -252,9 +253,7 @@ export function createBattleReplay(
   definition: HeadlessBattleDefinition,
   result: HeadlessBattleRunResult,
 ): BattleReplay {
-  const frames: BattleReplayFrame[] = [
-    createInitialBattleReplayFrame(definition),
-  ]
+  const frames: BattleReplayFrame[] = [createInitialBattleReplayFrame(definition)]
   for (const event of result.log.events) {
     const currentFrame = frames.at(-1)
     if (currentFrame === undefined) {
@@ -262,13 +261,11 @@ export function createBattleReplay(
     }
     frames.push(applyBattleEventToReplayFrame(currentFrame, event))
   }
-
   const finalFrame = frames.at(-1)
   if (finalFrame === undefined) {
     throw new Error('battle replay requires a final frame')
   }
   assertReplayMatchesResult(finalFrame, result)
-
   return Object.freeze({
     frames: Object.freeze(frames),
     events: result.log.events,
@@ -309,6 +306,10 @@ export function formatBattleEventForDisplay(event: BattleEvent): string {
       return `${shortId(event.payload.battleUnitId)}が${event.payload.fromPositionId}から${event.payload.toPositionId}へ移動`
     case 'skill_used':
       return `${shortId(event.payload.actorBattleUnitId)}が${shortId(event.payload.skillId)}を${shortId(event.payload.targetBattleUnitId)}へ使用`
+    case 'guard_shared':
+      return `${shortId(event.payload.guardBattleUnitId)}が${event.payload.redirectedDamage}ダメージを肩代わり`
+    case 'barrier_absorbed':
+      return `${shortId(event.payload.targetBattleUnitId)}の障壁が${event.payload.absorbedDamage}吸収${event.payload.broken ? '・破壊' : ''}`
     case 'damage_applied':
       return `${shortId(event.payload.targetBattleUnitId)}に${event.payload.appliedDamage}ダメージ（HP ${event.payload.hpAfter}）`
     case 'effect_applied':
