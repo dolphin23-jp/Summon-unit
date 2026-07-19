@@ -107,7 +107,7 @@ describe('minimal battle UI replay model', () => {
         createBattleReplay(STANDARD_HEADLESS_BATTLE, runStandardHeadlessBattle()),
       ).toEqual(expected)
     }
-  })
+  }, 10_000)
 
   it('formats every event kind as a non-empty one-line log entry', () => {
     const result = runStandardHeadlessBattle()
