@@ -26,12 +26,20 @@ export function createRuntimeSaveGenerationId(
   return `${slotId}:generation:${savedAtEpochMs}:${generationSequence}`
 }
 
+interface BrowserMigrationGenerationInput {
+  readonly slotId: SaveSlotId
+  readonly savedAtEpochMs: number
+}
+
 export function createBrowserLoadSaveOptions(
   now: () => number = Date.now,
 ): LoadSaveSlotOptions {
   return Object.freeze({
     now,
-    createMigrationGenerationId: ({ slotId, savedAtEpochMs }) =>
+    createMigrationGenerationId: ({
+      slotId,
+      savedAtEpochMs,
+    }: BrowserMigrationGenerationInput) =>
       createRuntimeSaveGenerationId(slotId, savedAtEpochMs),
   })
 }
