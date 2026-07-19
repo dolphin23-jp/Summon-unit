@@ -30,6 +30,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
 
+      - name: Content validation
+        run: pnpm validate:content
+
       - name: Test
         run: pnpm test
 
