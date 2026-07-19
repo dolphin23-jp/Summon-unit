@@ -46,25 +46,49 @@ export function BattleResultScreen({
             <div><dt><span aria-hidden="true">C</span> 基本通貨</dt><dd>+{view.rewards.currency}</dd></div>
             <div><dt><span aria-hidden="true">R</span> 研究データ</dt><dd>+{view.rewards.researchData}</dd></div>
             <div><dt><span aria-hidden="true">K</span> 触媒</dt><dd>+{view.rewards.catalyst}</dd></div>
-            <div><dt><span aria-hidden="true">−</span> 修復費</dt><dd>{view.repairCost}</dd></div>
+            <div><dt><span aria-hidden="true">−</span> 修復費目安</dt><dd>{view.repairCost}</dd></div>
+            {view.regionalPoints !== null && (
+              <div>
+                <dt><span aria-hidden="true">P</span> 地域ポイント</dt>
+                <dd>{view.regionalPoints.before} → {view.regionalPoints.after}</dd>
+              </div>
+            )}
           </dl>
-          <p className="result-card__stub">T038接続前の表示用スタブです。進行データは変更しません。</p>
+          {view.rewards.catalysts.length > 0 && (
+            <ul className="result-analysis-list" aria-label="獲得触媒内訳">
+              {view.rewards.catalysts.map((catalyst) => (
+                <li key={catalyst.catalystId}>
+                  <span>{catalyst.catalystId}</span>
+                  <strong>+{catalyst.amount}</strong>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="result-card__stub">
+            {view.rewards.stub
+              ? 'ステージ未指定戦闘の表示用スタブです。進行データは変更しません。'
+              : 'ステージ報酬、地域ポイント、解析度、研究ヒントをPlayerDataへ精算済みです。'}
+          </p>
         </section>
 
         <section className="result-card" aria-labelledby="result-analysis-title">
           <h3 id="result-analysis-title">解析度変化</h3>
-          <ul className="result-analysis-list">
-            {view.analysisChanges.map((change) => (
-              <li key={change.speciesId}>
-                <span>{change.speciesId}</span>
-                <strong>+{change.change}</strong>
-              </li>
-            ))}
-          </ul>
+          {view.analysisChanges.length === 0 ? (
+            <p>今回適用された解析度変化はありません。</p>
+          ) : (
+            <ul className="result-analysis-list">
+              {view.analysisChanges.map((change) => (
+                <li key={change.speciesId}>
+                  <span>{change.speciesId}</span>
+                  <strong>+{change.change}</strong>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
 
         <section className="result-card" aria-labelledby="result-notification-title">
-          <h3 id="result-notification-title">開花・研究通知</h3>
+          <h3 id="result-notification-title">進行・研究通知</h3>
           <ul className="result-notification-list">
             {view.notifications.map((notification) => (
               <li key={notification}><span aria-hidden="true">!</span>{notification}</li>
