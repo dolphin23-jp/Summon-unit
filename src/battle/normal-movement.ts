@@ -23,6 +23,7 @@ import {
   type BattleTime,
   type UnitActionSchedule,
 } from './action-scheduling'
+import { getModifiedBattleStatValue } from './stat-modifiers'
 import {
   assertValidBattleUnitState,
   type BattleUnitId,
@@ -46,6 +47,8 @@ export interface NormalMovementResult {
   readonly battleUnitId: BattleUnitId
   readonly from: BoardPosition
   readonly to: BoardPosition
+  readonly effectiveActionCost: number
+  readonly effectiveSpeed: number
 }
 
 const VALID_SIDES: readonly Side[] = Object.freeze(['ALLY', 'ENEMY'])
@@ -202,11 +205,21 @@ export function performNormalMovement(input: PerformNormalMovementInput): Normal
     input.actorSpecies,
     input.destination,
   )
+  const effectiveActionCost = getModifiedBattleStatValue(
+    NORMAL_MOVEMENT_ACTION_COST,
+    actor.effects,
+    'ACTION_COST',
+  )
+  const effectiveSpeed = getModifiedBattleStatValue(
+    input.actorSpecies.stats.speed,
+    actor.effects,
+    'SPEED',
+  )
   const actorSchedule = rescheduleUnitActionAfterAction(
     input.actorSchedule,
     input.currentTime,
-    NORMAL_MOVEMENT_ACTION_COST,
-    input.actorSpecies.stats.speed,
+    effectiveActionCost,
+    effectiveSpeed,
   )
 
   return Object.freeze({
@@ -215,5 +228,7 @@ export function performNormalMovement(input: PerformNormalMovementInput): Normal
     battleUnitId: actor.battleUnitId,
     from: freezePosition(actor.position),
     to: freezePosition(input.destination),
+    effectiveActionCost,
+    effectiveSpeed,
   })
 }
