@@ -21,5 +21,6 @@
 - [x] T019 — [対象選択・固有特性・時間操作・待機・技使用制約](T019_TARGETING_TRAITS_TIME_USAGE.md)
 - [x] T020 — [障壁・肩代わり](T020_BARRIERS_GUARD_SHARE.md)
 - [x] T021 — [到達方式・範囲マスク・強制移動](T021_REACH_AREA_FORCED_MOVEMENT.md)
+- [x] T022 — [予兆・設置物・領域](T022_TELEGRAPH_OBJECTS_REGIONS.md)
 
-T001～T021 complete. Next: T022.
+T001～T022 complete. Next: T023.
