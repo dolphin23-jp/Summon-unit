@@ -1,0 +1,38 @@
+name: T037 Debug Demo
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  demo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: corepack enable && corepack prepare pnpm@10.13.1 --activate
+      - run: pnpm install --no-frozen-lockfile >/dev/null
+      - name: Concise headless diagnostics
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          pnpm demo:headless > demo.log 2>&1
+          status=$?
+          if [ "$status" -ne 0 ]; then
+            {
+              echo '### T037 concise headless diagnostics'
+              echo '```text'
+              tail -n 100 demo.log
+              echo '```'
+            } > demo-comment.md
+            gh pr comment "${{ github.event.pull_request.number }}" --body-file demo-comment.md
+          fi
+          exit $status
