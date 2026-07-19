@@ -924,7 +924,6 @@ function createEvaluationInput(
 
 function completeHeadlessActionState(
   actor: BattleUnitState,
-  actorSpecies: MonsterSpecies,
   decision: RunnerDecision,
   context: HeadlessBattleContext,
 ): void {
@@ -1378,7 +1377,6 @@ class InteractiveBattleRunnerImpl implements InteractiveBattleRunner {
 
     this.executeDecision(
       readyActor,
-      actorSpecies,
       schedule,
       evaluationToDecision(readyActor.battleUnitId, decisionResult.selected),
       decisionResult.log,
@@ -1421,7 +1419,6 @@ class InteractiveBattleRunnerImpl implements InteractiveBattleRunner {
     this.pendingManualExecution = null
     this.executeDecision(
       pending.actor,
-      pending.actorSpecies,
       pending.schedule,
       prepared.decision,
       reasonLog,
@@ -1463,7 +1460,6 @@ class InteractiveBattleRunnerImpl implements InteractiveBattleRunner {
 
   private executeDecision(
     actor: BattleUnitState,
-    actorSpecies: MonsterSpecies,
     schedule: UnitActionSchedule,
     decision: RunnerDecision,
     reasonLog: AiDecisionReasonLog | null,
@@ -1500,7 +1496,7 @@ class InteractiveBattleRunnerImpl implements InteractiveBattleRunner {
     this.battle = executed.battle
     this.log = executed.log
     this.context.schedules.set(actor.battleUnitId, executed.schedule)
-    completeHeadlessActionState(actor, actorSpecies, decision, this.context)
+    completeHeadlessActionState(actor, decision, this.context)
     this.totalActions += 1
     this.lastDecisionLog = reasonLog
 
