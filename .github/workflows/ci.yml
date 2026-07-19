@@ -34,7 +34,17 @@ jobs:
         run: pnpm test
 
       - name: Headless demo
-        run: pnpm demo:headless > /tmp/headless-battle-demo.json
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm demo:headless 2>&1 | tee /tmp/headless-diagnostics.txt
+
+      - name: Upload headless diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: headless-diagnostics
+          path: /tmp/headless-diagnostics.txt
 
       - name: AI regression benchmark
         run: pnpm benchmark:ai > /tmp/ai-regression-benchmark.json
