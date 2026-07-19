@@ -9,9 +9,12 @@ export type SkillId = string
 
 export const DAMAGE_MULTIPLIER_SCALE = 1000
 
+export const SKILL_SLOT_TYPES = ['INNATE', 'GENERIC', 'BLOOM'] as const
+export type SkillSlotType = (typeof SKILL_SLOT_TYPES)[number]
+
 export interface SkillDefinition {
   readonly id: SkillId
-  readonly slotType: 'INNATE'
+  readonly slotType: SkillSlotType
   readonly attributeId?: AttributeInputId
   readonly actionCost: number
   readonly targetType: 'SINGLE_ENEMY'
@@ -33,8 +36,8 @@ function assertSafeIntegerAtLeast(value: number, minimum: number, field: string)
 export function assertValidSkillDefinition(skill: SkillDefinition): void {
   assertNonEmptyString(skill.id, 'skill.id')
 
-  if (skill.slotType !== 'INNATE') {
-    throw new Error('skill.slotType must be INNATE')
+  if (!SKILL_SLOT_TYPES.includes(skill.slotType)) {
+    throw new Error('skill.slotType must be INNATE, GENERIC, or BLOOM')
   }
 
   if (skill.attributeId !== undefined) {

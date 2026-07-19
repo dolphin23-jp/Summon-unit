@@ -77,9 +77,15 @@ function withScheduleUnitId(
   }
 }
 
-describe('minimal innate skill definition', () => {
-  it('accepts the fixed single-enemy damage shape', () => {
+describe('minimal skill definition', () => {
+  it('accepts all three slot types for the fixed single-enemy damage shape', () => {
     expect(() => assertValidSkillDefinition(skill)).not.toThrow()
+    expect(() =>
+      assertValidSkillDefinition({ ...skill, id: 'skill.generic', slotType: 'GENERIC' }),
+    ).not.toThrow()
+    expect(() =>
+      assertValidSkillDefinition({ ...skill, id: 'skill.bloom', slotType: 'BLOOM' }),
+    ).not.toThrow()
   })
 
   it.each([
@@ -93,8 +99,8 @@ describe('minimal innate skill definition', () => {
       'skill.damageMultiplierPermille must be a safe integer greater than or equal to 1',
     ],
     [
-      { ...skill, slotType: 'GENERIC' } as unknown as SkillDefinition,
-      'skill.slotType must be INNATE',
+      { ...skill, slotType: 'ULTIMATE' } as unknown as SkillDefinition,
+      'skill.slotType must be INNATE, GENERIC, or BLOOM',
     ],
     [
       { ...skill, targetType: 'SELF' } as unknown as SkillDefinition,
@@ -210,6 +216,12 @@ describe('single-target innate skill use', () => {
     expect(
       canUseSingleTargetInnateSkill({
         ...input,
+        skill: { ...skill, slotType: 'BLOOM' },
+      }),
+    ).toBe(false)
+    expect(
+      canUseSingleTargetInnateSkill({
+        ...input,
         actorSchedule: withScheduleUnitId(input.actorSchedule, 'battle-unit.ally.999'),
       }),
     ).toBe(false)
@@ -232,9 +244,12 @@ describe('single-target innate skill use', () => {
     expect(alliedTarget.hp).toBe(120)
   })
 
-  it('rejects a skill not owned by the actor species', () => {
+  it('rejects non-innate or unowned skills', () => {
     const input = createUseInput()
 
+    expect(() =>
+      useSingleTargetInnateSkill({ ...input, skill: { ...skill, slotType: 'BLOOM' } }),
+    ).toThrow('single-target innate skill requires INNATE slotType')
     expect(() =>
       useSingleTargetInnateSkill({ ...input, skill: { ...skill, id: 'skill.other' } }),
     ).toThrow('skill.id must match actorSpecies.innateSkillId')

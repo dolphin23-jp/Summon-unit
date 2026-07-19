@@ -18,11 +18,19 @@ import {
   type BattleOutcome,
   type BattleState,
 } from './defeat-and-victory'
+import type {
+  ActiveEffectMutation,
+  ActiveEffectState,
+} from './effect-framework'
 import {
   EMPTY_BATTLE_EVENT_LOG,
+  appendBattleEvent,
+  recordActiveEffectMutation,
+  recordBattleEnded,
   recordBattleStarted,
   recordSingleTargetSkillResolution,
   recordTurnStarted,
+  recordUnitDefeated,
   recordUnitMoved,
   type BattleEventLog,
 } from './event-log'
@@ -32,6 +40,12 @@ import {
 } from './minimal-auto-ai'
 import { performNormalMovement } from './normal-movement'
 import { useSingleTargetInnateSkill } from './single-target-damage'
+import {
+  consumeTargetActionDurations,
+  resolveTurnStartStatusConditions,
+  type EffectDurationChange,
+  type StatusDamageTrigger,
+} from './status-conditions'
 import {
   createTimelineQueue,
   popTimelineEvent,
@@ -52,6 +66,7 @@ export interface HeadlessBattleUnitDefinition {
   readonly speciesId: string
   readonly position: BoardPosition
   readonly initialHp?: number
+  readonly initialEffects?: readonly ActiveEffectState[]
   readonly tiePriority: number
 }
 
@@ -220,6 +235,7 @@ function createInitialBattle(definition: HeadlessBattleDefinition): {
       battleUnitId: unitDefinition.battleUnitId,
       position: unitDefinition.position,
       initialHp: unitDefinition.initialHp,
+      initialEffects: unitDefinition.initialEffects,
     })
   })
 
@@ -373,6 +389,152 @@ function executeWaitDecision(
   })
 }
 
+function getDurationChangeMutation(
+  change: EffectDurationChange,
+): ActiveEffectMutation {
+  return Object.freeze({
+    kind: 'MERGED',
+    before: change.before,
+    after: change.after,
+  })
+}
+
+function recordStatusTriggers(
+  log: BattleEventLog,
+  triggers: readonly StatusDamageTrigger[],
+  currentTime: BattleTime,
+): BattleEventLog {
+  let nextLog = log
+  for (const trigger of triggers) {
+    nextLog = appendBattleEvent(nextLog, {
+      kind: 'damage_applied',
+      virtualTime: currentTime,
+      payload: {
+        sourceBattleUnitId: trigger.sourceBattleUnitId,
+        targetBattleUnitId: trigger.targetBattleUnitId,
+        skillId: null,
+        calculatedDamage: trigger.calculatedDamage,
+        appliedDamage: trigger.appliedDamage,
+        hpBefore: trigger.hpBefore,
+        hpAfter: trigger.hpAfter,
+      },
+    })
+    if (trigger.durationChange !== null) {
+      nextLog = recordActiveEffectMutation(
+        nextLog,
+        getDurationChangeMutation(trigger.durationChange),
+        currentTime,
+      )
+    }
+    if (trigger.removalMutation !== null) {
+      nextLog = recordActiveEffectMutation(
+        nextLog,
+        trigger.removalMutation,
+        currentTime,
+      )
+    }
+  }
+  return nextLog
+}
+
+function getStatusKillerBattleUnitId(
+  battle: BattleState,
+  trigger: StatusDamageTrigger | undefined,
+): BattleUnitId | null {
+  if (trigger?.sourceBattleUnitId === null || trigger?.sourceBattleUnitId === undefined) {
+    return null
+  }
+  if (trigger.sourceBattleUnitId === trigger.targetBattleUnitId) {
+    return null
+  }
+  return battle.units.some(
+    (unit) => unit.battleUnitId === trigger.sourceBattleUnitId,
+  )
+    ? trigger.sourceBattleUnitId
+    : null
+}
+
+function applyTurnStartStatuses(
+  battle: BattleState,
+  log: BattleEventLog,
+  actorBattleUnitId: BattleUnitId,
+  currentTime: BattleTime,
+  context: HeadlessBattleContext,
+): {
+  readonly battle: BattleState
+  readonly log: BattleEventLog
+  readonly defeated: boolean
+} {
+  const actor = getRequiredUnit(battle, actorBattleUnitId)
+  const actorSpecies = getRequiredSpecies(context.speciesById, actor.speciesId)
+  const resolution = resolveTurnStartStatusConditions(actor, actorSpecies)
+  if (resolution.triggers.length === 0) {
+    return Object.freeze({ battle, log, defeated: false })
+  }
+
+  let nextLog = recordStatusTriggers(log, resolution.triggers, currentTime)
+  if (!resolution.state.defeated) {
+    return Object.freeze({
+      battle: replaceLivingUnit(battle, resolution.state),
+      log: nextLog,
+      defeated: false,
+    })
+  }
+
+  const killingTrigger = [...resolution.triggers]
+    .reverse()
+    .find((trigger) => trigger.hpAfter === 0)
+  const nextBattle = resolveBattleUnitDefeat({
+    battle,
+    defeatedUnit: resolution.state,
+    killerBattleUnitId: getStatusKillerBattleUnitId(battle, killingTrigger),
+    currentTime,
+  })
+  const defeatRecord = nextBattle.defeatRecords.at(-1)
+  if (defeatRecord === undefined) {
+    throw new Error('status defeat must create a defeat record')
+  }
+  nextLog = recordUnitDefeated(nextLog, defeatRecord)
+  if (nextBattle.outcome !== 'ONGOING') {
+    nextLog = recordBattleEnded(nextLog, nextBattle.outcome, currentTime)
+  }
+  return Object.freeze({ battle: nextBattle, log: nextLog, defeated: true })
+}
+
+function consumeActorTargetActionDurations(
+  battle: BattleState,
+  log: BattleEventLog,
+  actorBattleUnitId: BattleUnitId,
+  currentTime: BattleTime,
+  context: HeadlessBattleContext,
+): { readonly battle: BattleState; readonly log: BattleEventLog } {
+  const actor = getRequiredUnit(battle, actorBattleUnitId)
+  if (actor.defeated) {
+    return Object.freeze({ battle, log })
+  }
+  const actorSpecies = getRequiredSpecies(context.speciesById, actor.speciesId)
+  const resolution = consumeTargetActionDurations(actor, actorSpecies)
+  if (resolution.changes.length === 0 && resolution.removals.length === 0) {
+    return Object.freeze({ battle, log })
+  }
+
+  let nextLog = log
+  for (const change of resolution.changes) {
+    nextLog = recordActiveEffectMutation(
+      nextLog,
+      getDurationChangeMutation(change),
+      currentTime,
+    )
+  }
+  for (const removal of resolution.removals) {
+    nextLog = recordActiveEffectMutation(nextLog, removal, currentTime)
+  }
+  return Object.freeze({
+    battle: replaceLivingUnit(battle, resolution.state),
+    log: nextLog,
+  })
+}
+
 function createSummary(
   battle: BattleState,
   log: BattleEventLog,
@@ -448,10 +610,24 @@ export function runHeadlessBattle(definition: HeadlessBattleDefinition): Headles
     battle = withTimeline(battle, popped.queue)
     log = recordTurnStarted(log, actor.battleUnitId, finalVirtualTime)
 
-    const actorSpecies = getRequiredSpecies(context.speciesById, actor.speciesId)
+    const statusStart = applyTurnStartStatuses(
+      battle,
+      log,
+      actor.battleUnitId,
+      finalVirtualTime,
+      context,
+    )
+    battle = statusStart.battle
+    log = statusStart.log
+    if (statusStart.defeated) {
+      continue
+    }
+
+    const readyActor = getRequiredUnit(battle, actor.battleUnitId)
+    const actorSpecies = getRequiredSpecies(context.speciesById, readyActor.speciesId)
     const decision = selectMinimalAutoAiAction({
       battle,
-      actorBattleUnitId: actor.battleUnitId,
+      actorBattleUnitId: readyActor.battleUnitId,
       speciesById: context.speciesById,
       availableDirectSkills: [getRequiredSkill(context.skillById, actorSpecies.innateSkillId)],
     })
@@ -465,10 +641,19 @@ export function runHeadlessBattle(definition: HeadlessBattleDefinition): Headles
 
     battle = executed.battle
     log = executed.log
-    context.schedules.set(actor.battleUnitId, executed.schedule)
+    context.schedules.set(readyActor.battleUnitId, executed.schedule)
     totalActions += 1
 
     if (battle.outcome === 'ONGOING') {
+      const durationProgress = consumeActorTargetActionDurations(
+        battle,
+        log,
+        readyActor.battleUnitId,
+        finalVirtualTime,
+        context,
+      )
+      battle = durationProgress.battle
+      log = durationProgress.log
       battle = registerNextTurn(battle, executed.schedule, nextTimelineSequence)
       nextTimelineSequence += 1
     }

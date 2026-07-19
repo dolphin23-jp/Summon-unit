@@ -24,6 +24,7 @@ import {
   type UnitActionSchedule,
 } from './action-scheduling'
 import { getModifiedBattleStatValue } from './stat-modifiers'
+import { isMovementLocked } from './status-conditions'
 import {
   assertValidBattleUnitState,
   type BattleUnitId,
@@ -110,7 +111,7 @@ export function getNormalMovementCandidates(
   const unit = getRequiredBattleUnit(battle, battleUnitId)
   assertValidBoardPosition(unit.position, 'unit.position')
 
-  if (battle.outcome !== 'ONGOING' || unit.defeated) {
+  if (battle.outcome !== 'ONGOING' || unit.defeated || isMovementLocked(unit)) {
     return EMPTY_POSITIONS
   }
 
@@ -130,6 +131,9 @@ function assertCanPerformNormalMovement(
   }
   if (actor.defeated) {
     throw new Error('defeated unit cannot move')
+  }
+  if (isMovementLocked(actor)) {
+    throw new Error('movement-locked unit cannot move')
   }
   if (input.actorSchedule.battleUnitId !== actor.battleUnitId) {
     throw new Error('actorSchedule.battleUnitId must match actorBattleUnitId')
