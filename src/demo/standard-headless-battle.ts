@@ -8,7 +8,7 @@ import {
 
 export const STANDARD_HEADLESS_SPECIES: readonly MonsterSpecies[] = Object.freeze([
   Object.freeze({
-    id: 'species.demo-alpha', rarity: 2, attributeId: 'attribute.air',
+    id: 'species.demo-alpha', rarity: 2, attributeId: 'attribute.wind',
     primarySpeciesId: 'species-group.alpha', tagIds: Object.freeze(['tag.fast']),
     innateSkillId: 'skill.demo-alpha',
     stats: Object.freeze({ hp: 92, attack: 34, defense: 12, speed: 5 }),
@@ -20,7 +20,7 @@ export const STANDARD_HEADLESS_SPECIES: readonly MonsterSpecies[] = Object.freez
     stats: Object.freeze({ hp: 148, attack: 24, defense: 38, speed: 2 }),
   }),
   Object.freeze({
-    id: 'species.demo-gamma', rarity: 2, attributeId: 'attribute.air',
+    id: 'species.demo-gamma', rarity: 2, attributeId: 'attribute.wind',
     primarySpeciesId: 'species-group.gamma', tagIds: Object.freeze(['tag.fast']),
     innateSkillId: 'skill.demo-gamma',
     stats: Object.freeze({ hp: 82, attack: 39, defense: 9, speed: 6 }),
