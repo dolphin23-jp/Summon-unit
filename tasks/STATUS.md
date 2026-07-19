@@ -41,5 +41,6 @@
 - [x] T039 — [地域UI・高速化・進行通知](T039_REGION_UI_FAST_SIM_NOTIFICATIONS.md)
 - [x] T040 — [IndexedDB永続化](T040_INDEXEDDB_PERSISTENCE.md)
 - [x] T041 — [migration基盤](T041_SAVE_MIGRATION_FRAMEWORK.md)
+- [x] T042 — [エクスポート／インポート・戦闘再開](T042_EXPORT_IMPORT_BATTLE_RESUME.md)
 
-T001～T041 complete. Next: T042.
+T001～T042 complete. Next: T043.
