@@ -16,5 +16,6 @@
 - [x] T014 — [ヘッドレス戦闘デモ](T014_HEADLESS_BATTLE_DEMO.md)
 - [x] T015 — [最小盤面UI](T015_MINIMAL_BATTLE_UI.md)
 - [x] T016 — [効果フレームワーク骨格](T016_EFFECT_FRAMEWORK.md)
+- [x] T017 — [属性・バフデバフ・状態耐性](T017_ATTRIBUTES_BUFFS_RESISTANCE.md)
 
-T001～T016 complete. Next: T017.
+T001～T017 complete. Next: T018.

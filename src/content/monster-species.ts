@@ -1,4 +1,6 @@
 import type { SkillId } from './skill-definition'
+import { assertValidAttributeId, type AttributeInputId } from './attribute'
+import { assertValidStatusResistanceTags } from './status-resistance'
 
 export type SpeciesId = string
 
@@ -14,7 +16,7 @@ export interface MonsterStats {
 export interface MonsterSpecies {
   readonly id: SpeciesId
   readonly rarity: MonsterRarity
-  readonly attributeId: string
+  readonly attributeId: AttributeInputId
   readonly primarySpeciesId: string
   readonly tagIds: readonly string[]
   readonly stats: MonsterStats
@@ -35,7 +37,7 @@ function assertIntegerAtLeast(value: number, minimum: number, fieldName: string)
 
 export function assertValidMonsterSpecies(species: MonsterSpecies): void {
   assertNonEmptyString(species.id, 'species.id')
-  assertNonEmptyString(species.attributeId, 'species.attributeId')
+  assertValidAttributeId(species.attributeId)
   assertNonEmptyString(species.primarySpeciesId, 'species.primarySpeciesId')
   assertNonEmptyString(species.innateSkillId, 'species.innateSkillId')
   assertIntegerAtLeast(species.rarity, 1, 'species.rarity')
@@ -52,4 +54,5 @@ export function assertValidMonsterSpecies(species: MonsterSpecies): void {
   for (const tagId of species.tagIds) {
     assertNonEmptyString(tagId, 'species.tagIds[]')
   }
+  assertValidStatusResistanceTags(species.tagIds)
 }

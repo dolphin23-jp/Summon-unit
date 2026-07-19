@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { getStatusResistanceTagId } from './status-resistance'
 import { assertValidMonsterSpecies, type MonsterSpecies } from './monster-species'
 
 const validSpecies: MonsterSpecies = {
@@ -18,6 +19,10 @@ const invalidCases: readonly (readonly [MonsterSpecies, string])[] = [
     'species.rarity must be less than or equal to 10',
   ],
   [
+    { ...validSpecies, attributeId: 'attribute.ice' } as unknown as MonsterSpecies,
+    'attributeId is invalid: attribute.ice',
+  ],
+  [
     { ...validSpecies, stats: { ...validSpecies.stats, attack: -1 } },
     'species.stats.attack must be an integer greater than or equal to 0',
   ],
@@ -27,6 +32,16 @@ const invalidCases: readonly (readonly [MonsterSpecies, string])[] = [
   ],
   [{ ...validSpecies, tagIds: [''] }, 'species.tagIds[] must be a non-empty string'],
   [
+    {
+      ...validSpecies,
+      tagIds: [
+        getStatusResistanceTagId('poison', 'STRONG'),
+        getStatusResistanceTagId('poison', 'WEAK'),
+      ],
+    },
+    'status resistance tags conflict for poison',
+  ],
+  [
     { ...validSpecies, innateSkillId: '' },
     'species.innateSkillId must be a non-empty string',
   ],
@@ -35,6 +50,12 @@ const invalidCases: readonly (readonly [MonsterSpecies, string])[] = [
 describe('monster species validation', () => {
   it('accepts the minimal valid master data', () => {
     expect(() => assertValidMonsterSpecies(validSpecies)).not.toThrow()
+  })
+
+  it('accepts the legacy air id as the wind attribute during migration', () => {
+    expect(() =>
+      assertValidMonsterSpecies({ ...validSpecies, attributeId: 'attribute.air' }),
+    ).not.toThrow()
   })
 
   it.each(invalidCases)('rejects invalid master data', (invalidSpecies, message) => {

@@ -1,3 +1,10 @@
+import {
+  assertValidAttributeId,
+  normalizeAttributeId,
+  type AttributeId,
+  type AttributeInputId,
+} from './attribute'
+
 export type SkillId = string
 
 export const DAMAGE_MULTIPLIER_SCALE = 1000
@@ -5,6 +12,7 @@ export const DAMAGE_MULTIPLIER_SCALE = 1000
 export interface SkillDefinition {
   readonly id: SkillId
   readonly slotType: 'INNATE'
+  readonly attributeId?: AttributeInputId
   readonly actionCost: number
   readonly targetType: 'SINGLE_ENEMY'
   readonly damageMultiplierPermille: number
@@ -29,6 +37,10 @@ export function assertValidSkillDefinition(skill: SkillDefinition): void {
     throw new Error('skill.slotType must be INNATE')
   }
 
+  if (skill.attributeId !== undefined) {
+    assertValidAttributeId(skill.attributeId)
+  }
+
   if (skill.targetType !== 'SINGLE_ENEMY') {
     throw new Error('skill.targetType must be SINGLE_ENEMY')
   }
@@ -39,4 +51,9 @@ export function assertValidSkillDefinition(skill: SkillDefinition): void {
     1,
     'skill.damageMultiplierPermille',
   )
+}
+
+export function resolveSkillAttributeId(skill: SkillDefinition): AttributeId {
+  assertValidSkillDefinition(skill)
+  return normalizeAttributeId(skill.attributeId ?? 'attribute.neutral')
 }
