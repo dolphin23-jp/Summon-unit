@@ -1,0 +1,38 @@
+name: Trigger T042 integration
+
+on:
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/t042-export-import-battle-resume
+      - name: Apply embedded integration patch
+        run: |
+          if grep -q "INTERACTIVE_BATTLE_STABLE_SNAPSHOT_VERSION" src/battle/interactive-battle-runner.ts; then
+            exit 0
+          fi
+          python - <<'PY'
+          from pathlib import Path
+          source = Path('.github/workflows/t042-integration-patch.yml').read_text()
+          start_marker = "          python - <<'PY'\n"
+          end_marker = "\n          PY\n      - name: Commit integration"
+          start = source.index(start_marker) + len(start_marker)
+          end = source.index(end_marker, start)
+          lines = source[start:end].splitlines()
+          script = '\n'.join(line[10:] if line.startswith('          ') else line for line in lines)
+          exec(compile(script, 't042-embedded-patch.py', 'exec'))
+          PY
+      - name: Commit integration
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add src/battle/interactive-battle-runner.ts src/save/save-model.ts src/save/save-repository.ts src/save/browser-save-runtime.ts src/ui/MinimalBattleScreen.tsx src/App.tsx src/ui/SaveSlotScreen.tsx src/t040.css
+          git commit -m "Integrate JSON saves and battle resume" || true
+          git push
