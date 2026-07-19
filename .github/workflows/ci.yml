@@ -34,7 +34,22 @@ jobs:
         run: pnpm test
 
       - name: Headless demo
-        run: pnpm demo:headless > /tmp/headless-battle-demo.json
+        id: headless
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          pnpm demo:headless 2>&1 | tee /tmp/t030-headless.log
+
+      - name: Upload headless log
+        if: steps.headless.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: t030-headless-log
+          path: /tmp/t030-headless.log
+
+      - name: Stop on headless failure
+        if: steps.headless.outcome == 'failure'
+        run: exit 1
 
       - name: AI regression benchmark
         run: pnpm benchmark:ai
