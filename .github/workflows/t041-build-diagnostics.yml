@@ -12,7 +12,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: pnpm
       - run: corepack enable
       - run: pnpm install --frozen-lockfile
       - name: Build with concise failure output
