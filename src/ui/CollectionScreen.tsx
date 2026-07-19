@@ -10,6 +10,7 @@ import {
 import { COLUMNS, LOCAL_ROWS } from '../battle/board'
 import type { MonsterSpecies } from '../content/monster-species'
 import type { SkillDefinition } from '../content/skill-definition'
+import { MonsterIcon } from './MonsterIcon'
 import {
   moveFormationMemberPriority,
   placeFormationMember,
@@ -98,19 +99,6 @@ function speciesStateForInstance(
   )
   if (state === undefined) throw new Error(`species state does not exist: ${instance.speciesId}`)
   return state
-}
-
-function MonsterIcon({ species, concealed = false }: { species: MonsterSpecies; concealed?: boolean }) {
-  return (
-    <div
-      className={`collection-icon${concealed ? ' collection-icon--concealed' : ''}`}
-      role="img"
-      aria-label={concealed ? '未開示のモンスター画像領域' : `${displayName(species.id)}の画像領域`}
-    >
-      <span>{concealed ? '?' : shortId(species.id).slice(0, 2).toUpperCase()}</span>
-      <small>IMAGE SLOT</small>
-    </div>
-  )
 }
 
 function RosterCard({
