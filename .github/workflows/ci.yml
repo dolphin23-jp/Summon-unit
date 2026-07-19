@@ -33,8 +33,10 @@ jobs:
       - name: Content validation
         run: pnpm validate:content
 
-      - name: Test
-        run: pnpm test
+      - name: Run tests
+        id: tests
+        continue-on-error: true
+        run: pnpm test > /tmp/tests.txt 2>&1
 
       - name: Headless demo
         run: pnpm demo:headless > /tmp/headless-battle-demo.json
@@ -47,17 +49,18 @@ jobs:
         continue-on-error: true
         run: pnpm benchmark:balance > /tmp/vertical-slice-balance.json 2> /tmp/vertical-slice-balance.err
 
-      - name: Upload vertical slice balance output
+      - name: Upload T046 diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: vertical-slice-balance-output
+          name: t046-diagnostics
           path: |
+            /tmp/tests.txt
             /tmp/vertical-slice-balance.json
             /tmp/vertical-slice-balance.err
 
-      - name: Stop on balance benchmark failure
-        if: steps.balance_benchmark.outcome == 'failure'
+      - name: Stop on test or benchmark failure
+        if: steps.tests.outcome == 'failure' || steps.balance_benchmark.outcome == 'failure'
         run: exit 1
 
       - name: Lint
