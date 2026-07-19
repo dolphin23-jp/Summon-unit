@@ -37,5 +37,6 @@
 - [x] T035 — [研究網・情報開示・試験研究](T035_RESEARCH_NETWORK_TRIAL.md)
 - [x] T036 — [確定研究・召喚・還元・開花](T036_FINAL_RESEARCH_SUMMONING_BLOOM.md)
 - [x] T037 — [研究UI・施設段階](T037_RESEARCH_UI_FACILITY.md)
+- [x] T038 — [ステージマスター・報酬・ボス拡張](T038_STAGE_REWARD_BOSS.md)
 
-T001～T037 complete. Next: T038.
+T001～T038 complete. Next: T039.
