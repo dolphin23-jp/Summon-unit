@@ -35,7 +35,7 @@ function species(id: string, innateSkillId: string): MonsterSpecies {
   return Object.freeze({
     id,
     rarity: 1,
-    attributeId: 'attribute.none',
+    attributeId: 'attribute.neutral',
     primarySpeciesId: id,
     tagIds: Object.freeze([]),
     stats: Object.freeze({ hp: 100, attack: 20, defense: 20, speed: 20 }),
