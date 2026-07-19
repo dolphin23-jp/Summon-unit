@@ -25,6 +25,14 @@ import {
 } from './barrier-guard-resolution'
 import { getBoardPositionId, type BoardPosition } from './board'
 import {
+  createBossPhaseRuntimeState,
+  normalizeBossEncounterDefinition,
+  reserveBossPhaseChange,
+  resolveBossPhaseChange,
+  type BossEncounterDefinition,
+  type BossPhaseRuntimeState,
+} from './boss-phase'
+import {
   assertValidBattleState,
   createBattleState,
   resolveBattleUnitDefeat,
@@ -77,6 +85,7 @@ import {
 import {
   createTimelineQueue,
   popTimelineEvent,
+  type ScheduledEvent,
   type TimelineQueue,
 } from './timeline-queue'
 import {
@@ -118,6 +127,7 @@ export interface HeadlessBattleDefinition {
   readonly units: readonly HeadlessBattleUnitDefinition[]
   readonly guardShares?: readonly GuardShareState[]
   readonly aiConfigurations?: Readonly<Record<BattleUnitId, AiDecisionConfiguration>>
+  readonly boss?: BossEncounterDefinition
   readonly initialActionCost?: number
   readonly maxActions?: number
 }
@@ -148,6 +158,7 @@ export interface HeadlessBattleRunResult {
   readonly summary: HeadlessBattleSummary
   readonly battle: BattleState
   readonly log: BattleEventLog
+  readonly bossPhase: BossPhaseRuntimeState | null
 }
 
 export type InteractiveBattleStatus =
@@ -184,6 +195,7 @@ export interface InteractiveBattleSnapshot {
   readonly manualAllyActionRequested: boolean
   readonly pendingManualAction: InteractivePendingManualAction | null
   readonly lastDecisionLog: AiDecisionReasonLog | null
+  readonly bossPhase: BossPhaseRuntimeState | null
 }
 
 export type InteractiveBattleListener = (snapshot: InteractiveBattleSnapshot) => void
@@ -205,7 +217,7 @@ interface HeadlessBattleContext {
   readonly schedules: Map<BattleUnitId, UnitActionSchedule>
   readonly waitStates: Map<BattleUnitId, WaitActionState>
   readonly skillUsageBooks: Map<BattleUnitId, SkillUsageBook>
-  readonly skillIdsByBattleUnitId: ReadonlyMap<BattleUnitId, readonly string[]>
+  readonly skillIdsByBattleUnitId: Map<BattleUnitId, readonly string[]>
   readonly recentPositionIds: Map<BattleUnitId, readonly string[]>
   readonly aiConfigurations: Readonly<Record<BattleUnitId, AiDecisionConfiguration>>
   readonly guardShares: readonly GuardShareState[]
@@ -1189,6 +1201,8 @@ class InteractiveBattleRunnerImpl implements InteractiveBattleRunner {
   private manualAllyActionRequested = false
   private pendingManualExecution: PendingManualExecution | null = null
   private lastDecisionLog: AiDecisionReasonLog | null = null
+  private readonly bossDefinition: BossEncounterDefinition | null
+  private bossPhase: BossPhaseRuntimeState | null
   private readonly listeners = new Set<InteractiveBattleListener>()
 
   constructor(definition: HeadlessBattleDefinition) {
@@ -1199,6 +1213,28 @@ class InteractiveBattleRunnerImpl implements InteractiveBattleRunner {
     this.context = initial.context
     this.nextTimelineSequence = initial.nextTimelineSequence
     this.log = recordBattleStarted(EMPTY_BATTLE_EVENT_LOG, this.battle)
+    const knownSkillIds = new Set(Object.keys(this.context.skillById))
+    this.bossDefinition =
+      definition.boss === undefined
+        ? null
+        : normalizeBossEncounterDefinition(definition.boss, knownSkillIds)
+    this.bossPhase =
+      this.bossDefinition === null
+        ? null
+        : createBossPhaseRuntimeState(this.bossDefinition, this.battle, knownSkillIds)
+    if (this.bossDefinition !== null && this.bossPhase !== null) {
+      const loadedSkillIds = new Set(
+        getRequiredSkillIds(this.context, this.bossDefinition.bossBattleUnitId),
+      )
+      for (const phase of this.bossDefinition.phases) {
+        for (const skillId of phase.actionSkillIds) {
+          if (!loadedSkillIds.has(skillId)) {
+            throw new Error(`boss phase skill must be equipped: ${skillId}`)
+          }
+        }
+      }
+      this.setBossActionSkills(this.bossPhase.actionSkillIds)
+    }
   }
 
   getSnapshot(): InteractiveBattleSnapshot {
@@ -1219,6 +1255,7 @@ class InteractiveBattleRunnerImpl implements InteractiveBattleRunner {
               this.nextTimelineSequence,
             ),
       lastDecisionLog: this.lastDecisionLog,
+      bossPhase: this.bossPhase,
     })
   }
 
@@ -1237,6 +1274,12 @@ class InteractiveBattleRunnerImpl implements InteractiveBattleRunner {
     const popped = popTimelineEvent(this.battle.timeline)
     if (popped.event === null) {
       throw new Error('ongoing interactive battle must have a scheduled event')
+    }
+    if (popped.event.kind === 'PHASE_CHANGE') {
+      this.currentVirtualTime = popped.event.time
+      this.battle = withTimeline(this.battle, popped.queue)
+      this.resolveBossPhaseEvent(popped.event)
+      return this.publish()
     }
     if (popped.event.kind !== 'UNIT_TURN') {
       throw new Error(`unsupported interactive timeline event: ${popped.event.kind}`)
@@ -1387,6 +1430,7 @@ class InteractiveBattleRunnerImpl implements InteractiveBattleRunner {
       ),
       battle: this.battle,
       log: this.log,
+      bossPhase: this.bossPhase,
     })
   }
 
@@ -1442,6 +1486,7 @@ class InteractiveBattleRunnerImpl implements InteractiveBattleRunner {
       )
       this.battle = durationProgress.battle
       this.log = durationProgress.log
+      this.reserveBossPhaseEvent()
       this.battle = registerNextTurn(
         this.battle,
         executed.schedule,
@@ -1450,6 +1495,57 @@ class InteractiveBattleRunnerImpl implements InteractiveBattleRunner {
       this.nextTimelineSequence += 1
     }
     updateRecentPositionHistory(this.battle, actor.battleUnitId, this.context)
+  }
+
+  private setBossActionSkills(skillIds: readonly string[]): void {
+    if (this.bossDefinition === null) return
+    const bossBattleUnitId = this.bossDefinition.bossBattleUnitId
+    const frozenSkillIds = Object.freeze([...skillIds])
+    const boss = getRequiredUnit(this.battle, bossBattleUnitId)
+    const species = getRequiredSpecies(this.context.speciesById, boss.speciesId)
+    if (!frozenSkillIds.includes(species.innateSkillId)) {
+      throw new Error('boss phase action table must include the innate skill')
+    }
+    const skills = frozenSkillIds.map((skillId) =>
+      getRequiredSkill(this.context.skillById, skillId),
+    )
+    this.context.skillIdsByBattleUnitId.set(bossBattleUnitId, frozenSkillIds)
+    this.context.skillUsageBooks.set(bossBattleUnitId, createSkillUsageBook(skills))
+  }
+
+  private reserveBossPhaseEvent(): void {
+    if (this.bossDefinition === null || this.bossPhase === null) return
+    const reserved = reserveBossPhaseChange({
+      battle: this.battle,
+      state: this.bossPhase,
+      definition: this.bossDefinition,
+      speciesById: this.context.speciesById,
+      knownSkillIds: new Set(Object.keys(this.context.skillById)),
+      currentTime: this.currentVirtualTime,
+      sequence: this.nextTimelineSequence,
+    })
+    this.battle = reserved.battle
+    this.bossPhase = reserved.state
+    this.nextTimelineSequence = reserved.nextSequence
+  }
+
+  private resolveBossPhaseEvent(event: ScheduledEvent): void {
+    if (this.bossDefinition === null || this.bossPhase === null) {
+      throw new Error('PHASE_CHANGE event requires a boss encounter')
+    }
+    const resolved = resolveBossPhaseChange({
+      battle: this.battle,
+      state: this.bossPhase,
+      definition: this.bossDefinition,
+      event,
+      speciesById: this.context.speciesById,
+      knownSkillIds: new Set(Object.keys(this.context.skillById)),
+      barrierApplicationSequence: event.sequence,
+    })
+    this.battle = resolved.battle
+    this.bossPhase = resolved.state
+    this.setBossActionSkills(resolved.actionSkillIds)
+    this.reserveBossPhaseEvent()
   }
 
   private getStatus(): InteractiveBattleStatus {

@@ -410,6 +410,7 @@ export function createFormationBattleDefinition(
     skills: catalog.skills,
     units: Object.freeze([...allyUnits, ...enemyUnits]),
     aiConfigurations: Object.freeze(aiConfigurations),
+    boss: baseBattle.boss,
     initialActionCost: baseBattle.initialActionCost,
     maxActions: baseBattle.maxActions,
   })

@@ -61,6 +61,7 @@ export function createStageBattleDefinition(
       skills: catalog.skills,
       units: stage.enemyFormation.units,
       aiConfigurations: stage.enemyFormation.aiConfigurations,
+      boss: stage.boss ?? undefined,
       initialActionCost: battleDefaults.initialActionCost,
       maxActions: battleDefaults.maxActions,
     }),
