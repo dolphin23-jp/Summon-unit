@@ -49,7 +49,7 @@ pnpm demo:headless
 pnpm build
 ```
 
-`pnpm demo:headless` は標準4種・3対3のヘッドレス戦闘を実行し、勝敗、仮想時刻、行動回数、最終状態、イベントログをJSONで出力します。
+`pnpm demo:headless` は、標準4種・3対3のv1戦闘に加え、毒・火傷・障壁・予兆・召喚・領域・タイムアウト判定を含む固定戦闘v2をJSONで出力します。
 
 ## 文書の読み順
 
@@ -61,8 +61,9 @@ pnpm build
 6. `docs/15_BALANCE_GUIDELINES.md`
 7. `docs/16_DATA_SCHEMAS.md`
 8. `docs/17_IMPLEMENTATION_ROADMAP.md`
-9. `AGENTS.md`
-10. `tasks/STATUS.md` の未完了タスクを上から実装
+9. `docs/18_GOLDEN_TEST_POLICY.md`
+10. `AGENTS.md`
+11. `tasks/STATUS.md` の未完了タスクを上から実装
 
 ## 現在の状態
 
@@ -91,5 +92,7 @@ pnpm build
 - Phase 2 T021の到達方式・9種範囲マスク・一歩強制移動・決定論テスト：完了
 - Phase 2 T022の予兆予約・占有型設置物・非占有領域・決定論テスト：完了
 - Phase 2 T023の召喚・初動待ち・領域侵入・30%蘇生・1戦闘1回制限：完了
+- Phase 2 T024の全効果リファレンスv2・100回再実行・タイムアウト勝敗・ゴールデン規約：完了
+- Phase 2 T016～T024：完了
 
-次の実装対象はT024「決定論リファレンスv2」です。詳細な確定・暫定区分は `docs/DECISIONS.md` を参照してください。
+次の実装対象はT025「AI評価基盤」です。詳細な確定・暫定区分は `docs/DECISIONS.md` を参照してください。

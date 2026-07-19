@@ -23,5 +23,6 @@
 - [x] T021 — [到達方式・範囲マスク・強制移動](T021_REACH_AREA_FORCED_MOVEMENT.md)
 - [x] T022 — [予兆・設置物・領域](T022_TELEGRAPH_OBJECTS_REGIONS.md)
 - [x] T023 — [召喚・蘇生](T023_SUMMON_REVIVE.md)
+- [x] T024 — [決定論リファレンスv2](T024_DETERMINISM_REFERENCE_V2.md)
 
-T001～T023 complete. Next: T024.
+T001～T024 complete. Next: T025.

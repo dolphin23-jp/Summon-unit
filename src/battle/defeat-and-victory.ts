@@ -7,7 +7,7 @@ import {
 } from './timeline-queue'
 import type { BattleUnitId, BattleUnitState } from './unit-state'
 
-export type BattleOutcome = 'ONGOING' | 'ALLY_VICTORY' | 'ALLY_DEFEAT'
+export type BattleOutcome = 'ONGOING' | 'ALLY_VICTORY' | 'ALLY_DEFEAT' | 'DRAW'
 
 export interface BoardOccupant {
   readonly battleUnitId: BattleUnitId
