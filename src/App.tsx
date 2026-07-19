@@ -21,6 +21,12 @@ interface BattleSession {
   readonly serial: number
 }
 
+const T038_STAGE_BATTLE: HeadlessBattleDefinition = Object.freeze({
+  ...STANDARD_INTERACTIVE_BATTLE,
+  units: T038_STAGE.enemyFormation.units,
+  aiConfigurations: T038_STAGE.enemyFormation.aiConfigurations,
+})
+
 function App() {
   const [playerData, setPlayerData] = useState<PlayerData>(T038_INITIAL_PLAYER_DATA)
   const [screen, setScreen] = useState<AppScreen>('COLLECTION')
@@ -94,7 +100,7 @@ function App() {
             playerData,
             formationId,
             T038_PLAYER_CATALOG,
-            STANDARD_INTERACTIVE_BATTLE,
+            T038_STAGE_BATTLE,
           )
           setBattleSession({ definition, serial: nextBattleSerial })
           setNextBattleSerial((current) => current + 1)
