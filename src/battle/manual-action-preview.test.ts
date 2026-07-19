@@ -5,10 +5,10 @@ import {
   type HeadlessBattleDefinition,
   type InteractiveBattleSnapshot,
 } from './interactive-battle-runner'
-import { STANDARD_HEADLESS_BATTLE } from '../demo/standard-headless-battle'
+import { STANDARD_INTERACTIVE_BATTLE } from '../demo/standard-headless-battle'
 
 function advanceToManual(
-  definition: HeadlessBattleDefinition = STANDARD_HEADLESS_BATTLE,
+  definition: HeadlessBattleDefinition = STANDARD_INTERACTIVE_BATTLE,
 ): {
   readonly runner: ReturnType<typeof createInteractiveBattleRunner>
   readonly snapshot: InteractiveBattleSnapshot
@@ -27,9 +27,9 @@ function advanceToManual(
 
 function withBarrierAndGuard(): HeadlessBattleDefinition {
   return Object.freeze({
-    ...STANDARD_HEADLESS_BATTLE,
+    ...STANDARD_INTERACTIVE_BATTLE,
     units: Object.freeze(
-      STANDARD_HEADLESS_BATTLE.units.map((unit) =>
+      STANDARD_INTERACTIVE_BATTLE.units.map((unit) =>
         unit.battleUnitId === 'enemy.delta'
           ? Object.freeze({
               ...unit,

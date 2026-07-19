@@ -8,7 +8,7 @@ import {
   type InteractiveManualActionOption,
 } from '../battle/headless-battle-runner'
 import type { ManualActionCategory } from '../battle/manual-action-preview'
-import { STANDARD_HEADLESS_BATTLE } from '../demo/standard-headless-battle'
+import { STANDARD_INTERACTIVE_BATTLE } from '../demo/standard-headless-battle'
 import { BattleDecisionPanel } from './BattleDecisionPanel'
 import { BattleTimelinePanel } from './BattleTimelinePanel'
 import { BattleUnitCard } from './BattleUnitCard'
@@ -19,7 +19,7 @@ const STEP_MS = 420
 type BattleSpeed = 1 | 2 | 4
 
 function createRunner(): InteractiveBattleRunner {
-  return createInteractiveBattleRunner(STANDARD_HEADLESS_BATTLE)
+  return createInteractiveBattleRunner(STANDARD_INTERACTIVE_BATTLE)
 }
 
 function outcomeLabel(outcome: BattleOutcome): string {
@@ -285,7 +285,7 @@ export function MinimalBattleScreen() {
     [pending, selectedCandidateId],
   )
   const view = useMemo(
-    () => createBattleScreenView(STANDARD_HEADLESS_BATTLE, snapshot, previewOption),
+    () => createBattleScreenView(STANDARD_INTERACTIVE_BATTLE, snapshot, previewOption),
     [previewOption, snapshot],
   )
 

@@ -1,8 +1,5 @@
 import type { AiDecisionReasonLog } from '../ai/configured-decision'
-import {
-  calculateNextActionTime,
-  type UnitTurnEventPayload,
-} from '../battle/action-scheduling'
+import type { UnitTurnEventPayload } from '../battle/action-scheduling'
 import { getTotalBarrierCapacity } from '../battle/barrier'
 import {
   ALL_BOARD_POSITIONS,
@@ -15,8 +12,6 @@ import type {
   InteractiveBattleSnapshot,
   InteractiveManualActionOption,
 } from '../battle/headless-battle-runner'
-import { NORMAL_MOVEMENT_ACTION_COST } from '../battle/normal-movement'
-import { getModifiedBattleStatValue } from '../battle/stat-modifiers'
 import type { TelegraphResolvePayload } from '../battle/telegraph'
 import type { ScheduledEvent, ScheduledEventKind } from '../battle/timeline-queue'
 import type { BattleUnitState } from '../battle/unit-state'
@@ -373,47 +368,10 @@ function createTimelineEntry(
   })
 }
 
-function getPreviewActionCost(
-  definition: HeadlessBattleDefinition,
-  actor: BattleUnitState,
-  option: InteractiveManualActionOption,
-): number | null {
-  if (option.kind === 'WAIT') {
-    return null
-  }
-  const baseCost =
-    option.kind === 'MOVE'
-      ? NORMAL_MOVEMENT_ACTION_COST
-      : (() => {
-          const match = /^skill:(.+):target:/.exec(option.candidateId)
-          if (match === null) {
-            return null
-          }
-          return definition.skills.find((skill) => skill.id === match[1])?.actionCost ?? null
-        })()
-  return baseCost === null
-    ? null
-    : getModifiedBattleStatValue(baseCost, actor.effects, 'ACTION_COST')
-}
-
-function getPreviewPositionId(
-  actor: BattleUnitState,
-  option: InteractiveManualActionOption,
-): string {
-  if (option.kind !== 'MOVE') {
-    return getBoardPositionId(actor.position)
-  }
-  const match = /^move:(ALLY|ENEMY):([0-2]):([0-2])$/.exec(option.candidateId)
-  return match === null
-    ? getBoardPositionId(actor.position)
-    : `${match[1]}:${match[2]}:${match[3]}`
-}
-
 function createProvisionalTimelineEntry(
   definition: HeadlessBattleDefinition,
   snapshot: InteractiveBattleSnapshot,
   option: InteractiveManualActionOption | null,
-  speciesById: Readonly<Record<string, MonsterSpecies>>,
 ): BattleTimelineEntryView | null {
   const pending = snapshot.pendingManualAction
   if (pending === null || option === null) {
@@ -425,18 +383,8 @@ function createProvisionalTimelineEntry(
   if (actor === undefined || actor.defeated) {
     return null
   }
-  const actionCost = getPreviewActionCost(definition, actor, option)
-  if (actionCost === null) {
-    return null
-  }
-  const species = getRequiredSpecies(speciesById, actor.speciesId)
-  const speed = getModifiedBattleStatValue(species.stats.speed, actor.effects, 'SPEED')
-  const time = calculateNextActionTime(
-    snapshot.currentVirtualTime,
-    actionCost,
-    speed,
-  )
-  const positionId = getPreviewPositionId(actor, option)
+  const time = option.preview.nextActionTime
+  const positionId = option.preview.toPositionId
   const isKnownUnit = definition.units.some(
     (unit) => unit.battleUnitId === actor.battleUnitId,
   )
@@ -502,7 +450,6 @@ export function createBattleScreenView(
     definition,
     snapshot,
     previewOption,
-    speciesById,
   )
   if (provisional !== null) {
     timeline.push(provisional)
