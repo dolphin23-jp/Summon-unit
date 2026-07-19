@@ -45,5 +45,6 @@
 - [x] T043 — [コンテンツ検証パイプライン](T043_CONTENT_VALIDATION_PIPELINE.md)
 - [x] T044 — [スライスモンスター・技一式](T044_VERTICAL_SLICE_MONSTERS_SKILLS.md)
 - [x] T045 — [研究網スライス・地域A/B制作](T045_RESEARCH_REGIONS_A_B.md)
+- [x] T046 — [バランスシミュレーション・調整・導入](T046_BALANCE_SIMULATION_ONBOARDING.md)
 
-T001～T045 complete. Next: T046.
+T001～T046 complete. Next: T047.
