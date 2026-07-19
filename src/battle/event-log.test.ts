@@ -147,6 +147,27 @@ describe('battle event log', () => {
     ])
   })
 
+  it('allows a self-target skill event for generalized manual commands', () => {
+    const started = recordBattleStarted(EMPTY_BATTLE_EVENT_LOG, createBattle())
+    const next = appendBattleEvent(started, {
+      kind: 'skill_used',
+      virtualTime: 10_000,
+      payload: {
+        actorBattleUnitId: 'ally.a',
+        targetBattleUnitId: 'ally.a',
+        skillId: 'skill.log-guard',
+      },
+    })
+
+    expect(next.events.at(-1)).toMatchObject({
+      kind: 'skill_used',
+      payload: {
+        actorBattleUnitId: 'ally.a',
+        targetBattleUnitId: 'ally.a',
+      },
+    })
+  })
+
   it('can record environmental defeat and battle end separately', () => {
     let log = recordBattleStarted(EMPTY_BATTLE_EVENT_LOG, createBattle())
     log = recordUnitDefeated(log, {

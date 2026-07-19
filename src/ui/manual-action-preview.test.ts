@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest'
 import type { MonsterSpecies } from '../content/monster-species'
 import type { SkillDefinition } from '../content/skill-definition'
 import { STANDARD_HEADLESS_BATTLE } from '../demo/standard-headless-battle'
-import { getTotalBarrierCapacity } from './barrier'
+import { getTotalBarrierCapacity } from '../battle/barrier'
 import {
   createInteractiveBattleRunner,
   type HeadlessBattleDefinition,
   type InteractiveBattleSnapshot,
-} from './interactive-battle-runner'
+} from '../battle/interactive-battle-runner'
 
 function advanceToManual(snapshot: InteractiveBattleSnapshot, step: () => InteractiveBattleSnapshot) {
   let current = snapshot

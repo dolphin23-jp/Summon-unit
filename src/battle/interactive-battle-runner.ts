@@ -13,7 +13,11 @@ import {
 } from '../ai/configured-decision'
 import type { AiDecisionConfiguration } from '../ai/strategy-presets'
 import type { MonsterSpecies } from '../content/monster-species'
-import type { SkillDefinition, SkillSlotType } from '../content/skill-definition'
+import {
+  resolveSkillReachMethod,
+  type SkillDefinition,
+  type SkillSlotType,
+} from '../content/skill-definition'
 import {
   createInitialUnitActionSchedule,
   createOrderedUnitTurnEvents,
@@ -601,6 +605,7 @@ function executeSkillDecision(
   const eventTargetBattleUnitId =
     resolution.preview.actualTargetBattleUnitId ??
     resolution.preview.selectedTargetBattleUnitId ??
+    resolution.rawPreview.targetResults[0]?.battleUnitId ??
     actor.battleUnitId
   let nextLog = appendBattleEvent(log, {
     kind: 'skill_used',
@@ -875,6 +880,12 @@ function isCandidateUsable(
     return !isMovementLocked(actor)
   }
   const skill = getRequiredSkill(context.skillById, candidate.skillId)
+  if (
+    candidate.selectedTargetBattleUnitId === null &&
+    resolveSkillReachMethod(skill) !== 'GLOBAL'
+  ) {
+    return false
+  }
   const target =
     candidate.selectedTargetBattleUnitId === null
       ? undefined
