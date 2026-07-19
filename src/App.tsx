@@ -45,7 +45,9 @@ function mergeNotifications(
 ): readonly ProgressionNotification[] {
   const byId = new Map(current.map((notification) => [notification.id, notification]))
   for (const notification of incoming) byId.set(notification.id, notification)
-  return Object.freeze([...byId.values()].sort((left, right) => left.id.localeCompare(right.id, 'en')))
+  return Object.freeze(
+    [...byId.values()].sort((left, right) => left.id.localeCompare(right.id, 'en')),
+  )
 }
 
 function App() {
@@ -153,13 +155,23 @@ function App() {
 
   if (screen === 'RESEARCH') {
     return (
-      <ResearchScreen
-        playerData={playerData}
-        catalog={T039_PLAYER_CATALOG}
-        onPlayerDataChange={updatePlayerData}
-        onOpenCollection={() => setScreen('COLLECTION')}
-        onOpenRegion={() => setScreen('REGION')}
-      />
+      <div className="t039-research-shell">
+        <nav className="t039-screen-navigation" aria-label="主要画面">
+          <button
+            type="button"
+            className="collection-button collection-button--primary"
+            onClick={() => setScreen('REGION')}
+          >
+            地域・ステージ
+          </button>
+        </nav>
+        <ResearchScreen
+          playerData={playerData}
+          catalog={T039_PLAYER_CATALOG}
+          onPlayerDataChange={updatePlayerData}
+          onOpenCollection={() => setScreen('COLLECTION')}
+        />
+      </div>
     )
   }
 
