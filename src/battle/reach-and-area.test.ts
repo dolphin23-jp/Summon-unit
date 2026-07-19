@@ -248,7 +248,7 @@ describe('T021 area masks', () => {
     expect(positionIds(area.positions)).toEqual(['ENEMY:1:1', 'ENEMY:0:1'])
   })
 
-  it('chains to the nearest unvisited target and breaks ties by battle unit id', () => {
+  it('chains from each hit to the nearest unvisited target and breaks ties by battle unit id', () => {
     const battle = createScenario()
     const skill: SkillDefinition = {
       ...baseSkill,
@@ -272,7 +272,7 @@ describe('T021 area masks', () => {
     expect(targetIds(area.targets)).toEqual([
       'enemy.front',
       'enemy.left',
-      'enemy.middle',
+      'enemy.back-left',
       'enemy.back',
     ])
     expect(new Set(targetIds(area.targets)).size).toBe(4)
