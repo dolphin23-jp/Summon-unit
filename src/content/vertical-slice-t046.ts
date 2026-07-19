@@ -76,7 +76,7 @@ function balancedBossDefinition(record: VerticalSliceStageRecord): BossEncounter
         const gimmick =
           record.definition.stageId === 'stage.slice.b-08-wyvern-boss' &&
           phase.gimmick.type === 'BARRIER'
-            ? Object.freeze({ type: 'BARRIER' as const, capacity: 80 })
+            ? Object.freeze({ type: 'BARRIER' as const, capacity: 40 })
             : Object.freeze({ ...phase.gimmick })
         return Object.freeze({
           ...phase,
@@ -114,7 +114,7 @@ function adjustedUnits(record: VerticalSliceStageRecord): readonly HeadlessBattl
       (unit) => unit.speciesId === 'species.slice.disaster-flame-wyvern',
     )
     if (wyvern === undefined) throw new Error('T046 B-08 wyvern is missing')
-    return Object.freeze([Object.freeze({ ...wyvern, initialHp: 300 })])
+    return Object.freeze([Object.freeze({ ...wyvern, initialHp: 180 })])
   }
   return record.definition.enemyFormation.units
 }
