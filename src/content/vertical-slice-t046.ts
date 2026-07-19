@@ -1,4 +1,5 @@
 import type { BossEncounterDefinition } from '../battle/boss-phase'
+import type { HeadlessBattleUnitDefinition } from '../battle/headless-battle-runner'
 import type { PlayerData } from '../progression/player-data'
 import { createStagePlayerData } from '../progression/stage-reward'
 import { validateContentCatalog, type ContentValidationSummary } from './content-validation'
@@ -20,6 +21,7 @@ export interface VerticalSliceOnboardingCue {
 export interface VerticalSliceT046ValidationSummary extends ContentValidationSummary {
   readonly onboardingCues: number
   readonly balancedBossStages: number
+  readonly adjustedStages: number
   readonly initialUnits: number
   readonly initialFormationMembers: number
 }
@@ -46,6 +48,12 @@ export const VERTICAL_SLICE_ONBOARDING_CUES: readonly VerticalSliceOnboardingCue
     }),
   ])
 
+const ADJUSTED_STAGE_IDS = Object.freeze([
+  'stage.slice.a-03-movement',
+  'stage.slice.b-06-telegraph',
+  'stage.slice.b-08-wyvern-boss',
+])
+
 function uniqueSorted(values: readonly string[]): readonly string[] {
   return Object.freeze([...new Set(values)].sort((left, right) => left.localeCompare(right, 'en')))
 }
@@ -64,22 +72,79 @@ function balancedBossDefinition(record: VerticalSliceStageRecord): BossEncounter
   return Object.freeze({
     bossBattleUnitId: boss.bossBattleUnitId,
     phases: Object.freeze(
-      boss.phases.map((phase) =>
-        Object.freeze({
+      boss.phases.map((phase) => {
+        const gimmick =
+          record.definition.stageId === 'stage.slice.b-08-wyvern-boss' &&
+          phase.gimmick.type === 'BARRIER'
+            ? Object.freeze({ type: 'BARRIER' as const, capacity: 100 })
+            : Object.freeze({ ...phase.gimmick })
+        return Object.freeze({
           ...phase,
           actionSkillIds: uniqueSorted([species.innateSkillId, ...phase.actionSkillIds]),
-          gimmick: Object.freeze({ ...phase.gimmick }),
-        }),
-      ),
+          gimmick,
+        })
+      }),
     ),
   })
 }
 
+function adjustedUnits(record: VerticalSliceStageRecord): readonly HeadlessBattleUnitDefinition[] {
+  const stageId = record.definition.stageId
+  if (stageId === 'stage.slice.a-03-movement') {
+    const gale = record.definition.enemyFormation.units.find(
+      (unit) => unit.speciesId === 'species.slice.gale-wolf',
+    )
+    if (gale === undefined) throw new Error('T046 A-03 gale wolf is missing')
+    return Object.freeze([Object.freeze({ ...gale, initialHp: 82 })])
+  }
+  if (stageId === 'stage.slice.b-06-telegraph') {
+    return Object.freeze(
+      record.definition.enemyFormation.units
+        .filter((unit) => unit.speciesId !== 'species.slice.spark-bird')
+        .map((unit) =>
+          Object.freeze({
+            ...unit,
+            ...(unit.speciesId === 'species.slice.flame-automaton' ? { initialHp: 125 } : {}),
+          }),
+        ),
+    )
+  }
+  if (stageId === 'stage.slice.b-08-wyvern-boss') {
+    return Object.freeze(
+      record.definition.enemyFormation.units
+        .filter((unit) => unit.speciesId !== 'species.slice.windtree-priest')
+        .map((unit) =>
+          Object.freeze({
+            ...unit,
+            ...(unit.speciesId === 'species.slice.disaster-flame-wyvern'
+              ? { initialHp: 320 }
+              : unit.speciesId === 'species.slice.molten-carapace'
+                ? { initialHp: 220 }
+                : {}),
+          }),
+        ),
+    )
+  }
+  return record.definition.enemyFormation.units
+}
+
 function balancedStageRecord(record: VerticalSliceStageRecord): VerticalSliceStageRecord {
+  const units = adjustedUnits(record)
+  const unitIds = new Set(units.map((unit) => unit.battleUnitId))
   return Object.freeze({
     ...record,
     definition: Object.freeze({
       ...record.definition,
+      enemyFormation: Object.freeze({
+        units,
+        aiConfigurations: Object.freeze(
+          Object.fromEntries(
+            Object.entries(record.definition.enemyFormation.aiConfigurations).filter(([unitId]) =>
+              unitIds.has(unitId),
+            ),
+          ),
+        ),
+      }),
       boss: balancedBossDefinition(record),
     }),
   })
@@ -211,6 +276,7 @@ export function validateVerticalSliceT046(): VerticalSliceT046ValidationSummary 
     ...base,
     onboardingCues: VERTICAL_SLICE_ONBOARDING_CUES.length,
     balancedBossStages: balancedBossStages.length,
+    adjustedStages: ADJUSTED_STAGE_IDS.length,
     initialUnits: VERTICAL_SLICE_T046_INITIAL_PLAYER_DATA.collection.unitInstances.length,
     initialFormationMembers:
       VERTICAL_SLICE_T046_INITIAL_PLAYER_DATA.formations.formations[0]?.members.length ?? 0,
