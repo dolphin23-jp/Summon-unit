@@ -1,38 +1,64 @@
 import { useState } from 'react'
 import type { HeadlessBattleDefinition } from './battle/headless-battle-runner'
 import {
-  T037_GENERIC_SKILL_COSTS,
-  T037_INITIAL_PLAYER_DATA,
-  T037_PLAYER_CATALOG,
-} from './demo/research-ui-demo'
+  T038_GENERIC_SKILL_COSTS,
+  T038_INITIAL_PLAYER_DATA,
+  T038_PLAYER_CATALOG,
+  T038_STAGE,
+} from './demo/stage-reward-demo'
 import { STANDARD_INTERACTIVE_BATTLE } from './demo/standard-headless-battle'
 import { createFormationBattleDefinition } from './progression/formation-editor'
 import type { PlayerData } from './progression/player-data'
-import { preserveResearchFacilityState } from './progression/research-facility'
+import { createStagePlayerData, settleStageBattle } from './progression/stage-reward'
 import { CollectionScreen } from './ui/CollectionScreen'
 import { MinimalBattleScreen } from './ui/MinimalBattleScreen'
 import { ResearchScreen } from './ui/ResearchScreen'
 
 type AppScreen = 'COLLECTION' | 'RESEARCH'
 
+interface BattleSession {
+  readonly definition: HeadlessBattleDefinition
+  readonly serial: number
+}
+
 function App() {
-  const [playerData, setPlayerData] = useState<PlayerData>(T037_INITIAL_PLAYER_DATA)
+  const [playerData, setPlayerData] = useState<PlayerData>(T038_INITIAL_PLAYER_DATA)
   const [screen, setScreen] = useState<AppScreen>('COLLECTION')
-  const [battleDefinition, setBattleDefinition] = useState<HeadlessBattleDefinition | null>(null)
+  const [battleSession, setBattleSession] = useState<BattleSession | null>(null)
+  const [nextBattleSerial, setNextBattleSerial] = useState(1)
 
   const updatePlayerData = (next: PlayerData) => {
     setPlayerData((current) =>
-      preserveResearchFacilityState(next, current, T037_PLAYER_CATALOG),
+      createStagePlayerData(
+        {
+          ...next,
+          facilities: next.facilities ?? current.facilities,
+          stageProgress: next.stageProgress ?? current.stageProgress,
+        },
+        T038_PLAYER_CATALOG,
+      ),
     )
   }
 
-  if (battleDefinition !== null) {
+  if (battleSession !== null) {
     return (
       <MinimalBattleScreen
-        definition={battleDefinition}
+        definition={battleSession.definition}
+        settleResult={(result, attempt) =>
+          settleStageBattle(playerData, result, T038_PLAYER_CATALOG, {
+            settlementId: `${T038_STAGE.stageId}:run-${battleSession.serial}:attempt-${attempt}`,
+            stageId: T038_STAGE.stageId,
+            bonusRollBasisPoints: (battleSession.serial * 7919 + attempt * 3571) % 10_000,
+          })
+        }
+        onSettlement={(settlement) => updatePlayerData(settlement.playerData)}
         onOpenFormation={() => {
-          setBattleDefinition(null)
+          setBattleSession(null)
           setScreen('COLLECTION')
+        }}
+        onOpenResearch={() => {
+          setBattleSession(null)
+          setScreen('RESEARCH')
         }}
       />
     )
@@ -42,7 +68,7 @@ function App() {
     return (
       <ResearchScreen
         playerData={playerData}
-        catalog={T037_PLAYER_CATALOG}
+        catalog={T038_PLAYER_CATALOG}
         onPlayerDataChange={updatePlayerData}
         onOpenCollection={() => setScreen('COLLECTION')}
       />
@@ -60,19 +86,19 @@ function App() {
       </button>
       <CollectionScreen
         playerData={playerData}
-        catalog={T037_PLAYER_CATALOG}
-        genericSkillCosts={T037_GENERIC_SKILL_COSTS}
+        catalog={T038_PLAYER_CATALOG}
+        genericSkillCosts={T038_GENERIC_SKILL_COSTS}
         onPlayerDataChange={updatePlayerData}
-        onStartBattle={(formationId) =>
-          setBattleDefinition(
-            createFormationBattleDefinition(
-              playerData,
-              formationId,
-              T037_PLAYER_CATALOG,
-              STANDARD_INTERACTIVE_BATTLE,
-            ),
+        onStartBattle={(formationId) => {
+          const definition = createFormationBattleDefinition(
+            playerData,
+            formationId,
+            T038_PLAYER_CATALOG,
+            STANDARD_INTERACTIVE_BATTLE,
           )
-        }
+          setBattleSession({ definition, serial: nextBattleSerial })
+          setNextBattleSerial((current) => current + 1)
+        }}
       />
     </div>
   )
