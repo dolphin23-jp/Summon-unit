@@ -1,0 +1,7 @@
+
+> summon-unit@0.0.0 build /home/runner/work/Summon-unit/Summon-unit
+> tsc -b && vite build
+
+src/save/browser-save-runtime.ts(34,37): error TS7031: Binding element 'slotId' implicitly has an 'any' type.
+src/save/browser-save-runtime.ts(34,45): error TS7031: Binding element 'savedAtEpochMs' implicitly has an 'any' type.
+ ELIFECYCLE  Command failed with exit code 2.
