@@ -19,6 +19,6 @@
 - [x] T017 — [属性・バフデバフ・状態耐性](T017_ATTRIBUTES_BUFFS_RESISTANCE.md)
 - [x] T018 — [状態異常一式](T018_STATUS_CONDITIONS.md)
 - [x] T019 — [対象選択・固有特性・時間操作・待機・技使用制約](T019_TARGETING_TRAITS_TIME_USAGE.md)
-- [ ] T020 — [障壁・肩代わり](T020_BARRIERS_GUARD_SHARE.md)
+- [x] T020 — [障壁・肩代わり](T020_BARRIERS_GUARD_SHARE.md)
 
-T020 in progress.
+T001～T020 complete. Next: T021.
