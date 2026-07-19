@@ -8,8 +8,6 @@ on:
 
 permissions:
   contents: write
-  issues: write
-  pull-requests: write
 
 jobs:
   materialize:
@@ -17,23 +15,16 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          ref: agent/t030-manual-preview
-      - name: Apply or report materialization error
+      - name: Apply T030 implementation
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          git clone --quiet --depth 1 --branch agent/t030-manual-preview "https://x-access-token:${GH_TOKEN}@github.com/dolphin23-jp/Summon-unit.git" repo
+          cd repo
           base64 --decode .agent/t030-patch.tar.gz.b64 > /tmp/t030-patch.tar.gz
           tar -xzf /tmp/t030-patch.tar.gz -C /tmp
-          set +e
-          python /tmp/apply_t030.py > /tmp/t030-materialize.log 2>&1
-          status=$?
-          set -e
-          if [ "$status" -ne 0 ]; then
-            python -c 'import json,pathlib; log=pathlib.Path("/tmp/t030-materialize.log").read_text(); print(json.dumps({"body":"T030 materialization failed:\n\n```text\n"+log[-6000:]+"\n```"}))' > /tmp/t030-comment.json
-            curl --fail-with-body --silent --show-error -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" https://api.github.com/repos/dolphin23-jp/Summon-unit/issues/32/comments --data-binary @/tmp/t030-comment.json
+          if ! python /tmp/apply_t030.py > /tmp/t030-materialize.log 2>&1; then
+            cat /tmp/t030-materialize.log
             exit 1
           fi
           rm -rf .agent
