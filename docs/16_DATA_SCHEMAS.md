@@ -118,9 +118,9 @@ interface BattleEvent {
 
 状態更新はイベントを生成し、UIはイベントを購読します。
 
-## プレイヤー状態（T035時点）
+## プレイヤー状態（T036時点）
 
-T035ではコレクション、編成、経済、研究進行を同じPlayerDataへ統合します。地域進行と戦闘中断状態は後続タスクで同じトップレベルへ合成します。
+T036ではコレクション、編成、経済、研究進行を同じPlayerDataへ統合したまま、既存フィールドを使って確定研究、召喚、還元、修復、開花を処理します。地域進行と戦闘中断状態は後続タスクで同じトップレベルへ合成します。
 
 ```ts
 interface PlayerData {
@@ -138,9 +138,14 @@ interface PlayerDataContentCatalog {
   skills: SkillDefinition[];
   researchNodes: ResearchNodeDefinition[];
 }
+
+interface T036ProgressionCatalog extends PlayerDataContentCatalog {
+  finalResearchDefinitions: FinalResearchDefinition[];
+  bloomResearchDefinitions: BloomResearchDefinition[];
+}
 ```
 
-T035のデモPlayerDataは研究状態追加に伴いschemaVersion 3です。IndexedDB永続化とmigrationは未実装です。既存T032～T034のメモリ内入力では`research`と`researchNodes`を省略でき、省略時は空状態へ正規化します。
+T035のデモPlayerDataは研究状態追加に伴いschemaVersion 3です。T036は保存フィールドを追加しないためschemaVersion 3を維持します。IndexedDB永続化とmigrationは未実装です。
 
 ## 経済
 
@@ -193,7 +198,7 @@ interface PlayerUnitInstance {
 }
 ```
 
-図鑑段階と統計キーは固定文字列IDです。解析度とconditionは0～10000の整数basis pointsです。
+図鑑段階と統計キーは固定文字列IDです。解析度とconditionは0～10000の整数basis pointsです。T036の確定研究は`blueprintUnlocked`、召喚・還元は`unitInstances`、修復は`conditionBasisPoints`、開花研究は`bloomSkillIds`を更新します。
 
 ## 解析度取引
 
@@ -325,6 +330,66 @@ interface TrialResearchEvaluation {
 
 試験研究は`candidate`ノードと提示済み候補範囲だけを受け付けます。研究データのみを消費し、触媒と個体は消費しません。完全一致は`known`・段階4へ進め、不正解は署名を保存して試験ヒントを再評価します。
 
+## 確定研究マスター
+
+```ts
+interface RequiredCatalystAmount {
+  catalystId: CatalystId;
+  amount: number;
+}
+
+interface SpecimenRequirement {
+  speciesId: SpeciesId;
+  amount: number;
+}
+
+interface FinalResearchDefinition {
+  nodeId: ResearchNodeId;
+  researchDataCost: number;
+  catalysts: RequiredCatalystAmount[];
+  specimenRequirements: SpecimenRequirement[];
+}
+```
+
+確定研究定義は研究ノードごとに一つです。研究データ費は正の安全な整数、触媒・標本数量は正の安全な整数です。R1～R3は標本要件なし、R4以上は最低1体の標本要件を要求します。
+
+```ts
+interface CompleteFinalResearchRequest {
+  nodeId: ResearchNodeId;
+  specimenInstanceIds: UnitInstanceId[];
+}
+```
+
+`known`ノードだけ実行可能です。locked個体と編成中個体は標本に使用できません。資源・標本を検証後、研究データ・触媒・個体消費、`completed`・段階5、設計図解放を一括確定します。
+
+## 召喚・還元・修復
+
+```ts
+interface SummonUnitRequest {
+  instanceId: UnitInstanceId;
+  speciesId: SpeciesId;
+  nickname?: string | null;
+}
+```
+
+召喚費は基本費100とレア度倍率`1, 2, 4, 8, 16, 32, 64, 128, 256, 512`から導出します。設計図解放済み種だけを即時召喚し、instanceIdは呼び出し側が固定値を指定します。
+
+還元額は召喚費の70%切り捨てです。locked個体と編成中個体は還元できません。修復は全損時召喚費の5%をcondition不足割合で按分し、1以上の不足には最低1通貨を要求します。
+
+## 開花研究マスター
+
+```ts
+interface BloomResearchDefinition {
+  speciesId: SpeciesId;
+  skillId: SkillId;
+  analysisThresholdBasisPoints: number;
+  currencyCost: number;
+  researchDataCost: number;
+}
+```
+
+開花研究定義は種IDと開花技IDの組で一意です。技は対象種の`bloomSkillIds`候補に属するBLOOM技でなければなりません。設計図、解析度、資源を検証後、費用と種状態の開花技解放を一括確定します。
+
 ## 編成・ロードアウト
 
 装備状態は個体ではなく編成メンバーへ保存します。同じ個体を異なる編成で別設定にできます。
@@ -353,7 +418,7 @@ interface FormationMember {
 }
 ```
 
-固有技は種マスターから導出し、保存しません。戦闘用装備技は`固有 → 汎用 → 開花`の固定順です。
+固有技は種マスターから導出し、保存しません。戦闘用装備技は`固有 → 汎用 → 開花`の固定順です。開花技は種単位で解放され、各編成メンバーは一つだけ装備できます。
 
 ## Repository境界
 
@@ -390,6 +455,12 @@ interface PlayerSave extends PlayerData {
 - 研究状態と開示段階は固定対応を崩さない
 - 研究ヒントIDと不正解署名は同一ノード内で一意
 - 試験研究は研究データ以外を消費しない
+- 確定研究は条件を満たせば100%成功し、資源・標本・設計図・研究状態を一括確定する
+- R1～R3確定研究は標本不要、R4以上は標本必須
+- lockedまたは編成中個体を標本消費・還元しない
+- 召喚instanceIdへ時刻・乱数・表示名を使わない
+- 解放済み設計図は個体消費・還元で失われない
+- 開花研究は個体や触媒を消費せず、種状態へ保存する
 - 所持個体には対応する種状態が存在する
 - 同じ編成内で同一instanceIdを重複配置しない
 - 同じ編成内で位置とtiePriorityを重複させない
@@ -401,4 +472,4 @@ interface PlayerSave extends PlayerData {
 
 ## スキーマ検証
 
-T035は依存を追加せず、純粋TypeScriptのランタイム検証と正規化を実装します。将来、JSON import境界を追加する際はZod等の導入を別タスクで判断します。
+T036は依存を追加せず、純粋TypeScriptのランタイム検証と正規化を実装します。将来、JSON import境界を追加する際はZod等の導入を別タスクで判断します。

@@ -35,5 +35,6 @@
 - [x] T033 — [編成UI・技習得・図鑑](T033_FORMATION_SKILL_ENCYCLOPEDIA_UI.md)
 - [x] T034 — [経済・解析度](T034_ECONOMY_ANALYSIS.md)
 - [x] T035 — [研究網・情報開示・試験研究](T035_RESEARCH_NETWORK_TRIAL.md)
+- [x] T036 — [確定研究・召喚・還元・開花](T036_FINAL_RESEARCH_SUMMONING_BLOOM.md)
 
-T001～T035 complete. Next: T036.
+T001～T036 complete. Next: T037.
