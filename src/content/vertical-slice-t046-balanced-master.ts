@@ -18,9 +18,9 @@ function tuneSpecies(species: MonsterSpecies): MonsterSpecies {
   return Object.freeze({
     ...species,
     stats: Object.freeze({
-      hp: 240,
-      attack: 55,
-      defense: 48,
+      hp: 260,
+      attack: 65,
+      defense: 60,
       speed: 5,
     }),
   })
@@ -30,14 +30,14 @@ function tuneSkill(skill: SkillDefinition): SkillDefinition {
   if (skill.id === WYVERN_INNATE_SKILL_ID) {
     return Object.freeze({
       ...skill,
-      actionCost: 185,
-      damageMultiplierPermille: 1150,
+      actionCost: 180,
+      damageMultiplierPermille: 1300,
     })
   }
   if (skill.id === WYVERN_BLOOM_SKILL_ID) {
     return Object.freeze({
       ...skill,
-      damageMultiplierPermille: 1000,
+      damageMultiplierPermille: 1100,
     })
   }
   return skill
@@ -74,7 +74,7 @@ export function validateVerticalSliceT046BalancedMaster(): VerticalSliceT046Bala
   const wyvern = VERTICAL_SLICE_T046_BALANCED_SPECIES.find(
     (species) => species.id === WYVERN_SPECIES_ID,
   )
-  if (wyvern === undefined || wyvern.stats.attack !== 55 || wyvern.stats.defense !== 48) {
+  if (wyvern === undefined || wyvern.stats.attack !== 65 || wyvern.stats.defense !== 60) {
     throw new Error('T046 balanced wyvern species master is not applied')
   }
   const innate = VERTICAL_SLICE_T046_BALANCED_SKILLS.find(
@@ -83,7 +83,7 @@ export function validateVerticalSliceT046BalancedMaster(): VerticalSliceT046Bala
   const bloom = VERTICAL_SLICE_T046_BALANCED_SKILLS.find(
     (skill) => skill.id === WYVERN_BLOOM_SKILL_ID,
   )
-  if (innate?.damageMultiplierPermille !== 1150 || bloom?.damageMultiplierPermille !== 1000) {
+  if (innate?.damageMultiplierPermille !== 1300 || bloom?.damageMultiplierPermille !== 1100) {
     throw new Error('T046 balanced wyvern skill master is not applied')
   }
   return Object.freeze({
