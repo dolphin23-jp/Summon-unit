@@ -8,6 +8,7 @@ import {
 export type SkillId = string
 
 export const DAMAGE_MULTIPLIER_SCALE = 1000
+export const DEFAULT_CHAIN_TARGET_COUNT = 3
 
 export const SKILL_SLOT_TYPES = ['INNATE', 'GENERIC', 'BLOOM'] as const
 export type SkillSlotType = (typeof SKILL_SLOT_TYPES)[number]
@@ -26,6 +27,30 @@ export type SkillTargetSide = (typeof SKILL_TARGET_SIDES)[number]
 
 export const SKILL_TARGET_SHAPES = ['SINGLE', 'SINGLE_AND_ADJACENT'] as const
 export type SkillTargetShape = (typeof SKILL_TARGET_SHAPES)[number]
+
+export const SKILL_REACH_METHODS = [
+  'CONTACT',
+  'DIRECT',
+  'PIERCE',
+  'ARC',
+  'SNIPE',
+  'SELF',
+  'GLOBAL',
+] as const
+export type SkillReachMethod = (typeof SKILL_REACH_METHODS)[number]
+
+export const SKILL_AREA_MASKS = [
+  'SINGLE',
+  'HORIZONTAL_ROW',
+  'VERTICAL_COLUMN',
+  'TARGET_AND_SIDES',
+  'TARGET_AND_BEHIND',
+  'CROSS',
+  'SURROUNDING_EIGHT',
+  'CHAIN',
+  'SIDE_ALL',
+] as const
+export type SkillAreaMask = (typeof SKILL_AREA_MASKS)[number]
 
 export interface SkillTargetSelector {
   readonly side: SkillTargetSide
@@ -52,6 +77,9 @@ export interface SkillDefinition {
   readonly actionCost: number
   readonly targetType: SkillTargetType
   readonly targetSelector?: SkillTargetSelector
+  readonly reachMethod?: SkillReachMethod
+  readonly areaMask?: SkillAreaMask
+  readonly chainTargetCount?: number
   readonly damageMultiplierPermille: number
   readonly cooldownActions?: number
   readonly usageLimit?: number
@@ -70,6 +98,15 @@ const DEFAULT_TARGET_SELECTOR_BY_TYPE: Readonly<
   SELF: Object.freeze({ side: 'SELF', shape: 'SINGLE' }),
   SELF_AREA: Object.freeze({ side: 'SELF', shape: 'SINGLE_AND_ADJACENT' }),
 })
+
+const DEFAULT_REACH_METHOD_BY_TYPE: Readonly<Record<SkillTargetType, SkillReachMethod>> =
+  Object.freeze({
+    SINGLE_ENEMY: 'DIRECT',
+    SINGLE_ALLY: 'SNIPE',
+    SINGLE_ALLY_AND_ADJACENT: 'SNIPE',
+    SELF: 'SELF',
+    SELF_AREA: 'SELF',
+  })
 
 function assertNonEmptyString(value: string, field: string): void {
   if (value.trim().length === 0) {
@@ -129,6 +166,62 @@ export function resolveSkillTargetSelector(skill: SkillDefinition): SkillTargetS
   return Object.freeze({ ...skill.targetSelector })
 }
 
+export function resolveSkillReachMethod(skill: SkillDefinition): SkillReachMethod {
+  const reachMethod = skill.reachMethod ?? DEFAULT_REACH_METHOD_BY_TYPE[skill.targetType]
+  if (!SKILL_REACH_METHODS.includes(reachMethod)) {
+    throw new Error('skill.reachMethod is invalid')
+  }
+  return reachMethod
+}
+
+export function resolveSkillAreaMask(skill: SkillDefinition): SkillAreaMask {
+  const areaMask = skill.areaMask ?? 'SINGLE'
+  if (!SKILL_AREA_MASKS.includes(areaMask)) {
+    throw new Error('skill.areaMask is invalid')
+  }
+  return areaMask
+}
+
+export function resolveSkillChainTargetCount(skill: SkillDefinition): number {
+  const areaMask = resolveSkillAreaMask(skill)
+  if (areaMask !== 'CHAIN') {
+    if (skill.chainTargetCount !== undefined) {
+      throw new Error('skill.chainTargetCount is only valid for CHAIN areaMask')
+    }
+    return 1
+  }
+
+  const count = skill.chainTargetCount ?? DEFAULT_CHAIN_TARGET_COUNT
+  assertSafeIntegerAtLeast(count, 2, 'skill.chainTargetCount')
+  return count
+}
+
+function assertCompatibleReachAndTarget(skill: SkillDefinition): void {
+  const selector = resolveSkillTargetSelector(skill)
+  const reachMethod = resolveSkillReachMethod(skill)
+  const areaMask = resolveSkillAreaMask(skill)
+
+  if (reachMethod === 'SELF' && selector.side !== 'SELF') {
+    throw new Error('SELF reachMethod requires a SELF target selector')
+  }
+  if (selector.side === 'SELF' && reachMethod !== 'SELF') {
+    throw new Error('SELF target selector requires SELF reachMethod')
+  }
+  if (
+    (reachMethod === 'CONTACT' ||
+      reachMethod === 'DIRECT' ||
+      reachMethod === 'PIERCE') &&
+    selector.side !== 'ENEMY'
+  ) {
+    throw new Error(`${reachMethod} reachMethod requires an ENEMY target selector`)
+  }
+  if (reachMethod === 'GLOBAL' && areaMask !== 'SIDE_ALL') {
+    throw new Error('GLOBAL reachMethod requires SIDE_ALL areaMask')
+  }
+
+  resolveSkillChainTargetCount(skill)
+}
+
 export function assertValidSkillDefinition(skill: SkillDefinition): void {
   assertNonEmptyString(skill.id, 'skill.id')
 
@@ -141,6 +234,7 @@ export function assertValidSkillDefinition(skill: SkillDefinition): void {
   }
 
   resolveSkillTargetSelector(skill)
+  assertCompatibleReachAndTarget(skill)
 
   assertSafeIntegerAtLeast(skill.actionCost, 1, 'skill.actionCost')
   assertSafeIntegerAtLeast(
