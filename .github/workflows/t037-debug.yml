@@ -22,7 +22,7 @@ jobs:
       - name: Enable pnpm
         run: corepack enable && corepack prepare pnpm@10.13.1 --activate
       - name: Install quietly
-        run: pnpm install --frozen-lockfile --reporter=silent >/dev/null
+        run: pnpm install --no-frozen-lockfile >/dev/null
       - name: Concise build diagnostics
         shell: bash
         run: |
