@@ -26,5 +26,6 @@
 - [x] T024 — [決定論リファレンスv2](T024_DETERMINISM_REFERENCE_V2.md)
 - [x] T025 — [AI評価基盤](T025_AI_EVALUATION_FOUNDATION.md)
 - [x] T026 — [評価スコア一式](T026_STANDARD_AI_SCORERS.md)
+- [x] T027 — [作戦・ポリシー・理由ログ・回帰指標](T027_AI_STRATEGY_POLICY_LOGS.md)
 
-T001～T026 complete. Next: T027.
+T001～T027 complete. Next: T028.

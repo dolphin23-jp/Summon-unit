@@ -36,6 +36,9 @@ jobs:
       - name: Headless demo
         run: pnpm demo:headless > /tmp/headless-battle-demo.json
 
+      - name: AI regression benchmark
+        run: pnpm benchmark:ai
+
       - name: Lint
         run: pnpm lint
 
