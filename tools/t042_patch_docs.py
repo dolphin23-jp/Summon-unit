@@ -12,7 +12,7 @@ def replace_once(path: str, old: str, new: str) -> None:
 save_doc = 'docs/11_SAVE_AND_COMPATIBILITY.md'
 replace_once(
     save_doc,
-    '処理中に終了した場合は直前のstableへ戻ります。T040はPlayerDataの永続化だけを扱い、戦闘中断スナップショットはT042で実装します。',
+    '処理中に終了した場合は直前のstableへ戻ります。T040～T041はPlayerDataの永続化とmigrationだけを扱い、戦闘中断スナップショットはT042で実装します。',
     'T042では各行動解決後などのstable状態を保存します。手動入力の選択途中は保存せず、処理中に終了した場合は直前のstableへ戻します。起動時またはスロットロード時に中断戦闘があれば、保存済み定義とsnapshotを検証して戦闘画面を再開します。',
 )
 replace_once(
@@ -28,12 +28,12 @@ replace_once(
 )
 replace_once(
     save_doc,
-    'generationのPlayerDataは`createStagePlayerData`で経済、研究、施設、編成、ステージ進行まで再検証・正規化します。チェックサムは正規化済みPlayerDataから算出します。',
-    'generationのPlayerDataは`createStagePlayerData`で経済、研究、施設、編成、ステージ進行まで再検証・正規化します。既存PlayerDataチェックサムはT040形式を維持します。中断戦闘は別チェックサムを持ち、戦闘定義とstable snapshotを再構築できることまで検証します。',
+    '現行schemaのgenerationは`createStagePlayerData`で経済、研究、施設、編成、ステージ進行まで再検証・正規化します。T041では旧schemaも読めるように、最初に保存時のJSONそのものへ対するチェックサムを検証し、その後にmigrationと現行schemaの全体検証を行います。',
+    '現行schemaのgenerationは`createStagePlayerData`で経済、研究、施設、編成、ステージ進行まで再検証・正規化します。T041では最初に保存時PlayerData JSONのチェックサムを検証し、その後にmigrationと現行schemaの全体検証を行います。T042の中断戦闘は別チェックサムを持ち、戦闘定義とstable snapshotを再構築できることまで検証します。',
 )
 replace_once(
     save_doc,
-    'T040はPlayerDataへ新しいゲーム進行フィールドを追加せず、外側へgenerationとslot pointerを追加します。このためデモPlayerDataのschemaVersionは6のままです。IndexedDB永続化は実装済みですが、旧schemaを一段ずつ変換するmigrationはT041、JSON import/exportはT042で実装します。',
+    'T040はPlayerDataへ新しいゲーム進行フィールドを追加せず、外側へgenerationとslot pointerを追加します。T041もmigration基盤を外側へ追加するため、現行PlayerDataのschemaVersionは6のままです。schema 1～6のmigrationは実装済みで、JSON import/exportはT042で実装します。',
     'T040はPlayerData外側へgenerationとslot pointerを追加し、T041は旧schemaを一段ずつ変換します。T042はPlayerDataのschemaVersionを6のまま維持し、generationへ任意の中断戦闘を追加します。JSON import/exportは転送format versionをPlayerData schemaVersionから分離します。',
 )
 replace_once(
