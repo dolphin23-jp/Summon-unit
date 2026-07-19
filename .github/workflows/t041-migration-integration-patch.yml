@@ -1,0 +1,183 @@
+name: Apply T041 migration integration
+
+on:
+  push:
+    branches: [agent/t041-save-migration-framework]
+    paths: [.github/workflows/t041-migration-integration-patch.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/t041-save-migration-framework
+      - name: Patch IndexedDB and app integration
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          indexeddb = Path('src/save/indexeddb-save-repository.ts')
+          text = indexeddb.read_text()
+          text = text.replace(
+              '''  async commitTemporaryGeneration(input: {
+              readonly slotId: SaveSlotId
+              readonly generationId: string
+              readonly maximumBackupGenerations: number
+            }): Promise<SaveSlotPointer> {'''.replace('            ', ''),
+              '''  async commitTemporaryGeneration(input: {
+              readonly slotId: SaveSlotId
+              readonly generationId: string
+              readonly maximumBackupGenerations: number
+              readonly preferredBackupGenerationId?: string
+            }): Promise<SaveSlotPointer> {'''.replace('            ', ''),
+              1,
+          )
+          old = '''          const previousGenerationIds =
+            previous === undefined
+              ? []
+              : [previous.currentGenerationId, ...previous.backupGenerationIds]
+          const uniquePrevious = previousGenerationIds.filter(
+            (generationId, index, values) =>
+              generationId !== input.generationId && values.indexOf(generationId) === index,
+          )
+'''
+          new = '''          const previousGenerationIds =
+            previous === undefined
+              ? []
+              : [previous.currentGenerationId, ...previous.backupGenerationIds]
+          if (
+            input.preferredBackupGenerationId !== undefined &&
+            !previousGenerationIds.includes(input.preferredBackupGenerationId)
+          ) {
+            fail(
+              new Error(
+                `preferred backup generation is not in the slot: ${input.preferredBackupGenerationId}`,
+              ),
+            )
+            return
+          }
+          const backupCandidates = [
+            input.preferredBackupGenerationId,
+            ...previousGenerationIds,
+          ].filter((generationId): generationId is string => generationId !== undefined)
+          const uniquePrevious = backupCandidates.filter(
+            (generationId, index, values) =>
+              generationId !== input.generationId && values.indexOf(generationId) === index,
+          )
+'''
+          if old not in text:
+              raise SystemExit('IndexedDB backup candidate snippet not found')
+          indexeddb.write_text(text.replace(old, new, 1))
+
+          app = Path('src/App.tsx')
+          text = app.read_text()
+          text = text.replace(
+              '''  bootstrapBrowserSaveSystem,
+  createBrowserSaveRepository,
+  createRuntimeSaveGenerationId,
+''',
+              '''  bootstrapBrowserSaveSystem,
+  createBrowserSaveMigrationRuntime,
+  createBrowserSaveRepository,
+  createRuntimeSaveGenerationId,
+''',
+              1,
+          )
+          text = text.replace(
+              '''import {
+  deleteSaveSlot,
+  listSaveSlotSummaries,
+  loadSaveSlot,
+  savePlayerDataAtomic,
+} from './save/save-repository'
+''',
+              '''import {
+  listSaveSlotSummariesWithMigration,
+  loadSaveSlotWithMigration,
+} from './save/save-migration'
+import { deleteSaveSlot, savePlayerDataAtomic } from './save/save-repository'
+''',
+              1,
+          )
+          text = text.replace(
+              '''const BROWSER_SAVE_REPOSITORY = createBrowserSaveRepository()
+let browserBootstrapPromise: Promise<BrowserSaveBootstrapResult> | null = null
+''',
+              '''const BROWSER_SAVE_REPOSITORY = createBrowserSaveRepository()
+const BROWSER_SAVE_MIGRATION_RUNTIME = createBrowserSaveMigrationRuntime()
+let browserBootstrapPromise: Promise<BrowserSaveBootstrapResult> | null = null
+''',
+              1,
+          )
+          text = text.replace(
+              '''        if (result.recoveredFromBackup) {
+          setSaveNotice('現在世代を検証できなかったため、バックアップ世代から復元しました。')
+        } else if (result.createdInitialSave) {
+''',
+              '''        if (result.migration !== null) {
+          setSaveNotice(
+            `セーブデータをschema ${result.migration.fromSchemaVersion}から${result.migration.toSchemaVersion}へ移行し、変換前世代をバックアップしました。`,
+          )
+        } else if (result.recoveredFromBackup) {
+          setSaveNotice('現在世代を検証できなかったため、バックアップ世代から復元しました。')
+        } else if (result.createdInitialSave) {
+''',
+              1,
+          )
+          text = text.replace(
+              '''      await listSaveSlotSummaries(BROWSER_SAVE_REPOSITORY, T039_PLAYER_CATALOG),
+''',
+              '''      await listSaveSlotSummariesWithMigration(
+        BROWSER_SAVE_REPOSITORY,
+        T039_PLAYER_CATALOG,
+        BROWSER_SAVE_MIGRATION_RUNTIME,
+      ),
+''',
+              1,
+          )
+          text = text.replace(
+              '''      const loaded = await loadSaveSlot(
+        BROWSER_SAVE_REPOSITORY,
+        slotId,
+        T039_PLAYER_CATALOG,
+      )
+''',
+              '''      const loaded = await loadSaveSlotWithMigration(
+        BROWSER_SAVE_REPOSITORY,
+        slotId,
+        T039_PLAYER_CATALOG,
+        BROWSER_SAVE_MIGRATION_RUNTIME,
+      )
+''',
+              1,
+          )
+          text = text.replace(
+              '''      setSaveNotice(
+        loaded.recoveredFromBackup
+          ? `${slotId}のバックアップ世代から復元しました。`
+          : `${slotId}をロードしました。`,
+      )
+''',
+              '''      setSaveNotice(
+        loaded.migration !== null
+          ? `${slotId}をschema ${loaded.migration.fromSchemaVersion}から${loaded.migration.toSchemaVersion}へ移行しました。変換前世代はバックアップに保持しています。`
+          : loaded.recoveredFromBackup
+            ? `${slotId}のバックアップ世代から復元しました。`
+            : `${slotId}をロードしました。`,
+      )
+''',
+              1,
+          )
+          app.write_text(text)
+          PY
+      - name: Commit integration
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add src/save/indexeddb-save-repository.ts src/App.tsx
+          git commit -m "Integrate save migration loading"
+          git push
