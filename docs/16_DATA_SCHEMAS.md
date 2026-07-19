@@ -504,3 +504,48 @@ T040ではPlayerDataのみを永続化します。stable戦闘スナップショ
 ## スキーマ検証
 
 T040は依存を追加せず、純粋TypeScriptのランタイム検証と正規化を使用します。旧schemaを一段ずつ変換するmigrationはT041、外部JSONを受け入れるimport境界の追加依存採否はT042またはT043で判断します。
+
+
+## T042 JSON転送と戦闘snapshot
+
+```ts
+interface SaveTransferDocument {
+  format: 'summon-unit-save';
+  formatVersion: 1;
+  exportedAtEpochMs: number;
+  checksum: string;
+  payload: {
+    playerData: PlayerData;
+    activeBattle: SavedBattleSession | null;
+  };
+}
+
+interface SavedBattleSession {
+  saveVersion: 1;
+  stageId: StageId;
+  serial: number;
+  attempt: number;
+  fastModeAvailable: boolean;
+  definition: HeadlessBattleDefinition;
+  stableSnapshot: InteractiveBattleStableSnapshot;
+}
+
+interface InteractiveBattleStableSnapshot {
+  snapshotVersion: 1;
+  battle: BattleState;
+  log: BattleEventLog;
+  currentVirtualTime: BattleTime;
+  totalActions: number;
+  manualAllyActionRequested: boolean;
+  lastDecisionLog: AiDecisionReasonLog | null;
+  bossPhase: BossPhaseRuntimeState | null;
+  nextTimelineSequence: number;
+  schedules: UnitActionSchedule[];
+  waitStates: BattleRuntimeEntry<WaitActionState>[];
+  skillUsageBooks: BattleRuntimeEntry<SkillUsageBook>[];
+  skillIdsByBattleUnitId: BattleRuntimeEntry<SkillId[]>[];
+  recentPositionIds: BattleRuntimeEntry<string[]>[];
+}
+```
+
+転送format version、戦闘snapshot version、PlayerData schemaVersionは独立して更新します。PlayerData-onlyの旧generationは`activeBattle`未定義を`null`として読み込みます。
