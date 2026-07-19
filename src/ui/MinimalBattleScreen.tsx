@@ -3,6 +3,7 @@ import type { BattleOutcome } from '../battle/defeat-and-victory'
 import type { Side } from '../battle/board'
 import {
   createInteractiveBattleRunner,
+  type HeadlessBattleDefinition,
   type InteractiveBattleRunner,
   type InteractiveBattleSnapshot,
   type InteractiveManualActionOption,
@@ -36,8 +37,8 @@ const MOTION_LABELS: Readonly<Record<BattleMotionLevel, string>> = Object.freeze
   MINIMAL: '最小',
 })
 
-function createRunner(): InteractiveBattleRunner {
-  return createInteractiveBattleRunner(STANDARD_INTERACTIVE_BATTLE)
+function createRunner(definition: HeadlessBattleDefinition): InteractiveBattleRunner {
+  return createInteractiveBattleRunner(definition)
 }
 
 function getInitialMotionLevel(): BattleMotionLevel {
@@ -104,8 +105,16 @@ function statusLabel(
   return autoRequested ? `AUTO ×${speed}` : '停止中'
 }
 
-export function MinimalBattleScreen() {
-  const [runner, setRunner] = useState(createRunner)
+export interface MinimalBattleScreenProps {
+  readonly definition?: HeadlessBattleDefinition
+  readonly onOpenFormation?: () => void
+}
+
+export function MinimalBattleScreen({
+  definition = STANDARD_INTERACTIVE_BATTLE,
+  onOpenFormation,
+}: MinimalBattleScreenProps) {
+  const [runner, setRunner] = useState(() => createRunner(definition))
   const [snapshot, setSnapshot] = useState(() => runner.getSnapshot())
   const [autoRequested, setAutoRequested] = useState(false)
   const [speed, setSpeed] = useState<BattleSpeed>(1)
@@ -151,15 +160,12 @@ export function MinimalBattleScreen() {
     [pending, selectedCandidateId],
   )
   const view = useMemo(
-    () => createBattleScreenView(STANDARD_INTERACTIVE_BATTLE, snapshot, previewOption),
-    [previewOption, snapshot],
+    () => createBattleScreenView(definition, snapshot, previewOption),
+    [definition, previewOption, snapshot],
   )
   const resultView = useMemo(
-    () =>
-      isTerminal
-        ? createBattleResultView(STANDARD_INTERACTIVE_BATTLE, runner.getResult())
-        : null,
-    [isTerminal, runner, snapshot.totalActions],
+    () => (isTerminal ? createBattleResultView(definition, runner.getResult()) : null),
+    [definition, isTerminal, runner, snapshot.totalActions],
   )
 
   const reset = () => {
@@ -168,16 +174,16 @@ export function MinimalBattleScreen() {
     setSelectedActionKey(null)
     setSelectedCandidateId(null)
     setNavigationNotice(null)
-    setRunner(createRunner())
+    setRunner(createRunner(definition))
   }
 
   const selectAction = (option: InteractiveManualActionOption) => {
     const key = getManualActionKey(option)
     setSelectedActionKey(key)
-    const candidates = pending?.options.filter(
-      (candidate) => getManualActionKey(candidate) === key,
-    ) ?? []
-    const selected = candidates.find((candidate) => candidate.recommended) ?? candidates[0] ?? option
+    const candidates =
+      pending?.options.filter((candidate) => getManualActionKey(candidate) === key) ?? []
+    const selected =
+      candidates.find((candidate) => candidate.recommended) ?? candidates[0] ?? option
     setSelectedCandidateId(selected.candidateId)
   }
 
@@ -213,8 +219,12 @@ export function MinimalBattleScreen() {
       reset()
       return
     }
+    if (action === 'FORMATION' && onOpenFormation !== undefined) {
+      onOpenFormation()
+      return
+    }
     const message: Readonly<Record<Exclude<BattleResultNavigationAction, 'RETRY'>, string>> = {
-      FORMATION: '編成画面はT033で接続します。戦闘結果はこのまま保持されます。',
+      FORMATION: '編成画面への導線が設定されていません。',
       RESEARCH: '研究画面はT034以降で接続します。報酬・解析度はまだ保存されません。',
       NEXT_STAGE: '次ステージ導線はT038で接続します。現在は結果確認のみです。',
     }
@@ -300,6 +310,11 @@ export function MinimalBattleScreen() {
         <button type="button" className="control-button" onClick={reset}>
           リセット
         </button>
+        {onOpenFormation !== undefined && (
+          <button type="button" className="control-button" onClick={onOpenFormation}>
+            編成へ戻る
+          </button>
+        )}
       </nav>
 
       {resultView !== null && (
@@ -340,7 +355,8 @@ export function MinimalBattleScreen() {
               const side = cell.position.side
               const frontDivider = side === 'ALLY' && cell.position.row === 0
               const coordinate = `${sideLabel(side)} ${rowLabel(cell.position.row)} ${columnLabel(cell.position.column)}`
-              const isAffected = previewOption?.preview.affectedPositionIds.includes(cell.positionId) ?? false
+              const isAffected =
+                previewOption?.preview.affectedPositionIds.includes(cell.positionId) ?? false
               const isSelected = previewOption?.targetPositionId === cell.positionId
               return (
                 <div
