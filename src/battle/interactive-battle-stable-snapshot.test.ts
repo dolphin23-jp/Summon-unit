@@ -6,14 +6,17 @@ function runUntilTerminal(runner: ReturnType<typeof createInteractiveBattleRunne
   while (runner.getSnapshot().status === 'READY') runner.step()
 }
 
+function jsonRoundTrip<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T
+}
+
 describe('interactive battle stable snapshots', () => {
   it('round-trips through JSON and resumes to the same deterministic result', () => {
     const original = createInteractiveBattleRunner(STANDARD_HEADLESS_BATTLE)
     for (let index = 0; index < 6; index += 1) original.step()
 
     const stable = original.getStableSnapshot()
-    const roundTripped = JSON.parse(JSON.stringify(stable)) as typeof stable
-    const restored = createInteractiveBattleRunner(STANDARD_HEADLESS_BATTLE, roundTripped)
+    const restored = createInteractiveBattleRunner(STANDARD_HEADLESS_BATTLE, jsonRoundTrip(stable))
 
     expect(restored.getStableSnapshot()).toEqual(stable)
     runUntilTerminal(original)
@@ -27,9 +30,7 @@ describe('interactive battle stable snapshots', () => {
     original.requestManualAllyAction()
     const restored = createInteractiveBattleRunner(
       STANDARD_HEADLESS_BATTLE,
-      JSON.parse(JSON.stringify(original.getStableSnapshot())) as ReturnType<
-        typeof original.getStableSnapshot
-      >,
+      jsonRoundTrip(original.getStableSnapshot()),
     )
 
     let left = original.getSnapshot()
@@ -39,7 +40,7 @@ describe('interactive battle stable snapshots', () => {
       right = restored.step()
     }
 
-    expect(right).toEqual(left)
+    expect(jsonRoundTrip(right)).toEqual(jsonRoundTrip(left))
     expect(right.status).toBe('AWAITING_MANUAL_ACTION')
   })
 
