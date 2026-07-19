@@ -27,5 +27,6 @@
 - [x] T025 — [AI評価基盤](T025_AI_EVALUATION_FOUNDATION.md)
 - [x] T026 — [評価スコア一式](T026_STANDARD_AI_SCORERS.md)
 - [x] T027 — [作戦・ポリシー・理由ログ・回帰指標](T027_AI_STRATEGY_POLICY_LOGS.md)
+- [x] T028 — [対話型戦闘ランナー](T028_INTERACTIVE_BATTLE_RUNNER.md)
 
-T001～T027 complete. Next: T028.
+T001～T028 complete. Next: T029.
