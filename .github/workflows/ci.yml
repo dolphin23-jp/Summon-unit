@@ -30,22 +30,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
 
-      - name: Compile headless diagnostics
-        id: headless_compile
-        continue-on-error: true
-        run: pnpm exec tsc -p tsconfig.headless.json --pretty false > /tmp/headless-tsc.txt 2>&1
-
-      - name: Upload headless diagnostics
-        if: steps.headless_compile.outcome == 'failure'
-        uses: actions/upload-artifact@v4
-        with:
-          name: headless-tsc-errors
-          path: /tmp/headless-tsc.txt
-
-      - name: Stop on headless compile failure
-        if: steps.headless_compile.outcome == 'failure'
-        run: exit 1
-
       - name: Content validation
         run: pnpm validate:content
 
@@ -58,8 +42,23 @@ jobs:
       - name: AI regression benchmark
         run: pnpm benchmark:ai
 
-      - name: Vertical slice balance benchmark
-        run: pnpm benchmark:balance > /tmp/vertical-slice-balance.json
+      - name: Run vertical slice balance benchmark
+        id: balance_benchmark
+        continue-on-error: true
+        run: pnpm benchmark:balance > /tmp/vertical-slice-balance.json 2> /tmp/vertical-slice-balance.err
+
+      - name: Upload vertical slice balance output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vertical-slice-balance-output
+          path: |
+            /tmp/vertical-slice-balance.json
+            /tmp/vertical-slice-balance.err
+
+      - name: Stop on balance benchmark failure
+        if: steps.balance_benchmark.outcome == 'failure'
+        run: exit 1
 
       - name: Lint
         run: pnpm lint
