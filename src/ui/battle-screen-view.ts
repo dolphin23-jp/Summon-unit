@@ -312,7 +312,9 @@ function timelineLabel(event: ScheduledEvent): {
     })
   }
 
-  const payload = isRecord(event.payload) ? event.payload : Object.freeze({})
+  const payload: Readonly<Record<string, unknown>> = isRecord(event.payload)
+    ? event.payload
+    : Object.freeze({})
   const actorBattleUnitId =
     typeof payload.battleUnitId === 'string'
       ? payload.battleUnitId
