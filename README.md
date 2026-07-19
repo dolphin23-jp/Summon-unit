@@ -26,6 +26,7 @@ pnpm dev
 検証:
 
 ```bash
+pnpm validate:content
 pnpm test
 pnpm lint
 pnpm demo:headless
@@ -92,6 +93,12 @@ PlayerDataは種状態、固定instanceIdの所持個体、編成、経済、研
 
 ボスはHPしきい値ごとのフェーズ、フェーズ別行動技表、進入時ギミックを持ちます。しきい値到達時は同じ仮想時刻へ`PHASE_CHANGE`を予約し、通常ユニット行動より先に解決します。現在は障壁展開ギミックを実装しています。
 
+## コンテンツ検証
+
+現行マスターはブラウザ起動時に実行時検証します。`pnpm validate:content`は同じ検証器をCLIから実行し、種・技・研究レシピ・地域・ステージ・敵AI・報酬・ボスフェーズ間の参照破損をCIで検出します。
+
+検証ルールは既存のTypeScript assertionとnormalizerを集約しています。外部JSONやCMSを入力元にするまでは新しいschema依存を追加せず、ルール正本の重複を避けます。
+
 ## 研究網と研究実行
 
 研究ノードは`hidden / hinted / candidate / known / completed`の状態と開示段階0～5を持ちます。解析度、触媒所持、地域進行、隣接研究、試験失敗をヒントへ接続し、開示段階を図鑑へ同期します。
@@ -134,5 +141,6 @@ PlayerDataは種状態、固定instanceIdの所持個体、編成、経済、研
 - Phase 6 T034～T037：完了
 - Phase 7 T038～T039：完了
 - Phase 8 T040～T042：完了
+- Phase 9 T043：完了、T044～T046を残す
 
-次の実装対象はT043「コンテンツ検証パイプライン」です。詳細は`tasks/STATUS.md`と`docs/17_IMPLEMENTATION_ROADMAP.md`を参照してください。
+次の実装対象はT044「スライスモンスター・技一式」です。詳細は`tasks/STATUS.md`と`docs/17_IMPLEMENTATION_ROADMAP.md`を参照してください。
