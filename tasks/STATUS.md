@@ -42,5 +42,6 @@
 - [x] T040 — [IndexedDB永続化](T040_INDEXEDDB_PERSISTENCE.md)
 - [x] T041 — [migration基盤](T041_SAVE_MIGRATION_FRAMEWORK.md)
 - [x] T042 — [エクスポート／インポート・戦闘再開](T042_EXPORT_IMPORT_BATTLE_RESUME.md)
+- [x] T043 — [コンテンツ検証パイプライン](T043_CONTENT_VALIDATION_PIPELINE.md)
 
-T001～T042 complete. Next: T043.
+T001～T043 complete. Next: T044.
