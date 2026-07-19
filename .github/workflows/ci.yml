@@ -3,7 +3,7 @@ name: T030 Materialize
 on:
   push:
     branches:
-      - agent/t030-manual-preview
+      - agent/t030-manual-preview-v2
   pull_request:
 
 permissions:
@@ -19,9 +19,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          git clone --quiet --depth 1 --branch agent/t030-manual-preview "https://x-access-token:${GH_TOKEN}@github.com/dolphin23-jp/Summon-unit.git" repo
+          git clone --quiet --depth 1 --branch agent/t030-manual-preview-v2 "https://x-access-token:${GH_TOKEN}@github.com/dolphin23-jp/Summon-unit.git" repo
           cd repo
-          cp .agent/t030-patch.tar.gz.b64 /tmp/t030-patch.tar.gz
+          cat .agent/t030-small-00.b64 .agent/t030-small-01.b64 .agent/t030-small-02.b64 .agent/t030-small-03.b64 .agent/t030-small-04.b64 > /tmp/t030-small.b64
+          base64 --decode /tmp/t030-small.b64 > /tmp/t030-patch.tar.gz
+          gzip --test /tmp/t030-patch.tar.gz
           tar -xzf /tmp/t030-patch.tar.gz -C /tmp
           if ! python /tmp/apply_t030.py > /tmp/t030-materialize.log 2>&1; then
             cat /tmp/t030-materialize.log
@@ -32,4 +34,4 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
           git commit -m "T030 add manual action confirmed previews"
-          git push origin HEAD:agent/t030-manual-preview
+          git push origin HEAD:agent/t030-manual-preview-v2
