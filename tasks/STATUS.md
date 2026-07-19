@@ -44,5 +44,6 @@
 - [x] T042 — [エクスポート／インポート・戦闘再開](T042_EXPORT_IMPORT_BATTLE_RESUME.md)
 - [x] T043 — [コンテンツ検証パイプライン](T043_CONTENT_VALIDATION_PIPELINE.md)
 - [x] T044 — [スライスモンスター・技一式](T044_VERTICAL_SLICE_MONSTERS_SKILLS.md)
+- [x] T045 — [研究網スライス・地域A/B制作](T045_RESEARCH_REGIONS_A_B.md)
 
-T001～T044 complete. Next: T045.
+T001～T045 complete. Next: T046.
