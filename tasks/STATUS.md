@@ -29,5 +29,6 @@
 - [x] T027 — [作戦・ポリシー・理由ログ・回帰指標](T027_AI_STRATEGY_POLICY_LOGS.md)
 - [x] T028 — [対話型戦闘ランナー](T028_INTERACTIVE_BATTLE_RUNNER.md)
 - [x] T029 — [戦闘画面一式](T029_BATTLE_SCREEN_SUITE.md)
+- [x] T030 — [手動操作・確定前プレビュー](T030_MANUAL_ACTION_PREVIEW.md)
 
-T001～T029 complete. Next: T030.
+T001～T030 complete. Next: T031.
