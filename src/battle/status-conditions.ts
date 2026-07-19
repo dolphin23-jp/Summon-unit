@@ -15,6 +15,7 @@ import {
   freezeActiveEffectState,
   type ActiveEffectMutation,
   type ActiveEffectState,
+  type EffectDurationUnit,
 } from './effect-framework'
 import { applyPermilleMultiplier } from './stat-modifiers'
 import {
@@ -35,15 +36,19 @@ export const STATUS_CONDITION_IDS = [
 ] as const
 
 export type StatusConditionId = (typeof STATUS_CONDITION_IDS)[number]
+type TurnStartStatusId = Extract<StatusConditionId, 'poison' | 'burn'>
+type BinaryTargetActionStatusId = Extract<
+  StatusConditionId,
+  'movement-lock' | 'bloom-seal'
+>
 
-export const STATUS_EFFECT_IDS: Readonly<Record<Uppercase<StatusConditionId>, string>> =
-  Object.freeze({
-    POISON: 'effect.status.poison',
-    BURN: 'effect.status.burn',
-    'MOVEMENT-LOCK': 'effect.status.movement-lock',
-    'BLOOM-SEAL': 'effect.status.bloom-seal',
-    'HEALING-INHIBITION': 'effect.status.healing-inhibition',
-  })
+export const STATUS_EFFECT_IDS = Object.freeze({
+  POISON: 'effect.status.poison',
+  BURN: 'effect.status.burn',
+  'MOVEMENT-LOCK': 'effect.status.movement-lock',
+  'BLOOM-SEAL': 'effect.status.bloom-seal',
+  'HEALING-INHIBITION': 'effect.status.healing-inhibition',
+} as const)
 
 export const POISON_DEFAULT_TRIGGER_COUNT = 3
 export const POISON_MAX_STACKS = 5
@@ -58,7 +63,10 @@ const STATUS_EFFECT_ID_BY_CONDITION: Readonly<Record<StatusConditionId, string>>
   'healing-inhibition': STATUS_EFFECT_IDS['HEALING-INHIBITION'],
 })
 
-const TURN_START_STATUS_ORDER: readonly StatusConditionId[] = Object.freeze(['poison', 'burn'])
+const TURN_START_STATUS_ORDER: readonly TurnStartStatusId[] = Object.freeze([
+  'poison',
+  'burn',
+])
 
 interface StatusApplicationBaseInput {
   readonly target: BattleUnitState
@@ -111,7 +119,7 @@ export interface EffectDurationChange {
 }
 
 export interface StatusDamageTrigger {
-  readonly statusId: Extract<StatusConditionId, 'poison' | 'burn'>
+  readonly statusId: TurnStartStatusId
   readonly activeEffectId: string
   readonly effectId: string
   readonly sourceBattleUnitId: BattleUnitId | null
@@ -138,6 +146,12 @@ export interface TargetActionDurationResolution {
   readonly state: BattleUnitState
   readonly changes: readonly EffectDurationChange[]
   readonly removals: readonly ActiveEffectMutation[]
+}
+
+interface DurationConsumptionResult {
+  readonly state: BattleUnitState
+  readonly change: EffectDurationChange | null
+  readonly removal: ActiveEffectMutation | null
 }
 
 function assertSafeIntegerAtLeast(value: number, minimum: number, field: string): void {
@@ -299,7 +313,7 @@ export function applyBurnStatus(input: ApplyBurnStatusInput): StatusApplicationR
 
 function applyBinaryTargetActionStatus(
   input: StatusApplicationBaseInput & { readonly targetActionCount: number },
-  statusId: Extract<StatusConditionId, 'movement-lock' | 'bloom-seal'>,
+  statusId: BinaryTargetActionStatusId,
 ): StatusApplicationResult {
   assertApplicationBase(input)
   assertSafeIntegerAtLeast(input.targetActionCount, 1, 'targetActionCount')
@@ -412,20 +426,17 @@ function consumeEffectDuration(
   state: BattleUnitState,
   species: MonsterSpecies,
   activeEffectId: string,
+  expectedUnit: Exclude<EffectDurationUnit, 'BATTLE'>,
   reason: EffectDurationProgressReason,
-): {
-  readonly state: BattleUnitState
-  readonly change: EffectDurationChange | null
-  readonly removal: ActiveEffectMutation | null
-} {
+): DurationConsumptionResult {
   const effect = state.effects.find(
     (candidate) => candidate.activeEffectId === activeEffectId,
   )
   if (effect === undefined) {
     return Object.freeze({ state, change: null, removal: null })
   }
-  if (effect.duration.unit === 'BATTLE') {
-    throw new Error('battle duration cannot be consumed')
+  if (effect.duration.unit !== expectedUnit) {
+    throw new Error(`${effect.effectId} must use ${expectedUnit} duration`)
   }
 
   if (effect.duration.remaining === 1) {
@@ -445,7 +456,7 @@ function consumeEffectDuration(
   const after = freezeActiveEffectState({
     ...effect,
     duration: {
-      unit: effect.duration.unit,
+      unit: expectedUnit,
       remaining: effect.duration.remaining - 1,
     },
   })
@@ -474,7 +485,7 @@ function multiplySafeIntegers(left: number, right: number, field: string): numbe
 }
 
 function getTurnStartDamage(
-  statusId: Extract<StatusConditionId, 'poison' | 'burn'>,
+  statusId: TurnStartStatusId,
   effect: ActiveEffectState,
   targetSpecies: MonsterSpecies,
 ): { readonly attributeId: AttributeId; readonly damage: number } {
@@ -496,6 +507,16 @@ function getTurnStartDamage(
       applyPermilleMultiplier(effect.strength, fireMultiplier, 'burnDamage'),
     ),
   })
+}
+
+function getRemainingAfterTrigger(progress: DurationConsumptionResult): number {
+  if (progress.change === null) {
+    return 0
+  }
+  if (progress.change.after.duration.unit !== 'TRIGGERS') {
+    throw new Error('turn-start status must keep TRIGGERS duration')
+  }
+  return progress.change.after.duration.remaining
 }
 
 export function resolveTurnStartStatusConditions(
@@ -536,14 +557,10 @@ export function resolveTurnStartStatusConditions(
       nextState,
       species,
       effect.activeEffectId,
+      'TRIGGERS',
       'TRIGGER_CONSUMED',
     )
     nextState = progress.state
-    const durationRemainingAfter =
-      progress.change?.after.duration.remaining ?? 0
-    if (durationRemainingAfter === null) {
-      throw new Error('trigger duration must remain counted')
-    }
 
     triggers.push(
       Object.freeze({
@@ -560,7 +577,7 @@ export function resolveTurnStartStatusConditions(
         hpBefore,
         hpAfter: nextState.hp,
         durationRemainingBefore: effect.duration.remaining,
-        durationRemainingAfter,
+        durationRemainingAfter: getRemainingAfterTrigger(progress),
         durationChange: progress.change,
         removalMutation: progress.removal,
       }),
@@ -598,6 +615,7 @@ export function consumeTargetActionDurations(
       nextState,
       species,
       activeEffectId,
+      'TARGET_ACTIONS',
       'TARGET_ACTION_COMPLETED',
     )
     nextState = progress.state
