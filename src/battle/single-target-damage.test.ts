@@ -103,8 +103,8 @@ describe('minimal skill definition', () => {
       'skill.slotType must be INNATE, GENERIC, or BLOOM',
     ],
     [
-      { ...skill, targetType: 'SELF' } as unknown as SkillDefinition,
-      'skill.targetType must be SINGLE_ENEMY',
+      { ...skill, targetType: 'GLOBAL' } as unknown as SkillDefinition,
+      'skill.targetType is invalid',
     ],
   ] as const)('rejects invalid skill master data', (invalidSkill, message) => {
     expect(() => assertValidSkillDefinition(invalidSkill)).toThrow(message)

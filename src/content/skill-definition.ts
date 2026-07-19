@@ -12,14 +12,64 @@ export const DAMAGE_MULTIPLIER_SCALE = 1000
 export const SKILL_SLOT_TYPES = ['INNATE', 'GENERIC', 'BLOOM'] as const
 export type SkillSlotType = (typeof SKILL_SLOT_TYPES)[number]
 
+export const SKILL_TARGET_TYPES = [
+  'SINGLE_ENEMY',
+  'SINGLE_ALLY',
+  'SINGLE_ALLY_AND_ADJACENT',
+  'SELF',
+  'SELF_AREA',
+] as const
+export type SkillTargetType = (typeof SKILL_TARGET_TYPES)[number]
+
+export const SKILL_TARGET_SIDES = ['ENEMY', 'ALLY', 'SELF'] as const
+export type SkillTargetSide = (typeof SKILL_TARGET_SIDES)[number]
+
+export const SKILL_TARGET_SHAPES = ['SINGLE', 'SINGLE_AND_ADJACENT'] as const
+export type SkillTargetShape = (typeof SKILL_TARGET_SHAPES)[number]
+
+export interface SkillTargetSelector {
+  readonly side: SkillTargetSide
+  readonly shape: SkillTargetShape
+}
+
+export const SKILL_USAGE_CONDITION_TYPES = [
+  'ACTOR_HP_AT_OR_BELOW',
+  'ACTOR_HP_AT_OR_ABOVE',
+  'TARGET_HP_AT_OR_BELOW',
+  'TARGET_HP_AT_OR_ABOVE',
+] as const
+export type SkillUsageConditionType = (typeof SKILL_USAGE_CONDITION_TYPES)[number]
+
+export interface SkillUsageCondition {
+  readonly type: SkillUsageConditionType
+  readonly thresholdPermille: number
+}
+
 export interface SkillDefinition {
   readonly id: SkillId
   readonly slotType: SkillSlotType
   readonly attributeId?: AttributeInputId
   readonly actionCost: number
-  readonly targetType: 'SINGLE_ENEMY'
+  readonly targetType: SkillTargetType
+  readonly targetSelector?: SkillTargetSelector
   readonly damageMultiplierPermille: number
+  readonly cooldownActions?: number
+  readonly usageLimit?: number
+  readonly usageConditions?: readonly SkillUsageCondition[]
 }
+
+const DEFAULT_TARGET_SELECTOR_BY_TYPE: Readonly<
+  Record<SkillTargetType, SkillTargetSelector>
+> = Object.freeze({
+  SINGLE_ENEMY: Object.freeze({ side: 'ENEMY', shape: 'SINGLE' }),
+  SINGLE_ALLY: Object.freeze({ side: 'ALLY', shape: 'SINGLE' }),
+  SINGLE_ALLY_AND_ADJACENT: Object.freeze({
+    side: 'ALLY',
+    shape: 'SINGLE_AND_ADJACENT',
+  }),
+  SELF: Object.freeze({ side: 'SELF', shape: 'SINGLE' }),
+  SELF_AREA: Object.freeze({ side: 'SELF', shape: 'SINGLE_AND_ADJACENT' }),
+})
 
 function assertNonEmptyString(value: string, field: string): void {
   if (value.trim().length === 0) {
@@ -33,6 +83,52 @@ function assertSafeIntegerAtLeast(value: number, minimum: number, field: string)
   }
 }
 
+function assertValidTargetSelector(selector: SkillTargetSelector): void {
+  if (!SKILL_TARGET_SIDES.includes(selector.side)) {
+    throw new Error('skill.targetSelector.side is invalid')
+  }
+  if (!SKILL_TARGET_SHAPES.includes(selector.shape)) {
+    throw new Error('skill.targetSelector.shape is invalid')
+  }
+}
+
+function assertValidUsageCondition(
+  condition: SkillUsageCondition,
+  index: number,
+): void {
+  if (!SKILL_USAGE_CONDITION_TYPES.includes(condition.type)) {
+    throw new Error(`skill.usageConditions[${index}].type is invalid`)
+  }
+  assertSafeIntegerAtLeast(
+    condition.thresholdPermille,
+    0,
+    `skill.usageConditions[${index}].thresholdPermille`,
+  )
+  if (condition.thresholdPermille > 1000) {
+    throw new Error(
+      `skill.usageConditions[${index}].thresholdPermille must be less than or equal to 1000`,
+    )
+  }
+}
+
+export function resolveSkillTargetSelector(skill: SkillDefinition): SkillTargetSelector {
+  if (!SKILL_TARGET_TYPES.includes(skill.targetType)) {
+    throw new Error('skill.targetType is invalid')
+  }
+  const expected = DEFAULT_TARGET_SELECTOR_BY_TYPE[skill.targetType]
+  if (skill.targetSelector === undefined) {
+    return expected
+  }
+  assertValidTargetSelector(skill.targetSelector)
+  if (
+    skill.targetSelector.side !== expected.side ||
+    skill.targetSelector.shape !== expected.shape
+  ) {
+    throw new Error('skill.targetSelector must match skill.targetType')
+  }
+  return Object.freeze({ ...skill.targetSelector })
+}
+
 export function assertValidSkillDefinition(skill: SkillDefinition): void {
   assertNonEmptyString(skill.id, 'skill.id')
 
@@ -44,9 +140,7 @@ export function assertValidSkillDefinition(skill: SkillDefinition): void {
     assertValidAttributeId(skill.attributeId)
   }
 
-  if (skill.targetType !== 'SINGLE_ENEMY') {
-    throw new Error('skill.targetType must be SINGLE_ENEMY')
-  }
+  resolveSkillTargetSelector(skill)
 
   assertSafeIntegerAtLeast(skill.actionCost, 1, 'skill.actionCost')
   assertSafeIntegerAtLeast(
@@ -54,6 +148,22 @@ export function assertValidSkillDefinition(skill: SkillDefinition): void {
     1,
     'skill.damageMultiplierPermille',
   )
+
+  if (skill.cooldownActions !== undefined) {
+    assertSafeIntegerAtLeast(skill.cooldownActions, 0, 'skill.cooldownActions')
+  }
+  if (skill.usageLimit !== undefined) {
+    assertSafeIntegerAtLeast(skill.usageLimit, 1, 'skill.usageLimit')
+  }
+
+  const seenConditions = new Set<SkillUsageConditionType>()
+  for (const [index, condition] of (skill.usageConditions ?? []).entries()) {
+    assertValidUsageCondition(condition, index)
+    if (seenConditions.has(condition.type)) {
+      throw new Error(`skill.usageConditions must not repeat ${condition.type}`)
+    }
+    seenConditions.add(condition.type)
+  }
 }
 
 export function resolveSkillAttributeId(skill: SkillDefinition): AttributeId {

@@ -21,6 +21,7 @@ export interface MonsterSpecies {
   readonly tagIds: readonly string[]
   readonly stats: MonsterStats
   readonly innateSkillId: SkillId
+  readonly passiveTraitIds?: readonly string[]
 }
 
 function assertNonEmptyString(value: string, fieldName: string): void {
@@ -55,4 +56,13 @@ export function assertValidMonsterSpecies(species: MonsterSpecies): void {
     assertNonEmptyString(tagId, 'species.tagIds[]')
   }
   assertValidStatusResistanceTags(species.tagIds)
+
+  const seenTraitIds = new Set<string>()
+  for (const traitId of species.passiveTraitIds ?? []) {
+    assertNonEmptyString(traitId, 'species.passiveTraitIds[]')
+    if (seenTraitIds.has(traitId)) {
+      throw new Error(`species.passiveTraitIds must not contain duplicates: ${traitId}`)
+    }
+    seenTraitIds.add(traitId)
+  }
 }

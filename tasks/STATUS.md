@@ -18,5 +18,6 @@
 - [x] T016 — [効果フレームワーク骨格](T016_EFFECT_FRAMEWORK.md)
 - [x] T017 — [属性・バフデバフ・状態耐性](T017_ATTRIBUTES_BUFFS_RESISTANCE.md)
 - [x] T018 — [状態異常一式](T018_STATUS_CONDITIONS.md)
+- [x] T019 — [対象選択・固有特性・時間操作・待機・技使用制約](T019_TARGETING_TRAITS_TIME_USAGE.md)
 
-T001～T018 complete. Next: T019.
+T001～T019 complete. Next: T020.

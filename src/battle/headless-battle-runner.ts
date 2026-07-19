@@ -5,7 +5,6 @@ import {
   createOrderedUnitTurnEvents,
   createUnitTurnEvent,
   registerUnitTurnEvent,
-  rescheduleUnitActionAfterAction,
   type BattleTime,
   type UnitActionSchedule,
   type UnitTurnEventPayload,
@@ -18,6 +17,7 @@ import {
   type BattleOutcome,
   type BattleState,
 } from './defeat-and-victory'
+import { getDirectEffectiveTarget } from './direct-targeting'
 import type {
   ActiveEffectMutation,
   ActiveEffectState,
@@ -41,6 +41,12 @@ import {
 import { performNormalMovement } from './normal-movement'
 import { useSingleTargetInnateSkill } from './single-target-damage'
 import {
+  canUseSkillWithUsageState,
+  completeActorActionSkillUsage,
+  createSkillUsageBook,
+  type SkillUsageBook,
+} from './skill-usage'
+import {
   consumeTargetActionDurations,
   resolveTurnStartStatusConditions,
   type EffectDurationChange,
@@ -56,6 +62,12 @@ import {
   type BattleUnitId,
   type BattleUnitState,
 } from './unit-state'
+import {
+  EMPTY_WAIT_ACTION_STATE,
+  performWaitAction,
+  resetWaitActionState,
+  type WaitActionState,
+} from './wait-action'
 
 export const HEADLESS_INITIAL_ACTION_COST = 100
 export const HEADLESS_WAIT_ACTION_COST = 50
@@ -109,6 +121,14 @@ interface HeadlessBattleContext {
   readonly speciesById: Readonly<Record<string, MonsterSpecies>>
   readonly skillById: Readonly<Record<string, SkillDefinition>>
   readonly schedules: Map<BattleUnitId, UnitActionSchedule>
+  readonly waitStates: Map<BattleUnitId, WaitActionState>
+  readonly skillUsageBooks: Map<BattleUnitId, SkillUsageBook>
+}
+
+interface ExecutedHeadlessAction {
+  readonly battle: BattleState
+  readonly log: BattleEventLog
+  readonly schedule: UnitActionSchedule
 }
 
 function compareIds(left: string, right: string): number {
@@ -169,6 +189,39 @@ function getRequiredUnit(battle: BattleState, battleUnitId: BattleUnitId): Battl
     throw new Error(`battle unit is missing: ${battleUnitId}`)
   }
   return unit
+}
+
+function getRequiredSchedule(
+  context: HeadlessBattleContext,
+  battleUnitId: BattleUnitId,
+): UnitActionSchedule {
+  const schedule = context.schedules.get(battleUnitId)
+  if (schedule === undefined) {
+    throw new Error(`schedule is missing: ${battleUnitId}`)
+  }
+  return schedule
+}
+
+function getRequiredWaitState(
+  context: HeadlessBattleContext,
+  battleUnitId: BattleUnitId,
+): WaitActionState {
+  const state = context.waitStates.get(battleUnitId)
+  if (state === undefined) {
+    throw new Error(`wait action state is missing: ${battleUnitId}`)
+  }
+  return state
+}
+
+function getRequiredSkillUsageBook(
+  context: HeadlessBattleContext,
+  battleUnitId: BattleUnitId,
+): SkillUsageBook {
+  const book = context.skillUsageBooks.get(battleUnitId)
+  if (book === undefined) {
+    throw new Error(`skill usage book is missing: ${battleUnitId}`)
+  }
+  return book
 }
 
 function withTimeline(battle: BattleState, timeline: TimelineQueue): BattleState {
@@ -243,10 +296,13 @@ function createInitialBattle(definition: HeadlessBattleDefinition): {
   assertSafeIntegerAtLeast(initialActionCost, 1, 'initialActionCost')
 
   const schedules = new Map<BattleUnitId, UnitActionSchedule>()
+  const waitStates = new Map<BattleUnitId, WaitActionState>()
+  const skillUsageBooks = new Map<BattleUnitId, SkillUsageBook>()
   definition.units.forEach((unitDefinition, index) => {
     assertSafeIntegerAtLeast(unitDefinition.tiePriority, 0, 'tiePriority')
     const unit = units[index]
     const species = getRequiredSpecies(speciesById, unit.speciesId)
+    const innateSkill = getRequiredSkill(skillById, species.innateSkillId)
     schedules.set(
       unit.battleUnitId,
       createInitialUnitActionSchedule(
@@ -256,6 +312,8 @@ function createInitialBattle(definition: HeadlessBattleDefinition): {
         unitDefinition.tiePriority,
       ),
     )
+    waitStates.set(unit.battleUnitId, EMPTY_WAIT_ACTION_STATE)
+    skillUsageBooks.set(unit.battleUnitId, createSkillUsageBook([innateSkill]))
   })
 
   const initialEvents = createOrderedUnitTurnEvents([...schedules.values()])
@@ -266,7 +324,13 @@ function createInitialBattle(definition: HeadlessBattleDefinition): {
 
   return Object.freeze({
     battle,
-    context: Object.freeze({ speciesById, skillById, schedules }),
+    context: Object.freeze({
+      speciesById,
+      skillById,
+      schedules,
+      waitStates,
+      skillUsageBooks,
+    }),
     nextTimelineSequence: initialEvents.length,
   })
 }
@@ -278,11 +342,7 @@ function executeSkillDecision(
   schedule: UnitActionSchedule,
   currentTime: BattleTime,
   context: HeadlessBattleContext,
-): {
-  readonly battle: BattleState
-  readonly log: BattleEventLog
-  readonly schedule: UnitActionSchedule
-} {
+): ExecutedHeadlessAction {
   const actor = getRequiredUnit(battle, decision.actorBattleUnitId)
   const target = getRequiredUnit(battle, decision.targetBattleUnitId)
   const actorSpecies = getRequiredSpecies(context.speciesById, actor.speciesId)
@@ -335,11 +395,7 @@ function executeMovementDecision(
   schedule: UnitActionSchedule,
   currentTime: BattleTime,
   context: HeadlessBattleContext,
-): {
-  readonly battle: BattleState
-  readonly log: BattleEventLog
-  readonly schedule: UnitActionSchedule
-} {
+): ExecutedHeadlessAction {
   const actor = getRequiredUnit(battle, decision.actorBattleUnitId)
   const actorSpecies = getRequiredSpecies(context.speciesById, actor.speciesId)
   const movement = performNormalMovement({
@@ -370,22 +426,21 @@ function executeWaitDecision(
   schedule: UnitActionSchedule,
   currentTime: BattleTime,
   context: HeadlessBattleContext,
-): {
-  readonly battle: BattleState
-  readonly log: BattleEventLog
-  readonly schedule: UnitActionSchedule
-} {
+): ExecutedHeadlessAction {
   const actor = getRequiredUnit(battle, decision.actorBattleUnitId)
   const actorSpecies = getRequiredSpecies(context.speciesById, actor.speciesId)
+  const wait = performWaitAction({
+    actor,
+    actorSpecies,
+    actorSchedule: schedule,
+    currentTime,
+    waitState: getRequiredWaitState(context, actor.battleUnitId),
+  })
+  context.waitStates.set(actor.battleUnitId, wait.waitState)
   return Object.freeze({
     battle,
     log,
-    schedule: rescheduleUnitActionAfterAction(
-      schedule,
-      currentTime,
-      HEADLESS_WAIT_ACTION_COST,
-      actorSpecies.stats.speed,
-    ),
+    schedule: wait.actorSchedule,
   })
 }
 
@@ -535,6 +590,53 @@ function consumeActorTargetActionDurations(
   })
 }
 
+function getUsableDirectSkills(
+  battle: BattleState,
+  actor: BattleUnitState,
+  actorSpecies: MonsterSpecies,
+  context: HeadlessBattleContext,
+): readonly SkillDefinition[] {
+  const skill = getRequiredSkill(context.skillById, actorSpecies.innateSkillId)
+  if (skill.targetType !== 'SINGLE_ENEMY') {
+    return Object.freeze([])
+  }
+  const target = getDirectEffectiveTarget(battle, actor.battleUnitId)
+  if (target === null) {
+    return Object.freeze([])
+  }
+  const targetSpecies = getRequiredSpecies(context.speciesById, target.speciesId)
+  const usable = canUseSkillWithUsageState({
+    usageBook: getRequiredSkillUsageBook(context, actor.battleUnitId),
+    skill,
+    actor,
+    actorSpecies,
+    target,
+    targetSpecies,
+  })
+  return usable ? Object.freeze([skill]) : Object.freeze([])
+}
+
+function completeHeadlessActionState(
+  actor: BattleUnitState,
+  actorSpecies: MonsterSpecies,
+  decision: MinimalAutoAiDecision,
+  context: HeadlessBattleContext,
+): void {
+  const innateSkill = getRequiredSkill(context.skillById, actorSpecies.innateSkillId)
+  const usageBook = getRequiredSkillUsageBook(context, actor.battleUnitId)
+  context.skillUsageBooks.set(
+    actor.battleUnitId,
+    completeActorActionSkillUsage(
+      usageBook,
+      [innateSkill],
+      decision.kind === 'USE_SKILL' ? decision.skillId : null,
+    ),
+  )
+  if (decision.kind !== 'WAIT') {
+    context.waitStates.set(actor.battleUnitId, resetWaitActionState())
+  }
+}
+
 function createSummary(
   battle: BattleState,
   log: BattleEventLog,
@@ -598,10 +700,7 @@ export function runHeadlessBattle(definition: HeadlessBattleDefinition): Headles
       throw new Error(`defeated unit received a turn: ${actor.battleUnitId}`)
     }
 
-    const schedule = context.schedules.get(actor.battleUnitId)
-    if (schedule === undefined) {
-      throw new Error(`schedule is missing: ${actor.battleUnitId}`)
-    }
+    const schedule = getRequiredSchedule(context, actor.battleUnitId)
     if (schedule.nextActionTime !== popped.event.time) {
       throw new Error('scheduled turn time must match the unit schedule')
     }
@@ -629,7 +728,12 @@ export function runHeadlessBattle(definition: HeadlessBattleDefinition): Headles
       battle,
       actorBattleUnitId: readyActor.battleUnitId,
       speciesById: context.speciesById,
-      availableDirectSkills: [getRequiredSkill(context.skillById, actorSpecies.innateSkillId)],
+      availableDirectSkills: getUsableDirectSkills(
+        battle,
+        readyActor,
+        actorSpecies,
+        context,
+      ),
     })
 
     const executed =
@@ -642,6 +746,7 @@ export function runHeadlessBattle(definition: HeadlessBattleDefinition): Headles
     battle = executed.battle
     log = executed.log
     context.schedules.set(readyActor.battleUnitId, executed.schedule)
+    completeHeadlessActionState(readyActor, actorSpecies, decision, context)
     totalActions += 1
 
     if (battle.outcome === 'ONGOING') {
