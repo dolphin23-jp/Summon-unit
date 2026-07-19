@@ -1,6 +1,7 @@
 import {
   ACTIVE_CONTENT_VALIDATION,
   AUTHORED_VERTICAL_SLICE_CONTENT_VALIDATION,
+  AUTHORED_VERTICAL_SLICE_WORLD_VALIDATION,
 } from '../src/content/runtime-content-validation'
 
 console.log(
@@ -8,6 +9,7 @@ console.log(
     {
       active: ACTIVE_CONTENT_VALIDATION,
       verticalSlice: AUTHORED_VERTICAL_SLICE_CONTENT_VALIDATION,
+      verticalSliceWorld: AUTHORED_VERTICAL_SLICE_WORLD_VALIDATION,
     },
     null,
     2,
