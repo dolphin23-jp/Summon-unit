@@ -89,7 +89,7 @@
 - 既存DIRECT遮蔽を再利用しながら、PIERCE・ARC・SNIPE・SELF・GLOBALを追加した。
 - 9種類の範囲マスクと決定論的チェイン選択を追加した。
 - 一歩の押し出し・引き寄せ・左右移動を追加し、盤外・陣営境界・占有時は状態を変更せず失敗する。
-- GitHub Actions CI run 89でtest、headless demo、lint、buildが成功した。
+- GitHub Actions CIでtest、headless demo、lint、buildが成功した。
 
 ## 次のタスク
 
