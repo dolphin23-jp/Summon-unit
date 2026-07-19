@@ -28,5 +28,6 @@
 - [x] T026 — [評価スコア一式](T026_STANDARD_AI_SCORERS.md)
 - [x] T027 — [作戦・ポリシー・理由ログ・回帰指標](T027_AI_STRATEGY_POLICY_LOGS.md)
 - [x] T028 — [対話型戦闘ランナー](T028_INTERACTIVE_BATTLE_RUNNER.md)
+- [x] T029 — [戦闘画面一式](T029_BATTLE_SCREEN_SUITE.md)
 
-T001～T028 complete. Next: T029.
+T001～T029 complete. Next: T030.
