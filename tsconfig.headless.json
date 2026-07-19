@@ -16,6 +16,7 @@
   "include": [
     "scripts/headless-battle-demo.ts",
     "scripts/ai-regression-benchmark.ts",
+    "scripts/validate-content.ts",
     "src/ai/**/*.ts",
     "src/battle/**/*.ts",
     "src/content/**/*.ts",
