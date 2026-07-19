@@ -31,7 +31,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           if [ "$status" -ne 0 ]; then
             cp /tmp/t030-materialize.log .agent/t030-error.log
-            git add .agent/t030-error.log
+            git add -f .agent/t030-error.log
             git commit -m "chore: capture T030 materialization error"
             git push origin HEAD:agent/t030-manual-preview
             exit 0
