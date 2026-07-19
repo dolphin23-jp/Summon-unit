@@ -16,6 +16,7 @@ import {
   type SkillDefinition,
   type SkillId,
 } from '../content/skill-definition'
+import { createEconomyState, type EconomyState } from './economy'
 
 export type UnitInstanceId = string
 export type FormationId = string
@@ -86,6 +87,7 @@ export interface PlayerData {
   readonly schemaVersion: number
   readonly gameVersion: string
   readonly contentVersion: string
+  readonly economy: EconomyState
   readonly collection: PlayerCollectionState
   readonly formations: PlayerFormationState
 }
@@ -427,6 +429,7 @@ export function createPlayerData(
   )
   assertNonEmptyString(input.gameVersion, 'playerData.gameVersion')
   assertNonEmptyString(input.contentVersion, 'playerData.contentVersion')
+  const economy = createEconomyState(input.economy)
   const catalog = resolveCatalog(contentCatalog)
 
   const speciesStates = input.collection.speciesStates.map((state) =>
@@ -479,6 +482,7 @@ export function createPlayerData(
     schemaVersion: input.schemaVersion,
     gameVersion: input.gameVersion,
     contentVersion: input.contentVersion,
+    economy,
     collection: Object.freeze({
       speciesStates: Object.freeze(speciesStates),
       unitInstances: Object.freeze(unitInstances),
