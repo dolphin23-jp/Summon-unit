@@ -17,6 +17,11 @@ import {
   type SkillId,
 } from '../content/skill-definition'
 import { createEconomyState, type EconomyState } from './economy'
+import {
+  createPlayerResearchState,
+  type PlayerResearchState,
+  type ResearchNodeDefinition,
+} from './research-model'
 
 export type UnitInstanceId = string
 export type FormationId = string
@@ -88,6 +93,7 @@ export interface PlayerData {
   readonly gameVersion: string
   readonly contentVersion: string
   readonly economy: EconomyState
+  readonly research?: PlayerResearchState
   readonly collection: PlayerCollectionState
   readonly formations: PlayerFormationState
 }
@@ -95,6 +101,7 @@ export interface PlayerData {
 export interface PlayerDataContentCatalog {
   readonly species: readonly MonsterSpecies[]
   readonly skills: readonly SkillDefinition[]
+  readonly researchNodes?: readonly ResearchNodeDefinition[]
 }
 
 interface ResolvedCatalog {
@@ -478,11 +485,18 @@ export function createPlayerData(
     throw new Error(`active formation does not exist: ${input.formations.activeFormationId}`)
   }
 
+  const research = createPlayerResearchState(
+    input.research ?? { nodes: [] },
+    contentCatalog.researchNodes ?? [],
+    new Set(catalog.speciesById.keys()),
+  )
+
   return Object.freeze({
     schemaVersion: input.schemaVersion,
     gameVersion: input.gameVersion,
     contentVersion: input.contentVersion,
     economy,
+    research,
     collection: Object.freeze({
       speciesStates: Object.freeze(speciesStates),
       unitInstances: Object.freeze(unitInstances),

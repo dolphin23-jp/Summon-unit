@@ -8,6 +8,7 @@ import {
 export const T033_PLAYER_CATALOG: PlayerDataContentCatalog = Object.freeze({
   species: STANDARD_HEADLESS_SPECIES,
   skills: STANDARD_INTERACTIVE_SKILLS,
+  researchNodes: Object.freeze([]),
 })
 
 export const T033_GENERIC_SKILL_COSTS: Readonly<Record<string, number>> = Object.freeze({
@@ -18,9 +19,9 @@ export const T033_GENERIC_SKILL_COSTS: Readonly<Record<string, number>> = Object
 
 export const T033_INITIAL_PLAYER_DATA = createPlayerData(
   {
-    schemaVersion: 2,
-    gameVersion: '0.0.0-t034',
-    contentVersion: 'demo-t034',
+    schemaVersion: 3,
+    gameVersion: '0.0.0-t035',
+    contentVersion: 'demo-t035',
     economy: {
       currency: 520,
       researchData: 180,
@@ -29,6 +30,7 @@ export const T033_INITIAL_PLAYER_DATA = createPlayerData(
         { catalystId: 'catalyst.demo-core', amount: 1 },
       ],
     },
+    research: { nodes: [] },
     collection: {
       speciesStates: [
         {
