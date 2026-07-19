@@ -7,13 +7,26 @@ jobs:
   concise-test:
     runs-on: ubuntu-latest
     steps:
-      - name: Run concise test output
+      - name: Clone pull request branch
         shell: bash
         run: |
-          set -o pipefail
-          git clone --quiet --depth=1 --branch "$GITHUB_HEAD_REF" "https://github.com/$GITHUB_REPOSITORY.git" repo
-          cd repo
+          set -euxo pipefail
+          echo "head=$GITHUB_HEAD_REF repo=$GITHUB_REPOSITORY"
+          git clone --depth=1 --branch "$GITHUB_HEAD_REF" "https://github.com/$GITHUB_REPOSITORY.git" repo
+      - name: Enable pnpm
+        shell: bash
+        working-directory: repo
+        run: |
+          set -euxo pipefail
           corepack enable
-          corepack prepare pnpm@10.13.1 --activate >/dev/null
-          pnpm install --frozen-lockfile --reporter=silent
-          pnpm test 2>&1 | tail -n 80
+          corepack prepare pnpm@10.13.1 --activate
+      - name: Install dependencies
+        shell: bash
+        working-directory: repo
+        run: pnpm install --frozen-lockfile --reporter=append-only
+      - name: Run concise test output
+        shell: bash
+        working-directory: repo
+        run: |
+          set -o pipefail
+          pnpm test 2>&1 | tail -n 100
