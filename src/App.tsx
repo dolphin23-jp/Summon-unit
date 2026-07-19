@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import type { HeadlessBattleDefinition } from './battle/headless-battle-runner'
+import type {
+  HeadlessBattleDefinition,
+  InteractiveBattleStableSnapshot,
+} from './battle/headless-battle-runner'
 import {
   T039_FOREST_NORMAL,
   T039_GENERIC_SKILL_COSTS,
@@ -37,6 +40,8 @@ import {
   type SaveSlotId,
   type SaveSlotSummary,
 } from './save/save-model'
+import { normalizeSavedBattleSession, type SavedBattleSession } from './save/save-state'
+import { exportSaveTransferJson, importSaveTransferJson } from './save/save-transfer'
 import {
   deleteSaveSlot,
   listSaveSlotSummaries,
@@ -60,6 +65,8 @@ interface BattleSession {
   readonly definition: HeadlessBattleDefinition
   readonly serial: number
   readonly fastModeAvailable: boolean
+  readonly initialStableSnapshot?: InteractiveBattleStableSnapshot
+  readonly initialAttempt?: number
 }
 
 const BATTLE_DEFAULTS = Object.freeze({
@@ -139,6 +146,7 @@ function App() {
   const [saveBusy, setSaveBusy] = useState(false)
   const [saveNotice, setSaveNotice] = useState<string | null>(null)
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve())
+  const activeBattleRef = useRef<SavedBattleSession | null>(null)
 
   useEffect(() => {
     const bootstrap = getBrowserBootstrap()
@@ -159,7 +167,19 @@ function App() {
         setAutosaveEnabled(result.settings.autosaveEnabled)
         setSaveSummaries(result.summaries)
         setSaveBootState('READY')
-        if (result.recoveredFromBackup) {
+        activeBattleRef.current = result.activeBattle
+        if (result.activeBattle !== null) {
+          setBattleSession({
+            stageId: result.activeBattle.stageId,
+            definition: result.activeBattle.definition,
+            serial: result.activeBattle.serial,
+            fastModeAvailable: result.activeBattle.fastModeAvailable,
+            initialStableSnapshot: result.activeBattle.stableSnapshot,
+            initialAttempt: result.activeBattle.attempt,
+          })
+          setNextBattleSerial((current) => Math.max(current, result.activeBattle!.serial + 1))
+          setSaveNotice('中断していた戦闘をstableスナップショットから再開しました。')
+        } else if (result.recoveredFromBackup) {
           setSaveNotice('現在世代を検証できなかったため、バックアップ世代から復元しました。')
         } else if (result.createdInitialSave) {
           setSaveNotice('スロット1を作成し、初期進行を保存しました。')
@@ -198,6 +218,8 @@ function App() {
   const persistPlayerData = async (
     nextPlayerData: PlayerData,
     slotId: SaveSlotId,
+    activeBattle: SavedBattleSession | null = activeBattleRef.current,
+    refreshSummaries = true,
   ): Promise<void> => {
     if (BROWSER_SAVE_REPOSITORY === null || saveBootState !== 'READY') return
     const savedAtEpochMs = Date.now()
@@ -209,9 +231,10 @@ function App() {
         slotId,
         generationId: createRuntimeSaveGenerationId(slotId, savedAtEpochMs),
         savedAtEpochMs,
+        activeBattle,
       },
     )
-    await refreshSaveSummaries()
+    if (refreshSummaries) await refreshSaveSummaries()
   }
 
   const queueAutosave = (nextPlayerData: PlayerData): void => {
@@ -285,6 +308,7 @@ function App() {
       )
       if (loaded === null) throw new Error(`${slotId}に保存データがありません。`)
       setPlayerData(loaded.playerData)
+      activeBattleRef.current = loaded.activeBattle
       setNotifications(
         createCurrentProgressionNotifications(loaded.playerData, T039_PLAYER_CATALOG),
       )
@@ -300,12 +324,27 @@ function App() {
           ? current
           : (unlockedStageIds[0] ?? null),
       )
+      if (loaded.activeBattle !== null) {
+        setBattleSession({
+          stageId: loaded.activeBattle.stageId,
+          definition: loaded.activeBattle.definition,
+          serial: loaded.activeBattle.serial,
+          fastModeAvailable: loaded.activeBattle.fastModeAvailable,
+          initialStableSnapshot: loaded.activeBattle.stableSnapshot,
+          initialAttempt: loaded.activeBattle.attempt,
+        })
+        setNextBattleSerial((current) => Math.max(current, loaded.activeBattle!.serial + 1))
+      } else {
+        setBattleSession(null)
+        setScreen('REGION')
+      }
       setSaveNotice(
-        loaded.recoveredFromBackup
-          ? `${slotId}のバックアップ世代から復元しました。`
-          : `${slotId}をロードしました。`,
+        loaded.activeBattle !== null
+          ? `${slotId}の中断戦闘を再開しました。`
+          : loaded.recoveredFromBackup
+            ? `${slotId}のバックアップ世代から復元しました。`
+            : `${slotId}をロードしました。`,
       )
-      setScreen('REGION')
     } catch (error) {
       setSaveNotice(error instanceof Error ? error.message : 'スロットのロードに失敗しました。')
     } finally {
@@ -356,12 +395,14 @@ function App() {
       BATTLE_DEFAULTS,
     )
     setSelectedStageId(stageId)
+    activeBattleRef.current = null
     setBattleSession({
       stageId,
       definition,
       serial: nextBattleSerial,
       fastModeAvailable:
         playerData.stageProgress?.completedStageIds.includes(stageId) ?? false,
+      initialAttempt: 0,
     })
     setNextBattleSerial((current) => current + 1)
   }
@@ -388,6 +429,96 @@ function App() {
     return result
   }
 
+
+  const leaveBattle = (nextScreen: Exclude<AppScreen, 'SAVE'>): void => {
+    activeBattleRef.current = null
+    setBattleSession(null)
+    setScreen(nextScreen)
+    if (autosaveEnabled && saveBootState === 'READY') {
+      void enqueueSaveTask(() => persistPlayerData(playerData, activeSlotId, null)).catch(
+        (error) =>
+          setSaveNotice(
+            error instanceof Error
+              ? `戦闘中断データの削除に失敗しました: ${error.message}`
+              : '戦闘中断データの削除に失敗しました。',
+          ),
+      )
+    }
+  }
+
+  const exportCurrentSave = (): void => {
+    try {
+      const json = exportSaveTransferJson(
+        { playerData, activeBattle: activeBattleRef.current },
+        T039_PLAYER_CATALOG,
+      )
+      const blob = new Blob([json], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = `summon-unit-${activeSlotId}.json`
+      anchor.click()
+      URL.revokeObjectURL(url)
+      setSaveNotice(`${activeSlotId}をJSONへエクスポートしました。`)
+    } catch (error) {
+      setSaveNotice(error instanceof Error ? error.message : 'JSONエクスポートに失敗しました。')
+    }
+  }
+
+  const importIntoActiveSlot = async (json: string): Promise<void> => {
+    if (BROWSER_SAVE_REPOSITORY === null || saveBootState !== 'READY') {
+      setSaveNotice('IndexedDBを利用できないためインポートできません。')
+      return
+    }
+    setSaveBusy(true)
+    try {
+      const imported = importSaveTransferJson(json, T039_PLAYER_CATALOG)
+      const savedAtEpochMs = Date.now()
+      const saved = await enqueueSaveTask(() =>
+        savePlayerDataAtomic(
+          BROWSER_SAVE_REPOSITORY,
+          imported.playerData,
+          T039_PLAYER_CATALOG,
+          {
+            slotId: activeSlotId,
+            generationId: createRuntimeSaveGenerationId(activeSlotId, savedAtEpochMs),
+            savedAtEpochMs,
+            activeBattle: imported.activeBattle,
+          },
+        ),
+      )
+      setPlayerData(saved.playerData)
+      activeBattleRef.current = saved.activeBattle
+      setNotifications(
+        createCurrentProgressionNotifications(saved.playerData, T039_PLAYER_CATALOG),
+      )
+      await refreshSaveSummaries()
+      if (saved.activeBattle !== null) {
+        setBattleSession({
+          stageId: saved.activeBattle.stageId,
+          definition: saved.activeBattle.definition,
+          serial: saved.activeBattle.serial,
+          fastModeAvailable: saved.activeBattle.fastModeAvailable,
+          initialStableSnapshot: saved.activeBattle.stableSnapshot,
+          initialAttempt: saved.activeBattle.attempt,
+        })
+        setNextBattleSerial((current) => Math.max(current, saved.activeBattle!.serial + 1))
+      } else {
+        setBattleSession(null)
+        setScreen('REGION')
+      }
+      setSaveNotice(
+        imported.appliedMigrations.length > 0
+          ? `JSONをschema ${imported.originalSchemaVersion}から${saved.playerData.schemaVersion}へ移行して${activeSlotId}へ保存しました。`
+          : `JSONを検証して${activeSlotId}へ保存しました。`,
+      )
+    } catch (error) {
+      setSaveNotice(error instanceof Error ? error.message : 'JSONインポートに失敗しました。')
+    } finally {
+      setSaveBusy(false)
+    }
+  }
+
   if (saveBootState === 'LOADING') {
     return (
       <main className="save-loading" aria-busy="true">
@@ -405,6 +536,31 @@ function App() {
       <MinimalBattleScreen
         definition={battleSession.definition}
         allowFastMode={battleSession.fastModeAvailable}
+        initialStableSnapshot={battleSession.initialStableSnapshot}
+        initialAttempt={battleSession.initialAttempt}
+        onStableSnapshot={(stableSnapshot, attempt) => {
+          const savedBattle = normalizeSavedBattleSession({
+            saveVersion: 1,
+            stageId: battleSession.stageId,
+            serial: battleSession.serial,
+            attempt,
+            fastModeAvailable: battleSession.fastModeAvailable,
+            definition: battleSession.definition,
+            stableSnapshot,
+          })
+          activeBattleRef.current = savedBattle
+          if (autosaveEnabled && saveBootState === 'READY') {
+            void enqueueSaveTask(() =>
+              persistPlayerData(playerData, activeSlotId, savedBattle, false),
+            ).catch((error) =>
+              setSaveNotice(
+                error instanceof Error
+                  ? `戦闘スナップショットの保存に失敗しました: ${error.message}`
+                  : '戦闘スナップショットの保存に失敗しました。',
+              ),
+            )
+          }
+        }}
         settleResult={(result, attempt) =>
           settleStageBattle(playerData, result, T039_PLAYER_CATALOG, {
             settlementId: `${battleSession.stageId}:run-${battleSession.serial}:attempt-${attempt}`,
@@ -414,6 +570,7 @@ function App() {
           })
         }
         onSettlement={(settlement) => {
+          activeBattleRef.current = null
           updatePlayerData(settlement.playerData)
           if (settlement.victory) {
             setBattleSession((current) =>
@@ -421,18 +578,9 @@ function App() {
             )
           }
         }}
-        onOpenFormation={() => {
-          setBattleSession(null)
-          setScreen('COLLECTION')
-        }}
-        onOpenResearch={() => {
-          setBattleSession(null)
-          setScreen('RESEARCH')
-        }}
-        onNextStage={() => {
-          setBattleSession(null)
-          setScreen('REGION')
-        }}
+        onOpenFormation={() => leaveBattle('COLLECTION')}
+        onOpenResearch={() => leaveBattle('RESEARCH')}
+        onNextStage={() => leaveBattle('REGION')}
       />
     )
   }
@@ -449,6 +597,8 @@ function App() {
         onLoadSlot={(slotId) => void loadSlot(slotId)}
         onDeleteSlot={(slotId) => void removeSlot(slotId)}
         onAutosaveChange={changeAutosave}
+        onExportJson={exportCurrentSave}
+        onImportJson={(json) => void importIntoActiveSlot(json)}
         onBack={() => setScreen(screenBeforeSave)}
       />
     )
