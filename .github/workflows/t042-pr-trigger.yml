@@ -1,4 +1,4 @@
-name: Apply T042 save generation
+name: Apply T042 battle and save UI
 
 on:
   pull_request:
@@ -13,16 +13,16 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: agent/t042-export-import-battle-resume
-      - name: Patch save generation
+      - name: Patch battle and save UI
         run: |
-          if grep -q "calculateCanonicalJsonChecksum" src/save/save-model.ts; then
+          if grep -q "onExportJson" src/ui/SaveSlotScreen.tsx; then
             exit 0
           fi
-          python tools/t042_patch_save.py
-      - name: Commit save generation
+          python tools/t042_patch_battle_ui.py
+      - name: Commit battle and save UI
         run: |
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add src/save/save-model.ts src/save/save-repository.ts src/save/browser-save-runtime.ts
-          git commit -m "Persist resumable battle sessions" || true
+          git add src/ui/MinimalBattleScreen.tsx src/ui/SaveSlotScreen.tsx src/t040.css
+          git commit -m "Add save transfer and battle snapshot UI" || true
           git push
