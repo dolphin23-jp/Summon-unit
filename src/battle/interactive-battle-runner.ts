@@ -1331,7 +1331,7 @@ class InteractiveBattleRunnerImpl implements InteractiveBattleRunner {
     if (this.pendingManualExecution !== null) {
       throw new Error('cannot capture a stable snapshot during manual action selection')
     }
-    return Object.freeze({
+    const serializable = {
       snapshotVersion: INTERACTIVE_BATTLE_STABLE_SNAPSHOT_VERSION,
       battle: this.battle,
       log: this.log,
@@ -1350,7 +1350,10 @@ class InteractiveBattleRunnerImpl implements InteractiveBattleRunner {
       skillUsageBooks: createRuntimeEntries(this.context.skillUsageBooks),
       skillIdsByBattleUnitId: createRuntimeEntries(this.context.skillIdsByBattleUnitId),
       recentPositionIds: createRuntimeEntries(this.context.recentPositionIds),
-    })
+    }
+    return Object.freeze(
+      JSON.parse(JSON.stringify(serializable)) as InteractiveBattleStableSnapshot,
+    )
   }
 
   subscribe(listener: InteractiveBattleListener): () => void {
