@@ -20,13 +20,28 @@ jobs:
         with:
           ref: agent/t030-manual-preview
       - name: Apply T030 implementation
+        id: apply
+        continue-on-error: true
         run: |
           base64 --decode .agent/t030-patch.tar.gz.b64 > /tmp/t030-patch.tar.gz
           tar -xzf /tmp/t030-patch.tar.gz -C /tmp
-          python /tmp/apply_t030.py
-          rm -rf .agent
+          set +e
+          python /tmp/apply_t030.py > /tmp/t030-materialize.log 2>&1
+          status=$?
+          echo "$status" > /tmp/t030-materialize.status
+          cat /tmp/t030-materialize.log
+          exit 0
+      - name: Upload materialization log
+        uses: actions/upload-artifact@v4
+        with:
+          name: t030-materialize-log
+          path: /tmp/t030-materialize.log
+      - name: Stop on materialization failure
+        run: |
+          test "$(cat /tmp/t030-materialize.status)" = "0"
       - name: Commit implementation
         run: |
+          rm -rf .agent
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
