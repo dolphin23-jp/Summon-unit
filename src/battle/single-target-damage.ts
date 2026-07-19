@@ -65,6 +65,9 @@ function assertValidPreviewInput(input: SingleTargetDamagePreviewInput): void {
   assertValidBattleUnitState(input.actor, input.actorSpecies)
   assertValidBattleUnitState(input.target, input.targetSpecies)
   assertValidSkillDefinition(input.skill)
+  if (input.skill.targetType !== 'SINGLE_ENEMY') {
+    throw new Error('single-target damage executor requires SINGLE_ENEMY targetType')
+  }
 }
 
 function assertValidUseInput(input: SingleTargetSkillUseInput): void {
