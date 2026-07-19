@@ -9,6 +9,8 @@ import {
   type EffectDurationUnit,
   type EffectRemovalReason,
 } from './effect-framework'
+import type { BarrierLayerConsumption } from './barrier'
+import type { GuardShareState } from './guard-share'
 import type { BattleUnitId } from './unit-state'
 
 export const BATTLE_EVENT_KINDS = [
@@ -16,6 +18,8 @@ export const BATTLE_EVENT_KINDS = [
   'turn_started',
   'unit_moved',
   'skill_used',
+  'guard_shared',
+  'barrier_absorbed',
   'damage_applied',
   'effect_applied',
   'effect_merged',
@@ -46,6 +50,29 @@ export interface SkillUsedPayload {
   readonly actorBattleUnitId: BattleUnitId
   readonly targetBattleUnitId: BattleUnitId
   readonly skillId: SkillId
+}
+
+export interface GuardSharedPayload {
+  readonly sourceBattleUnitId: BattleUnitId
+  readonly protectedBattleUnitId: BattleUnitId
+  readonly guardBattleUnitId: BattleUnitId
+  readonly skillId: SkillId | null
+  readonly finalDamage: number
+  readonly retainedDamage: number
+  readonly redirectedDamage: number
+  readonly sharePermille: number
+}
+
+export interface BarrierAbsorbedPayload {
+  readonly sourceBattleUnitId: BattleUnitId | null
+  readonly targetBattleUnitId: BattleUnitId
+  readonly skillId: SkillId | null
+  readonly barrierLayerId: string
+  readonly barrierSourceBattleUnitId: BattleUnitId | null
+  readonly absorbedDamage: number
+  readonly remainingCapacityBefore: number
+  readonly remainingCapacityAfter: number
+  readonly broken: boolean
 }
 
 export interface DamageAppliedPayload {
@@ -102,6 +129,8 @@ export type BattleStartedEvent = BattleEventBase<'battle_started', BattleStarted
 export type TurnStartedEvent = BattleEventBase<'turn_started', TurnStartedPayload>
 export type UnitMovedEvent = BattleEventBase<'unit_moved', UnitMovedPayload>
 export type SkillUsedEvent = BattleEventBase<'skill_used', SkillUsedPayload>
+export type GuardSharedEvent = BattleEventBase<'guard_shared', GuardSharedPayload>
+export type BarrierAbsorbedEvent = BattleEventBase<'barrier_absorbed', BarrierAbsorbedPayload>
 export type DamageAppliedEvent = BattleEventBase<'damage_applied', DamageAppliedPayload>
 export type EffectAppliedEvent = BattleEventBase<'effect_applied', EffectAppliedPayload>
 export type EffectMergedEvent = BattleEventBase<'effect_merged', EffectMergedPayload>
@@ -114,6 +143,8 @@ export type BattleEvent =
   | TurnStartedEvent
   | UnitMovedEvent
   | SkillUsedEvent
+  | GuardSharedEvent
+  | BarrierAbsorbedEvent
   | DamageAppliedEvent
   | EffectAppliedEvent
   | EffectMergedEvent
@@ -151,6 +182,24 @@ export interface RecordSingleTargetSkillResolutionInput {
   readonly outcome?: FinishedBattleOutcome
 }
 
+export interface RecordGuardSharedInput {
+  readonly virtualTime: BattleTime
+  readonly sourceBattleUnitId: BattleUnitId
+  readonly skillId: SkillId | null
+  readonly guardShare: GuardShareState
+  readonly finalDamage: number
+  readonly retainedDamage: number
+  readonly redirectedDamage: number
+}
+
+export interface RecordBarrierConsumptionInput {
+  readonly virtualTime: BattleTime
+  readonly sourceBattleUnitId: BattleUnitId | null
+  readonly targetBattleUnitId: BattleUnitId
+  readonly skillId: SkillId | null
+  readonly consumption: BarrierLayerConsumption
+}
+
 function assertNonEmptyId(value: string, field: string): void {
   if (value.trim().length === 0) {
     throw new Error(`${field} must be a non-empty string`)
@@ -177,7 +226,6 @@ function freezeEvent(event: BattleEvent): BattleEvent {
       }),
     })
   }
-
   return Object.freeze({
     ...event,
     payload: Object.freeze({ ...event.payload }),
@@ -214,7 +262,6 @@ function parseBoardPositionId(positionId: string, field: string): BoardPosition 
   if (match === null) {
     throw new Error(`${field} must be a valid board position id`)
   }
-
   return {
     side: match[1] as BoardPosition['side'],
     row: Number(match[2]) as BoardPosition['row'],
@@ -265,11 +312,9 @@ function assertValidEffectSnapshot(payload: EffectAppliedPayload, field = 'effec
 export function assertValidBattleEvent(event: BattleEvent): void {
   assertSafeIntegerAtLeast(event.sequence, 0, 'event.sequence')
   assertSafeIntegerAtLeast(event.virtualTime, 0, 'event.virtualTime')
-
   if (event.id !== getBattleEventId(event.sequence)) {
     throw new Error('event.id must match event.sequence')
   }
-
   if (!BATTLE_EVENT_KINDS.includes(event.kind)) {
     throw new Error('event.kind is invalid')
   }
@@ -313,6 +358,53 @@ export function assertValidBattleEvent(event: BattleEvent): void {
         throw new Error('skill actor and target must differ')
       }
       return
+    case 'guard_shared': {
+      const payload = event.payload
+      assertNonEmptyId(payload.sourceBattleUnitId, 'sourceBattleUnitId')
+      assertNonEmptyId(payload.protectedBattleUnitId, 'protectedBattleUnitId')
+      assertNonEmptyId(payload.guardBattleUnitId, 'guardBattleUnitId')
+      if (payload.skillId !== null) {
+        assertNonEmptyId(payload.skillId, 'skillId')
+      }
+      assertSafeIntegerAtLeast(payload.finalDamage, 1, 'finalDamage')
+      assertSafeIntegerAtLeast(payload.retainedDamage, 0, 'retainedDamage')
+      assertSafeIntegerAtLeast(payload.redirectedDamage, 0, 'redirectedDamage')
+      assertSafeIntegerAtLeast(payload.sharePermille, 1, 'sharePermille')
+      if (payload.sharePermille > 1000) {
+        throw new Error('sharePermille must not exceed 1000')
+      }
+      if (payload.retainedDamage + payload.redirectedDamage !== payload.finalDamage) {
+        throw new Error('guard-share damage parts must equal finalDamage')
+      }
+      return
+    }
+    case 'barrier_absorbed': {
+      const payload = event.payload
+      if (payload.sourceBattleUnitId !== null) {
+        assertNonEmptyId(payload.sourceBattleUnitId, 'sourceBattleUnitId')
+      }
+      if (payload.skillId !== null) {
+        assertNonEmptyId(payload.skillId, 'skillId')
+      }
+      if (payload.barrierSourceBattleUnitId !== null) {
+        assertNonEmptyId(payload.barrierSourceBattleUnitId, 'barrierSourceBattleUnitId')
+      }
+      assertNonEmptyId(payload.targetBattleUnitId, 'targetBattleUnitId')
+      assertNonEmptyId(payload.barrierLayerId, 'barrierLayerId')
+      assertSafeIntegerAtLeast(payload.absorbedDamage, 1, 'absorbedDamage')
+      assertSafeIntegerAtLeast(payload.remainingCapacityBefore, 1, 'remainingCapacityBefore')
+      assertSafeIntegerAtLeast(payload.remainingCapacityAfter, 0, 'remainingCapacityAfter')
+      if (
+        payload.remainingCapacityBefore - payload.remainingCapacityAfter !==
+        payload.absorbedDamage
+      ) {
+        throw new Error('barrier capacity delta must equal absorbedDamage')
+      }
+      if (payload.broken !== (payload.remainingCapacityAfter === 0)) {
+        throw new Error('barrier broken must match zero remaining capacity')
+      }
+      return
+    }
     case 'damage_applied': {
       const payload = event.payload
       if (payload.sourceBattleUnitId !== null) {
@@ -386,7 +478,6 @@ export function assertValidBattleEventLog(log: BattleEventLog): void {
   if (log.nextSequence !== log.events.length) {
     throw new Error('log.nextSequence must equal log.events.length')
   }
-
   let previousTime = 0
   for (const [index, event] of log.events.entries()) {
     assertValidBattleEvent(event)
@@ -411,12 +502,10 @@ export function appendBattleEvent(
   input: BattleEventInput,
 ): BattleEventLog {
   assertValidBattleEventLog(log)
-
   const previousEvent = log.events.at(-1)
   if (previousEvent !== undefined && input.virtualTime < previousEvent.virtualTime) {
     throw new Error('battle event virtualTime must not move backwards')
   }
-
   const sequence = log.nextSequence
   const event = freezeEvent({
     ...input,
@@ -424,7 +513,6 @@ export function appendBattleEvent(
     sequence,
   } as BattleEvent)
   assertValidBattleEvent(event)
-
   return freezeLog([...log.events, event])
 }
 
@@ -446,7 +534,6 @@ export function recordBattleStarted(
   if (battle.outcome !== 'ONGOING') {
     throw new Error('battle_started requires an ongoing battle')
   }
-
   const allyBattleUnitIds = battle.units
     .filter((unit) => unit.side === 'ALLY')
     .map((unit) => unit.battleUnitId)
@@ -455,7 +542,6 @@ export function recordBattleStarted(
     .filter((unit) => unit.side === 'ENEMY')
     .map((unit) => unit.battleUnitId)
     .sort(compareIds)
-
   return appendBattleEvent(log, {
     kind: 'battle_started',
     virtualTime,
@@ -481,7 +567,6 @@ export function recordUnitMoved(
 ): BattleEventLog {
   assertNonEmptyId(input.battleUnitId, 'battleUnitId')
   assertSafeIntegerAtLeast(input.virtualTime, 0, 'virtualTime')
-
   return appendBattleEvent(log, {
     kind: 'unit_moved',
     virtualTime: input.virtualTime,
@@ -489,6 +574,47 @@ export function recordUnitMoved(
       battleUnitId: input.battleUnitId,
       fromPositionId: getBoardPositionId(input.from),
       toPositionId: getBoardPositionId(input.to),
+    },
+  })
+}
+
+export function recordGuardShared(
+  log: BattleEventLog,
+  input: RecordGuardSharedInput,
+): BattleEventLog {
+  return appendBattleEvent(log, {
+    kind: 'guard_shared',
+    virtualTime: input.virtualTime,
+    payload: {
+      sourceBattleUnitId: input.sourceBattleUnitId,
+      protectedBattleUnitId: input.guardShare.protectedBattleUnitId,
+      guardBattleUnitId: input.guardShare.guardBattleUnitId,
+      skillId: input.skillId,
+      finalDamage: input.finalDamage,
+      retainedDamage: input.retainedDamage,
+      redirectedDamage: input.redirectedDamage,
+      sharePermille: input.guardShare.sharePermille,
+    },
+  })
+}
+
+export function recordBarrierConsumption(
+  log: BattleEventLog,
+  input: RecordBarrierConsumptionInput,
+): BattleEventLog {
+  return appendBattleEvent(log, {
+    kind: 'barrier_absorbed',
+    virtualTime: input.virtualTime,
+    payload: {
+      sourceBattleUnitId: input.sourceBattleUnitId,
+      targetBattleUnitId: input.targetBattleUnitId,
+      skillId: input.skillId,
+      barrierLayerId: input.consumption.before.barrierLayerId,
+      barrierSourceBattleUnitId: input.consumption.before.sourceBattleUnitId,
+      absorbedDamage: input.consumption.absorbedDamage,
+      remainingCapacityBefore: input.consumption.before.remainingCapacity,
+      remainingCapacityAfter: input.consumption.after?.remainingCapacity ?? 0,
+      broken: input.consumption.broken,
     },
   })
 }
@@ -513,7 +639,6 @@ export function recordActiveEffectMutation(
   virtualTime: BattleTime,
 ): BattleEventLog {
   assertSafeIntegerAtLeast(virtualTime, 0, 'virtualTime')
-
   switch (mutation.kind) {
     case 'APPLIED':
       return appendBattleEvent(log, {
@@ -583,7 +708,6 @@ export function recordSingleTargetSkillResolution(
   assertSafeIntegerAtLeast(input.appliedDamage, 1, 'appliedDamage')
   assertSafeIntegerAtLeast(input.targetHpBefore, 1, 'targetHpBefore')
   assertSafeIntegerAtLeast(input.targetHpAfter, 0, 'targetHpAfter')
-
   if (input.actorBattleUnitId === input.targetBattleUnitId) {
     throw new Error('skill actor and target must differ')
   }
@@ -606,7 +730,6 @@ export function recordSingleTargetSkillResolution(
       skillId: input.skillId,
     },
   })
-
   nextLog = appendBattleEvent(nextLog, {
     kind: 'damage_applied',
     virtualTime: input.virtualTime,
@@ -620,7 +743,6 @@ export function recordSingleTargetSkillResolution(
       hpAfter: input.targetHpAfter,
     },
   })
-
   if (input.targetHpAfter === 0) {
     nextLog = appendBattleEvent(nextLog, {
       kind: 'unit_defeated',
@@ -631,10 +753,8 @@ export function recordSingleTargetSkillResolution(
       },
     })
   }
-
   if (input.outcome !== undefined) {
     nextLog = recordBattleEnded(nextLog, input.outcome, input.virtualTime)
   }
-
   return nextLog
 }

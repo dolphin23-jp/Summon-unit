@@ -5,6 +5,14 @@ import {
   type SpeciesId,
 } from '../content/monster-species'
 import {
+  addBarrierLayer,
+  assertValidBarrierLayerCollection,
+  createBarrierLayer,
+  freezeBarrierLayerCollection,
+  type BarrierLayerState,
+  type CreateBarrierLayerInput,
+} from './barrier'
+import {
   assertValidActiveEffectCollection,
   freezeActiveEffectCollection,
   registerActiveEffect,
@@ -25,6 +33,7 @@ export interface BattleUnitState {
   readonly side: Side
   readonly position: BoardPosition
   readonly hp: number
+  readonly barriers: readonly BarrierLayerState[]
   readonly effects: readonly ActiveEffectState[]
   readonly defeated: boolean
 }
@@ -34,12 +43,18 @@ export interface CreateBattleUnitStateInput {
   readonly sourceInstanceId?: UnitInstanceId | null
   readonly position: BoardPosition
   readonly initialHp?: number
+  readonly initialBarriers?: readonly BarrierLayerState[]
   readonly initialEffects?: readonly ActiveEffectState[]
 }
 
 export interface BattleUnitEffectUpdate {
   readonly state: BattleUnitState
   readonly mutation: ActiveEffectMutation | null
+}
+
+export interface BattleUnitBarrierUpdate {
+  readonly state: BattleUnitState
+  readonly barrier: BarrierLayerState
 }
 
 function assertNonEmptyId(value: string, fieldName: string): void {
@@ -74,6 +89,7 @@ export function assertValidBattleUnitState(
   }
 
   assertValidHp(state.hp, species.stats.hp)
+  assertValidBarrierLayerCollection(state.barriers, state.battleUnitId)
   assertValidActiveEffectCollection(state.effects, state.battleUnitId)
 
   if (state.defeated !== (state.hp === 0)) {
@@ -103,6 +119,10 @@ export function createBattleUnitState(
     side: input.position.side,
     position: { ...input.position },
     hp,
+    barriers: freezeBarrierLayerCollection(
+      input.initialBarriers ?? [],
+      input.battleUnitId,
+    ),
     effects: freezeActiveEffectCollection(input.initialEffects ?? [], input.battleUnitId),
     defeated: hp === 0,
   }
@@ -127,6 +147,38 @@ export function withBattleUnitHp(
 
   assertValidBattleUnitState(nextState, species)
   return nextState
+}
+
+export function withBattleUnitBarriers(
+  state: BattleUnitState,
+  species: MonsterSpecies,
+  barriers: readonly BarrierLayerState[],
+): BattleUnitState {
+  assertValidBattleUnitState(state, species)
+  const nextState: BattleUnitState = {
+    ...state,
+    barriers: freezeBarrierLayerCollection(barriers, state.battleUnitId),
+  }
+  assertValidBattleUnitState(nextState, species)
+  return nextState
+}
+
+export function withAddedBattleUnitBarrier(
+  state: BattleUnitState,
+  species: MonsterSpecies,
+  input: CreateBarrierLayerInput,
+): BattleUnitBarrierUpdate {
+  assertValidBattleUnitState(state, species)
+  if (input.targetBattleUnitId !== state.battleUnitId) {
+    throw new Error('barrier target must match the owning battle unit')
+  }
+  const barrier = createBarrierLayer(input)
+  const nextState = withBattleUnitBarriers(
+    state,
+    species,
+    addBarrierLayer(state.barriers, input),
+  )
+  return Object.freeze({ state: nextState, barrier })
 }
 
 export function withRegisteredBattleUnitEffect(

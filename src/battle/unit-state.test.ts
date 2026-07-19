@@ -3,6 +3,7 @@ import type { BoardPosition } from './board'
 import {
   assertValidBattleUnitState,
   createBattleUnitState,
+  withAddedBattleUnitBarrier,
   withBattleUnitHp,
   withRegisteredBattleUnitEffect,
   withoutBattleUnitEffect,
@@ -42,11 +43,38 @@ describe('battle unit state', () => {
       side: 'ALLY',
       position: allyFrontCenter,
       hp: 120,
+      barriers: [],
       effects: [],
       defeated: false,
     })
     expect(state.position).not.toBe(allyFrontCenter)
+    expect(Object.isFrozen(state.barriers)).toBe(true)
     expect(Object.isFrozen(state.effects)).toBe(true)
+  })
+
+  it('adds barrier layers without mutating the previous unit state', () => {
+    const initial = createBattleUnitState(species, {
+      battleUnitId: 'battle-unit.ally.001',
+      position: allyFrontCenter,
+    })
+    const added = withAddedBattleUnitBarrier(initial, species, {
+      sourceBattleUnitId: 'battle-unit.ally.002',
+      targetBattleUnitId: initial.battleUnitId,
+      capacity: 30,
+      applicationSequence: 4,
+    })
+
+    expect(initial.barriers).toEqual([])
+    expect(added.state.barriers).toHaveLength(1)
+    expect(added.barrier).toMatchObject({
+      sourceBattleUnitId: 'battle-unit.ally.002',
+      targetBattleUnitId: initial.battleUnitId,
+      initialCapacity: 30,
+      remainingCapacity: 30,
+      applicationSequence: 4,
+    })
+    expect(Object.isFrozen(added.state.barriers)).toBe(true)
+    expect(Object.isFrozen(added.state.barriers[0])).toBe(true)
   })
 
   it('registers and removes active effects without mutating the previous unit state', () => {
@@ -166,11 +194,19 @@ describe('battle unit state', () => {
     )
   })
 
-  it('rejects an effect owned by another battle unit', () => {
+  it('rejects barrier and effect ownership mismatches', () => {
     const initial = createBattleUnitState(species, {
       battleUnitId: 'battle-unit.ally.001',
       position: allyFrontCenter,
     })
+
+    expect(() =>
+      withAddedBattleUnitBarrier(initial, species, {
+        targetBattleUnitId: 'battle-unit.ally.other',
+        capacity: 20,
+        applicationSequence: 1,
+      }),
+    ).toThrow('barrier target must match the owning battle unit')
 
     expect(() =>
       withRegisteredBattleUnitEffect(initial, species, {

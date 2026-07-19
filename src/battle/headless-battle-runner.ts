@@ -9,6 +9,8 @@ import {
   type UnitActionSchedule,
   type UnitTurnEventPayload,
 } from './action-scheduling'
+import { getTotalBarrierCapacity, type BarrierLayerState } from './barrier'
+import { resolveBarrierGuardDamage, type DamageRecipientResolution } from './barrier-guard-resolution'
 import { getBoardPositionId, type BoardPosition } from './board'
 import {
   assertValidBattleState,
@@ -26,20 +28,26 @@ import {
   EMPTY_BATTLE_EVENT_LOG,
   appendBattleEvent,
   recordActiveEffectMutation,
+  recordBarrierConsumption,
   recordBattleEnded,
   recordBattleStarted,
-  recordSingleTargetSkillResolution,
+  recordGuardShared,
   recordTurnStarted,
   recordUnitDefeated,
   recordUnitMoved,
   type BattleEventLog,
 } from './event-log'
 import {
+  freezeGuardShareCollection,
+  getGuardShareForProtectedUnit,
+  type GuardShareState,
+} from './guard-share'
+import {
   selectMinimalAutoAiAction,
   type MinimalAutoAiDecision,
 } from './minimal-auto-ai'
 import { performNormalMovement } from './normal-movement'
-import { useSingleTargetInnateSkill } from './single-target-damage'
+import { scheduleSingleTargetInnateSkill } from './single-target-damage'
 import {
   canUseSkillWithUsageState,
   completeActorActionSkillUsage,
@@ -78,6 +86,7 @@ export interface HeadlessBattleUnitDefinition {
   readonly speciesId: string
   readonly position: BoardPosition
   readonly initialHp?: number
+  readonly initialBarriers?: readonly BarrierLayerState[]
   readonly initialEffects?: readonly ActiveEffectState[]
   readonly tiePriority: number
 }
@@ -86,6 +95,7 @@ export interface HeadlessBattleDefinition {
   readonly species: readonly MonsterSpecies[]
   readonly skills: readonly SkillDefinition[]
   readonly units: readonly HeadlessBattleUnitDefinition[]
+  readonly guardShares?: readonly GuardShareState[]
   readonly initialActionCost?: number
   readonly maxActions?: number
 }
@@ -97,6 +107,7 @@ export interface HeadlessBattleUnitSummary {
   readonly speciesId: string
   readonly side: BattleUnitState['side']
   readonly hp: number
+  readonly barrierTotal: number
   readonly defeated: boolean
   readonly positionId: string
   readonly actionCount: number
@@ -123,6 +134,7 @@ interface HeadlessBattleContext {
   readonly schedules: Map<BattleUnitId, UnitActionSchedule>
   readonly waitStates: Map<BattleUnitId, WaitActionState>
   readonly skillUsageBooks: Map<BattleUnitId, SkillUsageBook>
+  readonly guardShares: readonly GuardShareState[]
 }
 
 interface ExecutedHeadlessAction {
@@ -225,10 +237,7 @@ function getRequiredSkillUsageBook(
 }
 
 function withTimeline(battle: BattleState, timeline: TimelineQueue): BattleState {
-  const nextBattle: BattleState = Object.freeze({
-    ...battle,
-    timeline,
-  })
+  const nextBattle: BattleState = Object.freeze({ ...battle, timeline })
   assertValidBattleState(nextBattle)
   return nextBattle
 }
@@ -237,12 +246,10 @@ function replaceLivingUnit(battle: BattleState, updatedUnit: BattleUnitState): B
   if (updatedUnit.defeated) {
     throw new Error('replaceLivingUnit requires a living unit')
   }
-
   const existing = getRequiredUnit(battle, updatedUnit.battleUnitId)
   if (existing.defeated) {
     throw new Error('cannot replace an already defeated battle unit')
   }
-
   const nextBattle: BattleState = Object.freeze({
     ...battle,
     units: Object.freeze(
@@ -264,6 +271,28 @@ function registerNextTurn(
   return withTimeline(battle, registerUnitTurnEvent(battle.timeline, event))
 }
 
+function validateGuardShares(
+  guardShares: readonly GuardShareState[],
+  units: readonly BattleUnitState[],
+): readonly GuardShareState[] {
+  const frozen = freezeGuardShareCollection(guardShares)
+  for (const guardShare of frozen) {
+    const protectedUnit = units.find(
+      (unit) => unit.battleUnitId === guardShare.protectedBattleUnitId,
+    )
+    const guardUnit = units.find(
+      (unit) => unit.battleUnitId === guardShare.guardBattleUnitId,
+    )
+    if (protectedUnit === undefined || guardUnit === undefined) {
+      throw new Error('guard share units must belong to the battle')
+    }
+    if (protectedUnit.side !== guardUnit.side) {
+      throw new Error('guard share requires units on the same side')
+    }
+  }
+  return frozen
+}
+
 function createInitialBattle(definition: HeadlessBattleDefinition): {
   readonly battle: BattleState
   readonly context: HeadlessBattleContext
@@ -281,20 +310,19 @@ function createInitialBattle(definition: HeadlessBattleDefinition): {
       throw new Error(`battleUnitId must be unique: ${unitDefinition.battleUnitId}`)
     }
     unitIds.add(unitDefinition.battleUnitId)
-
     const species = getRequiredSpecies(speciesById, unitDefinition.speciesId)
     getRequiredSkill(skillById, species.innateSkillId)
     return createBattleUnitState(species, {
       battleUnitId: unitDefinition.battleUnitId,
       position: unitDefinition.position,
       initialHp: unitDefinition.initialHp,
+      initialBarriers: unitDefinition.initialBarriers,
       initialEffects: unitDefinition.initialEffects,
     })
   })
 
   const initialActionCost = definition.initialActionCost ?? HEADLESS_INITIAL_ACTION_COST
   assertSafeIntegerAtLeast(initialActionCost, 1, 'initialActionCost')
-
   const schedules = new Map<BattleUnitId, UnitActionSchedule>()
   const waitStates = new Map<BattleUnitId, WaitActionState>()
   const skillUsageBooks = new Map<BattleUnitId, SkillUsageBook>()
@@ -321,7 +349,6 @@ function createInitialBattle(definition: HeadlessBattleDefinition): {
     units,
     timeline: createTimelineQueue(initialEvents),
   })
-
   return Object.freeze({
     battle,
     context: Object.freeze({
@@ -330,9 +357,88 @@ function createInitialBattle(definition: HeadlessBattleDefinition): {
       schedules,
       waitStates,
       skillUsageBooks,
+      guardShares: validateGuardShares(definition.guardShares ?? [], units),
     }),
     nextTimelineSequence: initialEvents.length,
   })
+}
+
+function getLivingGuard(
+  battle: BattleState,
+  target: BattleUnitState,
+  context: HeadlessBattleContext,
+): {
+  readonly unit: BattleUnitState
+  readonly species: MonsterSpecies
+  readonly guardShare: GuardShareState
+} | null {
+  const guardShare = getGuardShareForProtectedUnit(
+    context.guardShares,
+    target.battleUnitId,
+  )
+  if (guardShare === null) {
+    return null
+  }
+  const guard = getRequiredUnit(battle, guardShare.guardBattleUnitId)
+  if (guard.defeated) {
+    return null
+  }
+  return Object.freeze({
+    unit: guard,
+    species: getRequiredSpecies(context.speciesById, guard.speciesId),
+    guardShare,
+  })
+}
+
+function applyRecipientResolution(
+  battle: BattleState,
+  resolution: DamageRecipientResolution,
+  killerBattleUnitId: BattleUnitId,
+  currentTime: BattleTime,
+): BattleState {
+  return resolution.after.defeated
+    ? resolveBattleUnitDefeat({
+        battle,
+        defeatedUnit: resolution.after,
+        killerBattleUnitId,
+        currentTime,
+      })
+    : replaceLivingUnit(battle, resolution.after)
+}
+
+function recordRecipientResolution(
+  log: BattleEventLog,
+  resolution: DamageRecipientResolution,
+  sourceBattleUnitId: BattleUnitId,
+  skillId: string,
+  currentTime: BattleTime,
+): BattleEventLog {
+  let nextLog = log
+  for (const consumption of resolution.barrierConsumptions) {
+    nextLog = recordBarrierConsumption(nextLog, {
+      virtualTime: currentTime,
+      sourceBattleUnitId,
+      targetBattleUnitId: resolution.before.battleUnitId,
+      skillId,
+      consumption,
+    })
+  }
+  if (resolution.hpDamage > 0) {
+    nextLog = appendBattleEvent(nextLog, {
+      kind: 'damage_applied',
+      virtualTime: currentTime,
+      payload: {
+        sourceBattleUnitId,
+        targetBattleUnitId: resolution.before.battleUnitId,
+        skillId,
+        calculatedDamage: resolution.assignedDamage,
+        appliedDamage: resolution.hpDamage,
+        hpBefore: resolution.before.hp,
+        hpAfter: resolution.after.hp,
+      },
+    })
+  }
+  return nextLog
 }
 
 function executeSkillDecision(
@@ -348,7 +454,7 @@ function executeSkillDecision(
   const actorSpecies = getRequiredSpecies(context.speciesById, actor.speciesId)
   const targetSpecies = getRequiredSpecies(context.speciesById, target.speciesId)
   const skill = getRequiredSkill(context.skillById, decision.skillId)
-  const resolution = useSingleTargetInnateSkill({
+  const scheduled = scheduleSingleTargetInnateSkill({
     actor,
     actorSpecies,
     actorSchedule: schedule,
@@ -357,34 +463,76 @@ function executeSkillDecision(
     skill,
     currentTime,
   })
-
-  let nextBattle = resolution.target.defeated
-    ? resolveBattleUnitDefeat({
-        battle,
-        defeatedUnit: resolution.target,
-        killerBattleUnitId: actor.battleUnitId,
-        currentTime,
-      })
-    : replaceLivingUnit(battle, resolution.target)
-
-  const outcome = nextBattle.outcome === 'ONGOING' ? undefined : nextBattle.outcome
-  const nextLog = recordSingleTargetSkillResolution(log, {
-    virtualTime: currentTime,
-    actorBattleUnitId: actor.battleUnitId,
-    targetBattleUnitId: target.battleUnitId,
-    skillId: skill.id,
-    calculatedDamage: resolution.calculatedDamage,
-    appliedDamage: resolution.appliedDamage,
-    targetHpBefore: target.hp,
-    targetHpAfter: resolution.target.hp,
-    outcome,
+  const mitigation = resolveBarrierGuardDamage({
+    finalDamage: scheduled.calculatedDamage,
+    target,
+    targetSpecies,
+    guard: getLivingGuard(battle, target, context),
   })
 
-  nextBattle = withTimeline(nextBattle, nextBattle.timeline)
+  const defeatCountBefore = battle.defeatRecords.length
+  let nextBattle = applyRecipientResolution(
+    battle,
+    mitigation.target,
+    actor.battleUnitId,
+    currentTime,
+  )
+  if (mitigation.guardShare !== null) {
+    nextBattle = applyRecipientResolution(
+      nextBattle,
+      mitigation.guardShare.guard,
+      actor.battleUnitId,
+      currentTime,
+    )
+  }
+
+  let nextLog = appendBattleEvent(log, {
+    kind: 'skill_used',
+    virtualTime: currentTime,
+    payload: {
+      actorBattleUnitId: actor.battleUnitId,
+      targetBattleUnitId: target.battleUnitId,
+      skillId: skill.id,
+    },
+  })
+  if (mitigation.guardShare !== null) {
+    nextLog = recordGuardShared(nextLog, {
+      virtualTime: currentTime,
+      sourceBattleUnitId: actor.battleUnitId,
+      skillId: skill.id,
+      guardShare: mitigation.guardShare.guardShare,
+      finalDamage: mitigation.finalDamage,
+      retainedDamage: mitigation.guardShare.retainedDamage,
+      redirectedDamage: mitigation.guardShare.redirectedDamage,
+    })
+  }
+  nextLog = recordRecipientResolution(
+    nextLog,
+    mitigation.target,
+    actor.battleUnitId,
+    skill.id,
+    currentTime,
+  )
+  if (mitigation.guardShare !== null) {
+    nextLog = recordRecipientResolution(
+      nextLog,
+      mitigation.guardShare.guard,
+      actor.battleUnitId,
+      skill.id,
+      currentTime,
+    )
+  }
+  for (const defeatRecord of nextBattle.defeatRecords.slice(defeatCountBefore)) {
+    nextLog = recordUnitDefeated(nextLog, defeatRecord)
+  }
+  if (nextBattle.outcome !== 'ONGOING') {
+    nextLog = recordBattleEnded(nextLog, nextBattle.outcome, currentTime)
+  }
+
   return Object.freeze({
-    battle: nextBattle,
+    battle: withTimeline(nextBattle, nextBattle.timeline),
     log: nextLog,
-    schedule: resolution.actorSchedule,
+    schedule: scheduled.actorSchedule,
   })
 }
 
@@ -406,7 +554,6 @@ function executeMovementDecision(
     destination: decision.destination,
     currentTime,
   })
-
   return Object.freeze({
     battle: movement.battle,
     log: recordUnitMoved(log, {
@@ -437,11 +584,7 @@ function executeWaitDecision(
     waitState: getRequiredWaitState(context, actor.battleUnitId),
   })
   context.waitStates.set(actor.battleUnitId, wait.waitState)
-  return Object.freeze({
-    battle,
-    log,
-    schedule: wait.actorSchedule,
-  })
+  return Object.freeze({ battle, log, schedule: wait.actorSchedule })
 }
 
 function getDurationChangeMutation(
@@ -656,6 +799,7 @@ function createSummary(
         speciesId: unit.speciesId,
         side: unit.side,
         hp: unit.hp,
+        barrierTotal: getTotalBarrierCapacity(unit.barriers),
         defeated: unit.defeated,
         positionId: getBoardPositionId(unit.position),
         actionCount: schedule.tie.actionCount,
@@ -699,7 +843,6 @@ export function runHeadlessBattle(definition: HeadlessBattleDefinition): Headles
     if (actor.defeated) {
       throw new Error(`defeated unit received a turn: ${actor.battleUnitId}`)
     }
-
     const schedule = getRequiredSchedule(context, actor.battleUnitId)
     if (schedule.nextActionTime !== popped.event.time) {
       throw new Error('scheduled turn time must match the unit schedule')
@@ -774,6 +917,5 @@ export function runHeadlessBattle(definition: HeadlessBattleDefinition): Headles
     finalVirtualTime,
     totalActions,
   )
-
   return Object.freeze({ summary, battle, log })
 }
