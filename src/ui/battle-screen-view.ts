@@ -1,8 +1,5 @@
 import type { AiDecisionReasonLog } from '../ai/configured-decision'
-import {
-  calculateNextActionTime,
-  type UnitTurnEventPayload,
-} from '../battle/action-scheduling'
+import type { UnitTurnEventPayload } from '../battle/action-scheduling'
 import { getTotalBarrierCapacity } from '../battle/barrier'
 import {
   ALL_BOARD_POSITIONS,
@@ -15,8 +12,6 @@ import type {
   InteractiveBattleSnapshot,
   InteractiveManualActionOption,
 } from '../battle/headless-battle-runner'
-import { NORMAL_MOVEMENT_ACTION_COST } from '../battle/normal-movement'
-import { getModifiedBattleStatValue } from '../battle/stat-modifiers'
 import type { TelegraphResolvePayload } from '../battle/telegraph'
 import type { ScheduledEvent, ScheduledEventKind } from '../battle/timeline-queue'
 import type { BattleUnitState } from '../battle/unit-state'
@@ -56,6 +51,14 @@ export interface BattleScreenBoardCellView {
   readonly position: BoardPosition
   readonly positionId: string
   readonly telegraphCount: number
+  readonly previewRole:
+    | 'SELECTED'
+    | 'AFFECTED'
+    | 'MOVE_DESTINATION'
+    | 'FORCED_DESTINATION'
+    | null
+  readonly previewDamage: number
+  readonly previewDefeated: boolean
   readonly unit: BattleScreenUnitView | null
 }
 
@@ -373,47 +376,9 @@ function createTimelineEntry(
   })
 }
 
-function getPreviewActionCost(
-  definition: HeadlessBattleDefinition,
-  actor: BattleUnitState,
-  option: InteractiveManualActionOption,
-): number | null {
-  if (option.kind === 'WAIT') {
-    return null
-  }
-  const baseCost =
-    option.kind === 'MOVE'
-      ? NORMAL_MOVEMENT_ACTION_COST
-      : (() => {
-          const match = /^skill:(.+):target:/.exec(option.candidateId)
-          if (match === null) {
-            return null
-          }
-          return definition.skills.find((skill) => skill.id === match[1])?.actionCost ?? null
-        })()
-  return baseCost === null
-    ? null
-    : getModifiedBattleStatValue(baseCost, actor.effects, 'ACTION_COST')
-}
-
-function getPreviewPositionId(
-  actor: BattleUnitState,
-  option: InteractiveManualActionOption,
-): string {
-  if (option.kind !== 'MOVE') {
-    return getBoardPositionId(actor.position)
-  }
-  const match = /^move:(ALLY|ENEMY):([0-2]):([0-2])$/.exec(option.candidateId)
-  return match === null
-    ? getBoardPositionId(actor.position)
-    : `${match[1]}:${match[2]}:${match[3]}`
-}
-
 function createProvisionalTimelineEntry(
-  definition: HeadlessBattleDefinition,
   snapshot: InteractiveBattleSnapshot,
   option: InteractiveManualActionOption | null,
-  speciesById: Readonly<Record<string, MonsterSpecies>>,
 ): BattleTimelineEntryView | null {
   const pending = snapshot.pendingManualAction
   if (pending === null || option === null) {
@@ -425,31 +390,14 @@ function createProvisionalTimelineEntry(
   if (actor === undefined || actor.defeated) {
     return null
   }
-  const actionCost = getPreviewActionCost(definition, actor, option)
-  if (actionCost === null) {
-    return null
-  }
-  const species = getRequiredSpecies(speciesById, actor.speciesId)
-  const speed = getModifiedBattleStatValue(species.stats.speed, actor.effects, 'SPEED')
-  const time = calculateNextActionTime(
-    snapshot.currentVirtualTime,
-    actionCost,
-    speed,
-  )
-  const positionId = getPreviewPositionId(actor, option)
-  const isKnownUnit = definition.units.some(
-    (unit) => unit.battleUnitId === actor.battleUnitId,
-  )
-  if (!isKnownUnit && actor.sourceInstanceId !== null) {
-    return null
-  }
+  const positionId = option.preview.toPositionId ?? getBoardPositionId(actor.position)
   return Object.freeze({
     id: `provisional:${option.candidateId}`,
     kind: 'UNIT_TURN',
-    time,
-    delta: Math.max(0, time - snapshot.currentVirtualTime),
+    time: option.preview.nextActionTime,
+    delta: Math.max(0, option.preview.nextActionTime - snapshot.currentVirtualTime),
     label: `${shortId(actor.battleUnitId)} 次回行動（仮）`,
-    detail: `${option.label}後 / ${positionId}`,
+    detail: `${option.label}後 / ${positionId} / 順位 ${option.preview.nextTimelineRank ?? '終了'}`,
     actorBattleUnitId: actor.battleUnitId,
     positionId,
     reservation: false,
@@ -477,6 +425,24 @@ export function createBattleScreenView(
 ): BattleScreenView {
   const speciesById = getSpeciesMap(definition)
   const telegraphs = telegraphCountsByPosition(snapshot)
+  const affected = new Set(previewOption?.preview.affectedPositionIds ?? [])
+  const damageByUnitId = new Map<string, { readonly hpDamage: number; readonly defeated: boolean }>()
+  for (const recipient of previewOption?.preview.damageRecipients ?? []) {
+    const previous = damageByUnitId.get(recipient.battleUnitId)
+    damageByUnitId.set(recipient.battleUnitId, {
+      hpDamage: (previous?.hpDamage ?? 0) + recipient.hpDamage,
+      defeated: (previous?.defeated ?? false) || recipient.defeated,
+    })
+  }
+  const forcedDestinations = new Set(
+    (previewOption?.preview.forcedMovements ?? []).flatMap((movement) =>
+      movement.toPositionId === null ? [] : [movement.toPositionId],
+    ),
+  )
+  const selectedPositionId = previewOption?.selectedTargetPositionId ?? null
+  const moveDestinationId =
+    previewOption?.kind === 'MOVE' ? previewOption.preview.toPositionId : null
+
   const cells = ALL_BOARD_POSITIONS.map((position) => {
     const positionId = getBoardPositionId(position)
     const telegraphCount = telegraphs.get(positionId) ?? 0
@@ -484,10 +450,24 @@ export function createBattleScreenView(
       snapshot.battle.units.find(
         (candidate) => !candidate.defeated && getBoardPositionId(candidate.position) === positionId,
       ) ?? null
+    const unitDamage = unit === null ? undefined : damageByUnitId.get(unit.battleUnitId)
+    const previewRole =
+      moveDestinationId === positionId
+        ? 'MOVE_DESTINATION'
+        : forcedDestinations.has(positionId)
+          ? 'FORCED_DESTINATION'
+          : selectedPositionId === positionId
+            ? 'SELECTED'
+            : affected.has(positionId)
+              ? 'AFFECTED'
+              : null
     return Object.freeze({
       position: Object.freeze({ ...position }),
       positionId,
       telegraphCount,
+      previewRole,
+      previewDamage: unitDamage?.hpDamage ?? 0,
+      previewDefeated: unitDamage?.defeated ?? false,
       unit:
         unit === null
           ? null
@@ -498,12 +478,7 @@ export function createBattleScreenView(
   const timeline = snapshot.battle.timeline.events.map((event) =>
     createTimelineEntry(event, snapshot.currentVirtualTime),
   )
-  const provisional = createProvisionalTimelineEntry(
-    definition,
-    snapshot,
-    previewOption,
-    speciesById,
-  )
+  const provisional = createProvisionalTimelineEntry(snapshot, previewOption)
   if (provisional !== null) {
     timeline.push(provisional)
   }

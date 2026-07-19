@@ -58,6 +58,7 @@ export interface AiEvaluationInput {
   readonly speciesById: Readonly<Record<string, MonsterSpecies>>
   readonly availableSkills: readonly SkillDefinition[]
   readonly occupyingObjects?: readonly OccupyingBoardObjectState[]
+  readonly candidateFilter?: (candidate: AiActionCandidate) => boolean
 }
 
 interface AiActionCandidateBase<TKind extends AiActionKind> {
@@ -361,7 +362,11 @@ export function enumerateAiActionCandidates(
   }
   candidates.push(...enumerateMoveCandidates(input, actor))
   candidates.sort(compareCandidates)
-  return Object.freeze(candidates)
+  const filtered =
+    input.candidateFilter === undefined
+      ? candidates
+      : candidates.filter((candidate) => input.candidateFilter?.(candidate) === true)
+  return Object.freeze(filtered)
 }
 
 function getRequiredSkill(
@@ -600,6 +605,9 @@ export function previewAiActionCandidate(
 ): AiActionResultPreview {
   const actor = validateInput(input)
   assertCandidateActor(input, candidate)
+  if (input.candidateFilter !== undefined && !input.candidateFilter(candidate)) {
+    throw new Error('candidate is not currently available')
+  }
   return candidate.kind === 'USE_SKILL'
     ? previewSkillCandidate(input, actor, candidate)
     : previewMoveCandidate(input, actor, candidate)

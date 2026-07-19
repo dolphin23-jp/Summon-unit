@@ -10,6 +10,7 @@ import { STANDARD_HEADLESS_BATTLE } from '../demo/standard-headless-battle'
 import { BattleDecisionPanel } from './BattleDecisionPanel'
 import { BattleTimelinePanel } from './BattleTimelinePanel'
 import { BattleUnitCard } from './BattleUnitCard'
+import { ManualActionPanel } from './ManualActionPanel'
 import { createBattleScreenView } from './battle-screen-view'
 
 const STEP_MS = 420
@@ -74,7 +75,7 @@ export function MinimalBattleScreen() {
   const [autoRequested, setAutoRequested] = useState(false)
   const [speed, setSpeed] = useState<BattleSpeed>(1)
   const [detailedLog, setDetailedLog] = useState(false)
-  const [previewCandidateId, setPreviewCandidateId] = useState<string | null>(null)
+  const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null)
 
   useEffect(() => {
     setSnapshot(runner.getSnapshot())
@@ -95,22 +96,24 @@ export function MinimalBattleScreen() {
 
   const pending = snapshot.pendingManualAction
   useEffect(() => {
-    setPreviewCandidateId(pending?.recommendedCandidateId ?? null)
+    setSelectedCandidateId(pending?.recommendedCandidateId ?? null)
   }, [pending])
 
-  const previewOption = useMemo(
-    () => pending?.options.find((option) => option.candidateId === previewCandidateId) ?? null,
-    [pending, previewCandidateId],
+  const selectedOption = useMemo(
+    () =>
+      pending?.options.find((option) => option.candidateId === selectedCandidateId) ??
+      null,
+    [pending, selectedCandidateId],
   )
   const view = useMemo(
-    () => createBattleScreenView(STANDARD_HEADLESS_BATTLE, snapshot, previewOption),
-    [previewOption, snapshot],
+    () => createBattleScreenView(STANDARD_HEADLESS_BATTLE, snapshot, selectedOption),
+    [selectedOption, snapshot],
   )
 
   const reset = () => {
     setAutoRequested(false)
     setDetailedLog(false)
-    setPreviewCandidateId(null)
+    setSelectedCandidateId(null)
     setRunner(createRunner())
   }
 
@@ -126,14 +129,27 @@ export function MinimalBattleScreen() {
     }
   }
 
+  const getCellCandidateId = (positionId: string): string | null => {
+    if (pending === null || selectedOption === null) {
+      return null
+    }
+    return (
+      pending.options.find(
+        (option) =>
+          option.actionKey === selectedOption.actionKey &&
+          option.selectedTargetPositionId === positionId,
+      )?.candidateId ?? null
+    )
+  }
+
   return (
     <main className="battle-app">
       <header className="battle-header">
         <div>
-          <p className="eyebrow">TACTICAL BATTLE VIEW</p>
+          <p className="eyebrow">CONFIRMED TACTICAL PREVIEW</p>
           <h1>Monster Research Tactics</h1>
           <p className="battle-header__description">
-            盤面状態、予約イベント、AI判断理由を同じ戦闘スナップショットから表示します。
+            行動と対象を選択し、カーネルと同じ解決結果を確認してから一手を確定します。
           </p>
         </div>
         <div className="battle-metrics" aria-label="現在の状態">
@@ -169,7 +185,7 @@ export function MinimalBattleScreen() {
           aria-pressed={snapshot.manualAllyActionRequested || pending !== null}
         >
           {pending !== null
-            ? '推奨行動で再開'
+            ? '手動を取消してAI推奨で再開'
             : snapshot.manualAllyActionRequested
               ? '手動割込を取消'
               : '次の味方を手動'}
@@ -194,32 +210,12 @@ export function MinimalBattleScreen() {
       </nav>
 
       {pending !== null && (
-        <section className="manual-panel" aria-labelledby="manual-action-title">
-          <div className="panel-heading">
-            <div>
-              <p className="panel-heading__kicker">MANUAL INTERRUPT</p>
-              <h2 id="manual-action-title">{pending.actorBattleUnitId} の行動</h2>
-            </div>
-            <span className="manual-panel__hint">候補に触れると仮タイムラインを表示</span>
-          </div>
-          <div className="manual-options">
-            {pending.options.map((option) => (
-              <button
-                key={option.candidateId}
-                type="button"
-                className={`${option.recommended ? 'control-button control-button--primary' : 'control-button'}${previewCandidateId === option.candidateId ? ' control-button--previewing' : ''}`}
-                onPointerEnter={() => setPreviewCandidateId(option.candidateId)}
-                onFocus={() => setPreviewCandidateId(option.candidateId)}
-                onClick={() => runner.submitManualAction(option.candidateId)}
-              >
-                {option.label}{option.recommended ? '（推奨）' : ''}
-              </button>
-            ))}
-          </div>
-          {pending.reasonLog !== null && (
-            <p className="manual-panel__reason">AI参考: {pending.reasonLog.oneLine}</p>
-          )}
-        </section>
+        <ManualActionPanel
+          pending={pending}
+          selectedCandidateId={selectedCandidateId}
+          onSelectedCandidateChange={setSelectedCandidateId}
+          onConfirm={(candidateId) => runner.submitManualAction(candidateId)}
+        />
       )}
 
       <div className="battle-workspace">
@@ -233,6 +229,7 @@ export function MinimalBattleScreen() {
               <span><b>A</b> 味方</span>
               <span><b>E</b> 相手</span>
               <span><i>!</i> 予兆</span>
+              <span><em>◎</em> 選択対象</span>
             </div>
           </div>
 
@@ -241,22 +238,35 @@ export function MinimalBattleScreen() {
               const side = cell.position.side
               const frontDivider = side === 'ALLY' && cell.position.row === 0
               const coordinate = `${sideLabel(side)} ${rowLabel(cell.position.row)} ${columnLabel(cell.position.column)}`
+              const candidateId = getCellCandidateId(cell.positionId)
               return (
-                <div
+                <button
                   key={cell.positionId}
-                  className={`board-cell board-cell--${side.toLowerCase()}${frontDivider ? ' board-cell--front-divider' : ''}${cell.telegraphCount > 0 ? ' board-cell--telegraph' : ''}`}
-                  aria-label={`${coordinate}${cell.telegraphCount > 0 ? `、予兆${cell.telegraphCount}件` : ''}`}
+                  type="button"
+                  className={`board-cell board-cell--${side.toLowerCase()}${frontDivider ? ' board-cell--front-divider' : ''}${cell.telegraphCount > 0 ? ' board-cell--telegraph' : ''}${cell.previewRole !== null ? ` board-cell--preview-${cell.previewRole.toLowerCase()}` : ''}${candidateId !== null ? ' board-cell--selectable' : ''}`}
+                  aria-label={`${coordinate}${cell.telegraphCount > 0 ? `、予兆${cell.telegraphCount}件` : ''}${candidateId !== null ? '、手動対象として選択可能' : ''}`}
+                  disabled={candidateId === null}
+                  onClick={() => candidateId !== null && setSelectedCandidateId(candidateId)}
                 >
                   <span className="board-cell__coordinate">{coordinate}</span>
                   {cell.telegraphCount > 0 && (
                     <span className="telegraph-marker" aria-hidden="true">! {cell.telegraphCount}</span>
                   )}
+                  {cell.previewRole !== null && (
+                    <span className="preview-marker" aria-hidden="true">
+                      {cell.previewRole === 'SELECTED' ? '◎' : cell.previewRole === 'FORCED_DESTINATION' ? '↪' : '◇'}
+                    </span>
+                  )}
                   {cell.unit === null ? (
                     <span className="board-cell__empty">空き</span>
                   ) : (
-                    <BattleUnitCard unit={cell.unit} />
+                    <BattleUnitCard
+                      unit={cell.unit}
+                      previewDamage={cell.previewDamage}
+                      previewDefeated={cell.previewDefeated}
+                    />
                   )}
-                </div>
+                </button>
               )
             })}
           </div>

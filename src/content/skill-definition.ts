@@ -70,6 +70,70 @@ export interface SkillUsageCondition {
   readonly thresholdPermille: number
 }
 
+export const SKILL_EFFECT_KINDS = [
+  'POISON',
+  'BURN',
+  'MOVEMENT_LOCK',
+  'BLOOM_SEAL',
+  'HEALING_INHIBITION',
+  'FORCED_MOVEMENT',
+] as const
+export type SkillEffectKind = (typeof SKILL_EFFECT_KINDS)[number]
+
+export const SKILL_FORCED_MOVEMENT_KINDS = [
+  'PUSH',
+  'PULL',
+  'LATERAL_LEFT',
+  'LATERAL_RIGHT',
+] as const
+export type SkillForcedMovementKind = (typeof SKILL_FORCED_MOVEMENT_KINDS)[number]
+
+export interface SkillPoisonEffectDefinition {
+  readonly kind: 'POISON'
+  readonly damagePerStack: number
+  readonly stacks?: number
+  readonly triggerCount?: number
+}
+
+export interface SkillBurnEffectDefinition {
+  readonly kind: 'BURN'
+  readonly damagePerTrigger: number
+  readonly triggerCount?: number
+  readonly attackReductionPermille?: number
+}
+
+export interface SkillMovementLockEffectDefinition {
+  readonly kind: 'MOVEMENT_LOCK'
+  readonly targetActionCount: number
+}
+
+export interface SkillBloomSealEffectDefinition {
+  readonly kind: 'BLOOM_SEAL'
+  readonly targetActionCount: number
+}
+
+export interface SkillHealingInhibitionEffectDefinition {
+  readonly kind: 'HEALING_INHIBITION'
+  readonly reductionPermille: number
+  readonly targetActionCount: number
+}
+
+export interface SkillForcedMovementEffectDefinition {
+  readonly kind: 'FORCED_MOVEMENT'
+  readonly movementKind: SkillForcedMovementKind
+}
+
+export type SkillStatusEffectDefinition =
+  | SkillPoisonEffectDefinition
+  | SkillBurnEffectDefinition
+  | SkillMovementLockEffectDefinition
+  | SkillBloomSealEffectDefinition
+  | SkillHealingInhibitionEffectDefinition
+
+export type SkillEffectDefinition =
+  | SkillStatusEffectDefinition
+  | SkillForcedMovementEffectDefinition
+
 export interface SkillDefinition {
   readonly id: SkillId
   readonly slotType: SkillSlotType
@@ -85,6 +149,7 @@ export interface SkillDefinition {
   readonly cooldownActions?: number
   readonly usageLimit?: number
   readonly usageConditions?: readonly SkillUsageCondition[]
+  readonly effects?: readonly SkillEffectDefinition[]
 }
 
 const DEFAULT_TARGET_SELECTOR_BY_TYPE: Readonly<
@@ -232,6 +297,64 @@ function assertCompatibleReachAndTarget(skill: SkillDefinition): void {
   resolveSkillChainTargetCount(skill)
 }
 
+function assertValidSkillEffect(effect: SkillEffectDefinition, index: number): void {
+  if (!SKILL_EFFECT_KINDS.includes(effect.kind)) {
+    throw new Error(`skill.effects[${index}].kind is invalid`)
+  }
+  switch (effect.kind) {
+    case 'POISON':
+      assertSafeIntegerAtLeast(effect.damagePerStack, 1, `skill.effects[${index}].damagePerStack`)
+      if (effect.stacks !== undefined) {
+        assertSafeIntegerAtLeast(effect.stacks, 1, `skill.effects[${index}].stacks`)
+        if (effect.stacks > 5) {
+          throw new Error(`skill.effects[${index}].stacks must not exceed 5`)
+        }
+      }
+      if (effect.triggerCount !== undefined) {
+        assertSafeIntegerAtLeast(effect.triggerCount, 1, `skill.effects[${index}].triggerCount`)
+      }
+      return
+    case 'BURN':
+      assertSafeIntegerAtLeast(effect.damagePerTrigger, 1, `skill.effects[${index}].damagePerTrigger`)
+      if (effect.triggerCount !== undefined) {
+        assertSafeIntegerAtLeast(effect.triggerCount, 1, `skill.effects[${index}].triggerCount`)
+      }
+      if (effect.attackReductionPermille !== undefined) {
+        assertSafeIntegerAtLeast(
+          effect.attackReductionPermille,
+          1,
+          `skill.effects[${index}].attackReductionPermille`,
+        )
+      }
+      return
+    case 'MOVEMENT_LOCK':
+    case 'BLOOM_SEAL':
+      assertSafeIntegerAtLeast(
+        effect.targetActionCount,
+        1,
+        `skill.effects[${index}].targetActionCount`,
+      )
+      return
+    case 'HEALING_INHIBITION':
+      assertSafeIntegerAtLeast(
+        effect.reductionPermille,
+        1,
+        `skill.effects[${index}].reductionPermille`,
+      )
+      assertSafeIntegerAtLeast(
+        effect.targetActionCount,
+        1,
+        `skill.effects[${index}].targetActionCount`,
+      )
+      return
+    case 'FORCED_MOVEMENT':
+      if (!SKILL_FORCED_MOVEMENT_KINDS.includes(effect.movementKind)) {
+        throw new Error(`skill.effects[${index}].movementKind is invalid`)
+      }
+      return
+  }
+}
+
 export function assertValidSkillDefinition(skill: SkillDefinition): void {
   assertNonEmptyString(skill.id, 'skill.id')
 
@@ -268,6 +391,15 @@ export function assertValidSkillDefinition(skill: SkillDefinition): void {
       throw new Error(`skill.usageConditions must not repeat ${condition.type}`)
     }
     seenConditions.add(condition.type)
+  }
+
+  const seenEffectKinds = new Set<SkillEffectKind>()
+  for (const [index, effect] of (skill.effects ?? []).entries()) {
+    assertValidSkillEffect(effect, index)
+    if (seenEffectKinds.has(effect.kind)) {
+      throw new Error(`skill.effects must not repeat ${effect.kind}`)
+    }
+    seenEffectKinds.add(effect.kind)
   }
 }
 

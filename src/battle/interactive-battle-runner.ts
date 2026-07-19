@@ -1,4 +1,11 @@
-import type { AiActionEvaluation } from '../ai/action-evaluation'
+import {
+  enumerateAiActionCandidates,
+  previewAiActionCandidate,
+  type AiActionCandidate,
+  type AiActionEvaluation,
+  type AiEvaluationInput,
+  type AiSkillActionCandidate,
+} from '../ai/action-evaluation'
 import {
   evaluateConfiguredAiDecision,
   type AiConfiguredDecisionResult,
@@ -6,7 +13,7 @@ import {
 } from '../ai/configured-decision'
 import type { AiDecisionConfiguration } from '../ai/strategy-presets'
 import type { MonsterSpecies } from '../content/monster-species'
-import type { SkillDefinition } from '../content/skill-definition'
+import type { SkillDefinition, SkillSlotType } from '../content/skill-definition'
 import {
   createInitialUnitActionSchedule,
   createOrderedUnitTurnEvents,
@@ -17,10 +24,7 @@ import {
   type UnitTurnEventPayload,
 } from './action-scheduling'
 import { getTotalBarrierCapacity, type BarrierLayerState } from './barrier'
-import {
-  resolveBarrierGuardDamage,
-  type DamageRecipientResolution,
-} from './barrier-guard-resolution'
+import type { DamageRecipientResolution } from './barrier-guard-resolution'
 import { getBoardPositionId, type BoardPosition } from './board'
 import {
   assertValidBattleState,
@@ -29,7 +33,6 @@ import {
   type BattleOutcome,
   type BattleState,
 } from './defeat-and-victory'
-import { getDirectEffectiveTarget } from './direct-targeting'
 import type {
   ActiveEffectMutation,
   ActiveEffectState,
@@ -49,11 +52,14 @@ import {
 } from './event-log'
 import {
   freezeGuardShareCollection,
-  getGuardShareForProtectedUnit,
   type GuardShareState,
 } from './guard-share'
+import {
+  getPredictedUnitTurnRank,
+  resolveManualSkillAction,
+  type ManualActionPreview,
+} from './manual-action-resolution'
 import { performNormalMovement } from './normal-movement'
-import { scheduleSingleTargetInnateSkill } from './single-target-damage'
 import {
   canUseSkillWithUsageState,
   completeActorActionSkillUsage,
@@ -62,6 +68,7 @@ import {
 } from './skill-usage'
 import {
   consumeTargetActionDurations,
+  isMovementLocked,
   resolveTurnStartStatusConditions,
   type EffectDurationChange,
   type StatusDamageTrigger,
@@ -96,6 +103,7 @@ const DEFAULT_AI_CONFIGURATION: AiDecisionConfiguration = Object.freeze({
 export interface HeadlessBattleUnitDefinition {
   readonly battleUnitId: BattleUnitId
   readonly speciesId: string
+  readonly equippedSkillIds?: readonly string[]
   readonly position: BoardPosition
   readonly initialHp?: number
   readonly initialBarriers?: readonly BarrierLayerState[]
@@ -147,11 +155,21 @@ export type InteractiveBattleStatus =
   | 'BATTLE_ENDED'
   | 'ACTION_LIMIT_REACHED'
 
+export type InteractiveManualActionSlot = SkillSlotType | 'MOVE' | 'WAIT'
+
 export interface InteractiveManualActionOption {
   readonly candidateId: string
   readonly kind: 'USE_SKILL' | 'MOVE' | 'WAIT'
+  readonly slot: InteractiveManualActionSlot
+  readonly skillId: string | null
+  readonly actionKey: string
+  readonly actionLabel: string
+  readonly targetLabel: string | null
   readonly label: string
+  readonly selectedTargetBattleUnitId: BattleUnitId | null
+  readonly selectedTargetPositionId: string | null
   readonly recommended: boolean
+  readonly preview: ManualActionPreview
 }
 
 export interface InteractivePendingManualAction {
@@ -188,6 +206,7 @@ export interface InteractiveBattleRunner {
 interface HeadlessBattleContext {
   readonly speciesById: Readonly<Record<string, MonsterSpecies>>
   readonly skillById: Readonly<Record<string, SkillDefinition>>
+  readonly skillsByUnitId: Readonly<Record<BattleUnitId, readonly SkillDefinition[]>>
   readonly schedules: Map<BattleUnitId, UnitActionSchedule>
   readonly waitStates: Map<BattleUnitId, WaitActionState>
   readonly skillUsageBooks: Map<BattleUnitId, SkillUsageBook>
@@ -200,8 +219,7 @@ type RunnerDecision =
   | {
       readonly kind: 'USE_SKILL'
       readonly actorBattleUnitId: BattleUnitId
-      readonly skillId: string
-      readonly targetBattleUnitId: BattleUnitId
+      readonly candidate: AiSkillActionCandidate
     }
   | {
       readonly kind: 'MOVE'
@@ -212,6 +230,11 @@ type RunnerDecision =
       readonly kind: 'WAIT'
       readonly actorBattleUnitId: BattleUnitId
     }
+
+interface PreparedManualAction {
+  readonly option: InteractiveManualActionOption
+  readonly decision: RunnerDecision
+}
 
 interface ExecutedHeadlessAction {
   readonly battle: BattleState
@@ -225,6 +248,7 @@ interface PendingManualExecution {
   readonly schedule: UnitActionSchedule
   readonly currentTime: BattleTime
   readonly decisionResult: AiConfiguredDecisionResult
+  readonly preparedActions: readonly PreparedManualAction[]
 }
 
 function compareIds(left: string, right: string): number {
@@ -318,6 +342,17 @@ function getRequiredSkillUsageBook(
     throw new Error(`skill usage book is missing: ${battleUnitId}`)
   }
   return book
+}
+
+function getRequiredUnitSkills(
+  context: HeadlessBattleContext,
+  battleUnitId: BattleUnitId,
+): readonly SkillDefinition[] {
+  const skills = context.skillsByUnitId[battleUnitId]
+  if (skills === undefined) {
+    throw new Error(`unit skills are missing: ${battleUnitId}`)
+  }
+  return skills
 }
 
 function withTimeline(battle: BattleState, timeline: TimelineQueue): BattleState {
@@ -414,6 +449,7 @@ function createInitialBattle(definition: HeadlessBattleDefinition): {
   const speciesById = createUniqueMap(definition.species, 'species')
   const skillById = createUniqueMap(definition.skills, 'skill')
   const unitIds = new Set<string>()
+  const skillsByUnitId: Record<BattleUnitId, readonly SkillDefinition[]> = {}
   const units = definition.units.map((unitDefinition) => {
     if (unitIds.has(unitDefinition.battleUnitId)) {
       throw new Error(`battleUnitId must be unique: ${unitDefinition.battleUnitId}`)
@@ -441,6 +477,24 @@ function createInitialBattle(definition: HeadlessBattleDefinition): {
     const unit = units[index]
     const species = getRequiredSpecies(speciesById, unit.speciesId)
     const innateSkill = getRequiredSkill(skillById, species.innateSkillId)
+    if (innateSkill.slotType !== 'INNATE') {
+      throw new Error(`species innate skill must use INNATE slot: ${innateSkill.id}`)
+    }
+    const equippedIds = unitDefinition.equippedSkillIds ?? Object.freeze([])
+    const seenSkillIds = new Set<string>([innateSkill.id])
+    const unitSkills: SkillDefinition[] = [innateSkill]
+    for (const skillId of equippedIds) {
+      if (seenSkillIds.has(skillId)) {
+        throw new Error(`unit skill ids must be unique: ${unitDefinition.battleUnitId}:${skillId}`)
+      }
+      const equipped = getRequiredSkill(skillById, skillId)
+      if (equipped.slotType === 'INNATE') {
+        throw new Error(`equipped skill must use GENERIC or BLOOM slot: ${skillId}`)
+      }
+      seenSkillIds.add(skillId)
+      unitSkills.push(equipped)
+    }
+    skillsByUnitId[unit.battleUnitId] = Object.freeze(unitSkills)
     schedules.set(
       unit.battleUnitId,
       createInitialUnitActionSchedule(
@@ -451,7 +505,7 @@ function createInitialBattle(definition: HeadlessBattleDefinition): {
       ),
     )
     waitStates.set(unit.battleUnitId, EMPTY_WAIT_ACTION_STATE)
-    skillUsageBooks.set(unit.battleUnitId, createSkillUsageBook([innateSkill]))
+    skillUsageBooks.set(unit.battleUnitId, createSkillUsageBook(unitSkills))
     recentPositionIds.set(
       unit.battleUnitId,
       Object.freeze([getBoardPositionId(unit.position)]),
@@ -468,6 +522,7 @@ function createInitialBattle(definition: HeadlessBattleDefinition): {
     context: Object.freeze({
       speciesById,
       skillById,
+      skillsByUnitId: Object.freeze({ ...skillsByUnitId }),
       schedules,
       waitStates,
       skillUsageBooks,
@@ -477,49 +532,6 @@ function createInitialBattle(definition: HeadlessBattleDefinition): {
     }),
     nextTimelineSequence: initialEvents.length,
   })
-}
-
-function getLivingGuard(
-  battle: BattleState,
-  target: BattleUnitState,
-  context: HeadlessBattleContext,
-): {
-  readonly unit: BattleUnitState
-  readonly species: MonsterSpecies
-  readonly guardShare: GuardShareState
-} | null {
-  const guardShare = getGuardShareForProtectedUnit(
-    context.guardShares,
-    target.battleUnitId,
-  )
-  if (guardShare === null) {
-    return null
-  }
-  const guard = getRequiredUnit(battle, guardShare.guardBattleUnitId)
-  if (guard.defeated) {
-    return null
-  }
-  return Object.freeze({
-    unit: guard,
-    species: getRequiredSpecies(context.speciesById, guard.speciesId),
-    guardShare,
-  })
-}
-
-function applyRecipientResolution(
-  battle: BattleState,
-  resolution: DamageRecipientResolution,
-  killerBattleUnitId: BattleUnitId,
-  currentTime: BattleTime,
-): BattleState {
-  return resolution.after.defeated
-    ? resolveBattleUnitDefeat({
-        battle,
-        defeatedUnit: resolution.after,
-        killerBattleUnitId,
-        currentTime,
-      })
-    : replaceLivingUnit(battle, resolution.after)
 }
 
 function recordRecipientResolution(
@@ -564,93 +576,100 @@ function executeSkillDecision(
   schedule: UnitActionSchedule,
   currentTime: BattleTime,
   context: HeadlessBattleContext,
+  nextTimelineSequence: number,
 ): ExecutedHeadlessAction {
   const actor = getRequiredUnit(battle, decision.actorBattleUnitId)
-  const target = getRequiredUnit(battle, decision.targetBattleUnitId)
   const actorSpecies = getRequiredSpecies(context.speciesById, actor.speciesId)
-  const targetSpecies = getRequiredSpecies(context.speciesById, target.speciesId)
-  const skill = getRequiredSkill(context.skillById, decision.skillId)
-  const scheduled = scheduleSingleTargetInnateSkill({
-    actor,
-    actorSpecies,
-    actorSchedule: schedule,
-    target,
-    targetSpecies,
-    skill,
-    currentTime,
-  })
-  const mitigation = resolveBarrierGuardDamage({
-    finalDamage: scheduled.calculatedDamage,
-    target,
-    targetSpecies,
-    guard: getLivingGuard(battle, target, context),
-  })
-
-  const defeatCountBefore = battle.defeatRecords.length
-  let nextBattle = applyRecipientResolution(
-    battle,
-    mitigation.target,
-    actor.battleUnitId,
-    currentTime,
-  )
-  if (mitigation.guardShare !== null) {
-    nextBattle = applyRecipientResolution(
-      nextBattle,
-      mitigation.guardShare.guard,
-      actor.battleUnitId,
-      currentTime,
+  const evaluationInput = createEvaluationInput(battle, actor, actorSpecies, context)
+  if (
+    !enumerateAiActionCandidates(evaluationInput).some(
+      (candidate) => candidate.candidateId === decision.candidate.candidateId,
     )
+  ) {
+    throw new Error(`skill candidate is no longer legal: ${decision.candidate.candidateId}`)
   }
-
+  const skill = getRequiredSkill(context.skillById, decision.candidate.skillId)
+  const resolution = resolveManualSkillAction({
+    evaluationInput,
+    candidate: decision.candidate,
+    actorSchedule: schedule,
+    currentTime,
+    guardShares: context.guardShares,
+    nextTimelineSequence,
+    applicationSequenceStart: log.nextSequence,
+  })
+  const eventTargetBattleUnitId =
+    resolution.preview.actualTargetBattleUnitId ??
+    resolution.preview.selectedTargetBattleUnitId ??
+    actor.battleUnitId
   let nextLog = appendBattleEvent(log, {
     kind: 'skill_used',
     virtualTime: currentTime,
     payload: {
       actorBattleUnitId: actor.battleUnitId,
-      targetBattleUnitId: target.battleUnitId,
+      targetBattleUnitId: eventTargetBattleUnitId,
       skillId: skill.id,
     },
   })
-  if (mitigation.guardShare !== null) {
-    nextLog = recordGuardShared(nextLog, {
-      virtualTime: currentTime,
-      sourceBattleUnitId: actor.battleUnitId,
-      skillId: skill.id,
-      guardShare: mitigation.guardShare.guardShare,
-      finalDamage: mitigation.finalDamage,
-      retainedDamage: mitigation.guardShare.retainedDamage,
-      redirectedDamage: mitigation.guardShare.redirectedDamage,
-    })
-  }
-  nextLog = recordRecipientResolution(
-    nextLog,
-    mitigation.target,
-    actor.battleUnitId,
-    skill.id,
-    currentTime,
-  )
-  if (mitigation.guardShare !== null) {
+
+  for (const step of resolution.damageSteps) {
+    if (step.resolution.guardShare !== null) {
+      nextLog = recordGuardShared(nextLog, {
+        virtualTime: currentTime,
+        sourceBattleUnitId: actor.battleUnitId,
+        skillId: skill.id,
+        guardShare: step.resolution.guardShare.guardShare,
+        finalDamage: step.resolution.finalDamage,
+        retainedDamage: step.resolution.guardShare.retainedDamage,
+        redirectedDamage: step.resolution.guardShare.redirectedDamage,
+      })
+    }
     nextLog = recordRecipientResolution(
       nextLog,
-      mitigation.guardShare.guard,
+      step.resolution.target,
       actor.battleUnitId,
       skill.id,
       currentTime,
     )
+    if (step.resolution.guardShare !== null) {
+      nextLog = recordRecipientResolution(
+        nextLog,
+        step.resolution.guardShare.guard,
+        actor.battleUnitId,
+        skill.id,
+        currentTime,
+      )
+    }
   }
-  for (const defeatRecord of nextBattle.defeatRecords.slice(defeatCountBefore)) {
+  for (const movement of resolution.forcedMovementResults) {
+    if (movement.success && movement.to !== null) {
+      nextLog = recordUnitMoved(nextLog, {
+        virtualTime: currentTime,
+        battleUnitId: movement.targetBattleUnitId,
+        from: movement.from,
+        to: movement.to,
+      })
+    }
+  }
+  for (const mutation of resolution.effectMutations) {
+    nextLog = recordActiveEffectMutation(nextLog, mutation, currentTime)
+  }
+  for (const defeatRecord of resolution.battle.defeatRecords.slice(
+    battle.defeatRecords.length,
+  )) {
     nextLog = recordUnitDefeated(nextLog, defeatRecord)
   }
-  if (nextBattle.outcome !== 'ONGOING') {
-    nextLog = recordBattleEnded(nextLog, nextBattle.outcome, currentTime)
+  if (resolution.battle.outcome !== 'ONGOING') {
+    nextLog = recordBattleEnded(nextLog, resolution.battle.outcome, currentTime)
   }
 
   return Object.freeze({
-    battle: withTimeline(nextBattle, nextBattle.timeline),
+    battle: resolution.battle,
     log: nextLog,
-    schedule: scheduled.actorSchedule,
+    schedule: resolution.actorSchedule,
   })
 }
+
 
 function executeMovementDecision(
   battle: BattleState,
@@ -845,22 +864,26 @@ function consumeActorTargetActionDurations(
   })
 }
 
-function getUsableDirectSkills(
+function isCandidateUsable(
+  candidate: AiActionCandidate,
   battle: BattleState,
   actor: BattleUnitState,
   actorSpecies: MonsterSpecies,
   context: HeadlessBattleContext,
-): readonly SkillDefinition[] {
-  const skill = getRequiredSkill(context.skillById, actorSpecies.innateSkillId)
-  if (skill.targetType !== 'SINGLE_ENEMY') {
-    return Object.freeze([])
+): boolean {
+  if (candidate.kind === 'MOVE') {
+    return !isMovementLocked(actor)
   }
-  const target = getDirectEffectiveTarget(battle, actor.battleUnitId)
-  if (target === null) {
-    return Object.freeze([])
-  }
-  const targetSpecies = getRequiredSpecies(context.speciesById, target.speciesId)
-  const usable = canUseSkillWithUsageState({
+  const skill = getRequiredSkill(context.skillById, candidate.skillId)
+  const target =
+    candidate.selectedTargetBattleUnitId === null
+      ? undefined
+      : getRequiredUnit(battle, candidate.selectedTargetBattleUnitId)
+  const targetSpecies =
+    target === undefined
+      ? undefined
+      : getRequiredSpecies(context.speciesById, target.speciesId)
+  return canUseSkillWithUsageState({
     usageBook: getRequiredSkillUsageBook(context, actor.battleUnitId),
     skill,
     actor,
@@ -868,8 +891,25 @@ function getUsableDirectSkills(
     target,
     targetSpecies,
   })
-  return usable ? Object.freeze([skill]) : Object.freeze([])
 }
+
+function createEvaluationInput(
+  battle: BattleState,
+  actor: BattleUnitState,
+  actorSpecies: MonsterSpecies,
+  context: HeadlessBattleContext,
+): AiEvaluationInput {
+  const availableSkills = getRequiredUnitSkills(context, actor.battleUnitId)
+  return Object.freeze({
+    battle,
+    actorBattleUnitId: actor.battleUnitId,
+    speciesById: context.speciesById,
+    availableSkills,
+    candidateFilter: (candidate: AiActionCandidate) =>
+      isCandidateUsable(candidate, battle, actor, actorSpecies, context),
+  })
+}
+
 
 function completeHeadlessActionState(
   actor: BattleUnitState,
@@ -877,14 +917,14 @@ function completeHeadlessActionState(
   decision: RunnerDecision,
   context: HeadlessBattleContext,
 ): void {
-  const innateSkill = getRequiredSkill(context.skillById, actorSpecies.innateSkillId)
+  const skills = getRequiredUnitSkills(context, actor.battleUnitId)
   const usageBook = getRequiredSkillUsageBook(context, actor.battleUnitId)
   context.skillUsageBooks.set(
     actor.battleUnitId,
     completeActorActionSkillUsage(
       usageBook,
-      [innateSkill],
-      decision.kind === 'USE_SKILL' ? decision.skillId : null,
+      skills,
+      decision.kind === 'USE_SKILL' ? decision.candidate.skillId : null,
     ),
   )
   if (decision.kind !== 'WAIT') {
@@ -950,12 +990,7 @@ function getConfiguredDecision(
   context: HeadlessBattleContext,
 ): AiConfiguredDecisionResult {
   return evaluateConfiguredAiDecision({
-    input: Object.freeze({
-      battle,
-      actorBattleUnitId: actor.battleUnitId,
-      speciesById: context.speciesById,
-      availableSkills: getUsableDirectSkills(battle, actor, actorSpecies, context),
-    }),
+    input: createEvaluationInput(battle, actor, actorSpecies, context),
     currentTime,
     recentActorPositionIds: context.recentPositionIds.get(actor.battleUnitId),
     configuration: context.aiConfigurations[actor.battleUnitId] ?? DEFAULT_AI_CONFIGURATION,
@@ -977,59 +1012,238 @@ function evaluationToDecision(
       destination: candidate.destination,
     })
   }
-  if (evaluation.preview.kind !== 'USE_SKILL') {
-    throw new Error('skill candidate must have a skill preview')
-  }
-  const targetBattleUnitId = evaluation.preview.reach.actualTargetBattleUnitId
-  if (targetBattleUnitId === null) {
-    return Object.freeze({ kind: 'WAIT', actorBattleUnitId })
-  }
   return Object.freeze({
     kind: 'USE_SKILL',
     actorBattleUnitId,
-    skillId: candidate.skillId,
-    targetBattleUnitId,
+    candidate,
   })
 }
 
-function actionOptionLabel(evaluation: AiActionEvaluation): string {
-  if (evaluation.preview.kind === 'MOVE') {
-    return `移動 → ${evaluation.preview.toPositionId}`
+function shortId(id: string): string {
+  return id.split('.').at(-1) ?? id
+}
+
+function slotLabel(slot: SkillSlotType): string {
+  switch (slot) {
+    case 'INNATE':
+      return '固有'
+    case 'GENERIC':
+      return '汎用'
+    case 'BLOOM':
+      return '開花'
   }
-  const target = evaluation.preview.reach.actualTargetBattleUnitId ?? '対象なし'
-  return `${evaluation.preview.candidate.skillId} → ${target}`
+}
+
+function createBasePreview(
+  kind: ManualActionPreview['kind'],
+  actionCost: number,
+  nextActionTime: BattleTime,
+  nextTimelineRank: number | null,
+  affectedPositionIds: readonly string[],
+  fromPositionId: string | null,
+  toPositionId: string | null,
+): ManualActionPreview {
+  return Object.freeze({
+    kind,
+    actionCost,
+    nextActionTime,
+    nextTimelineRank,
+    selectedTargetBattleUnitId: null,
+    selectedTargetPositionId: toPositionId,
+    affectedPositionIds: Object.freeze([...affectedPositionIds]),
+    reachMethod: null,
+    areaMask: null,
+    blockedByBattleUnitId: null,
+    actualTargetBattleUnitId: null,
+    telegraphDelay: null,
+    totalCalculatedDamage: 0,
+    totalHpDamage: 0,
+    damageRecipients: Object.freeze([]),
+    defeatedBattleUnitIds: Object.freeze([]),
+    statusChanges: Object.freeze([]),
+    forcedMovements: Object.freeze([]),
+    fromPositionId,
+    toPositionId,
+  })
+}
+
+function createPreparedManualActions(input: {
+  readonly battle: BattleState
+  readonly actor: BattleUnitState
+  readonly actorSpecies: MonsterSpecies
+  readonly schedule: UnitActionSchedule
+  readonly currentTime: BattleTime
+  readonly decisionResult: AiConfiguredDecisionResult
+  readonly context: HeadlessBattleContext
+  readonly nextTimelineSequence: number
+  readonly applicationSequenceStart: number
+}): readonly PreparedManualAction[] {
+  const evaluationInput = createEvaluationInput(
+    input.battle,
+    input.actor,
+    input.actorSpecies,
+    input.context,
+  )
+  const recommendedCandidateId =
+    input.decisionResult.selected?.preview.candidate.candidateId ??
+    MANUAL_WAIT_CANDIDATE_ID
+  const prepared: PreparedManualAction[] = []
+
+  for (const candidate of enumerateAiActionCandidates(evaluationInput)) {
+    if (candidate.kind === 'USE_SKILL') {
+      const skill = getRequiredSkill(input.context.skillById, candidate.skillId)
+      const resolution = resolveManualSkillAction({
+        evaluationInput,
+        candidate,
+        actorSchedule: input.schedule,
+        currentTime: input.currentTime,
+        guardShares: input.context.guardShares,
+        nextTimelineSequence: input.nextTimelineSequence,
+        applicationSequenceStart: input.applicationSequenceStart,
+      })
+      const targetLabel =
+        candidate.selectedTargetBattleUnitId ??
+        (candidate.selectedTargetPosition === null
+          ? '対象指定なし'
+          : getBoardPositionId(candidate.selectedTargetPosition))
+      const actionLabel = `${slotLabel(skill.slotType)} ${shortId(skill.id)}`
+      prepared.push(
+        Object.freeze({
+          decision: Object.freeze({
+            kind: 'USE_SKILL',
+            actorBattleUnitId: input.actor.battleUnitId,
+            candidate,
+          }),
+          option: Object.freeze({
+            candidateId: candidate.candidateId,
+            kind: 'USE_SKILL',
+            slot: skill.slotType,
+            skillId: skill.id,
+            actionKey: `skill:${skill.id}`,
+            actionLabel,
+            targetLabel,
+            label: `${actionLabel} → ${targetLabel}`,
+            selectedTargetBattleUnitId: candidate.selectedTargetBattleUnitId,
+            selectedTargetPositionId:
+              candidate.selectedTargetPosition === null
+                ? null
+                : getBoardPositionId(candidate.selectedTargetPosition),
+            recommended: candidate.candidateId === recommendedCandidateId,
+            preview: resolution.preview,
+          }),
+        }),
+      )
+      continue
+    }
+
+    const rawPreview = previewAiActionCandidate(evaluationInput, candidate)
+    if (rawPreview.kind !== 'MOVE') {
+      throw new Error('move candidate must create a move preview')
+    }
+    const movement = performNormalMovement({
+      battle: input.battle,
+      actorBattleUnitId: input.actor.battleUnitId,
+      actorSpecies: input.actorSpecies,
+      actorSchedule: input.schedule,
+      destination: candidate.destination,
+      currentTime: input.currentTime,
+    })
+    const toPositionId = getBoardPositionId(candidate.destination)
+    const preview = createBasePreview(
+      'MOVE',
+      rawPreview.actionCost,
+      movement.actorSchedule.nextActionTime,
+      getPredictedUnitTurnRank(
+        movement.battle,
+        movement.actorSchedule,
+        input.nextTimelineSequence,
+      ),
+      rawPreview.affectedPositionIds,
+      rawPreview.fromPositionId,
+      rawPreview.toPositionId,
+    )
+    prepared.push(
+      Object.freeze({
+        decision: Object.freeze({
+          kind: 'MOVE',
+          actorBattleUnitId: input.actor.battleUnitId,
+          destination: candidate.destination,
+        }),
+        option: Object.freeze({
+          candidateId: candidate.candidateId,
+          kind: 'MOVE',
+          slot: 'MOVE',
+          skillId: null,
+          actionKey: 'MOVE',
+          actionLabel: '通常移動',
+          targetLabel: toPositionId,
+          label: `移動 → ${toPositionId}`,
+          selectedTargetBattleUnitId: null,
+          selectedTargetPositionId: toPositionId,
+          recommended: candidate.candidateId === recommendedCandidateId,
+          preview,
+        }),
+      }),
+    )
+  }
+
+  const wait = performWaitAction({
+    actor: input.actor,
+    actorSpecies: input.actorSpecies,
+    actorSchedule: input.schedule,
+    currentTime: input.currentTime,
+    waitState: getRequiredWaitState(input.context, input.actor.battleUnitId),
+  })
+  prepared.push(
+    Object.freeze({
+      decision: Object.freeze({
+        kind: 'WAIT',
+        actorBattleUnitId: input.actor.battleUnitId,
+      }),
+      option: Object.freeze({
+        candidateId: MANUAL_WAIT_CANDIDATE_ID,
+        kind: 'WAIT',
+        slot: 'WAIT',
+        skillId: null,
+        actionKey: 'WAIT',
+        actionLabel: '待機',
+        targetLabel: null,
+        label: '待機',
+        selectedTargetBattleUnitId: null,
+        selectedTargetPositionId: null,
+        recommended: recommendedCandidateId === MANUAL_WAIT_CANDIDATE_ID,
+        preview: createBasePreview(
+          'WAIT',
+          wait.effectiveActionCost,
+          wait.actorSchedule.nextActionTime,
+          getPredictedUnitTurnRank(
+            input.battle,
+            wait.actorSchedule,
+            input.nextTimelineSequence,
+          ),
+          [getBoardPositionId(input.actor.position)],
+          getBoardPositionId(input.actor.position),
+          getBoardPositionId(input.actor.position),
+        ),
+      }),
+    }),
+  )
+  return Object.freeze(prepared)
 }
 
 function createPendingManualAction(
   pending: PendingManualExecution,
 ): InteractivePendingManualAction {
-  const recommendedCandidateId =
-    pending.decisionResult.selected?.preview.candidate.candidateId ?? MANUAL_WAIT_CANDIDATE_ID
-  const options: InteractiveManualActionOption[] = pending.decisionResult.evaluations.map(
-    (evaluation) =>
-      Object.freeze({
-        candidateId: evaluation.preview.candidate.candidateId,
-        kind: evaluation.preview.kind,
-        label: actionOptionLabel(evaluation),
-        recommended:
-          evaluation.preview.candidate.candidateId === recommendedCandidateId,
-      }),
-  )
-  options.push(
-    Object.freeze({
-      candidateId: MANUAL_WAIT_CANDIDATE_ID,
-      kind: 'WAIT',
-      label: '待機',
-      recommended: recommendedCandidateId === MANUAL_WAIT_CANDIDATE_ID,
-    }),
-  )
   return Object.freeze({
     actorBattleUnitId: pending.actor.battleUnitId,
-    recommendedCandidateId,
-    options: Object.freeze(options),
+    recommendedCandidateId:
+      pending.decisionResult.selected?.preview.candidate.candidateId ??
+      MANUAL_WAIT_CANDIDATE_ID,
+    options: Object.freeze(pending.preparedActions.map((action) => action.option)),
     reasonLog: pending.decisionResult.log,
   })
 }
+
 
 class InteractiveBattleRunnerImpl implements InteractiveBattleRunner {
   private battle: BattleState
@@ -1129,12 +1343,24 @@ class InteractiveBattleRunnerImpl implements InteractiveBattleRunner {
 
     if (this.manualAllyActionRequested && readyActor.side === 'ALLY') {
       this.manualAllyActionRequested = false
+      const preparedActions = createPreparedManualActions({
+        battle: this.battle,
+        actor: readyActor,
+        actorSpecies,
+        schedule,
+        currentTime: this.currentVirtualTime,
+        decisionResult,
+        context: this.context,
+        nextTimelineSequence: this.nextTimelineSequence,
+        applicationSequenceStart: this.log.nextSequence,
+      })
       this.pendingManualExecution = Object.freeze({
         actor: readyActor,
         actorSpecies,
         schedule,
         currentTime: this.currentVirtualTime,
         decisionResult,
+        preparedActions,
       })
       return this.publish()
     }
@@ -1170,30 +1396,23 @@ class InteractiveBattleRunnerImpl implements InteractiveBattleRunner {
       throw new Error('manual action can only be submitted at a manual interrupt point')
     }
 
-    let decision: RunnerDecision
-    let reasonLog: AiDecisionReasonLog | null = pending.decisionResult.log
-    if (candidateId === MANUAL_WAIT_CANDIDATE_ID) {
-      decision = Object.freeze({
-        kind: 'WAIT',
-        actorBattleUnitId: pending.actor.battleUnitId,
-      })
-      reasonLog = null
-    } else {
-      const evaluation = pending.decisionResult.evaluations.find(
-        (candidate) => candidate.preview.candidate.candidateId === candidateId,
-      )
-      if (evaluation === undefined) {
-        throw new Error(`manual candidate is not available: ${candidateId}`)
-      }
-      decision = evaluationToDecision(pending.actor.battleUnitId, evaluation)
+    const prepared = pending.preparedActions.find(
+      (action) => action.option.candidateId === candidateId,
+    )
+    if (prepared === undefined) {
+      throw new Error(`manual candidate is not available: ${candidateId}`)
     }
+    const reasonLog =
+      candidateId === pending.decisionResult.selected?.preview.candidate.candidateId
+        ? pending.decisionResult.log
+        : null
 
     this.pendingManualExecution = null
     this.executeDecision(
       pending.actor,
       pending.actorSpecies,
       pending.schedule,
-      decision,
+      prepared.decision,
       reasonLog,
     )
     return this.publish()
@@ -1247,6 +1466,7 @@ class InteractiveBattleRunnerImpl implements InteractiveBattleRunner {
             schedule,
             this.currentVirtualTime,
             this.context,
+            this.nextTimelineSequence,
           )
         : decision.kind === 'MOVE'
           ? executeMovementDecision(
