@@ -8,6 +8,8 @@ on:
 
 permissions:
   contents: write
+  issues: write
+  pull-requests: write
 
 jobs:
   materialize:
@@ -20,6 +22,8 @@ jobs:
         with:
           ref: agent/t030-manual-preview
       - name: Apply and commit T030 implementation
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           base64 --decode .agent/t030-patch.tar.gz.b64 > /tmp/t030-patch.tar.gz
           tar -xzf /tmp/t030-patch.tar.gz -C /tmp
@@ -27,16 +31,26 @@ jobs:
           python /tmp/apply_t030.py > /tmp/t030-materialize.log 2>&1
           status=$?
           set -e
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           if [ "$status" -ne 0 ]; then
-            cp /tmp/t030-materialize.log .agent/t030-error.log
-            git add -f .agent/t030-error.log
-            git commit -m "chore: capture T030 materialization error"
-            git push origin HEAD:agent/t030-manual-preview
-            exit 0
+            python - <<'PY' > /tmp/t030-comment.json
+          import json
+          from pathlib import Path
+          log = Path('/tmp/t030-materialize.log').read_text()
+          body = 'T030 materialization failed:\n\n```text\n' + log[-6000:] + '\n```'
+          print(json.dumps({'body': body}))
+          PY
+            curl --fail-with-body --silent --show-error \
+              -X POST \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              https://api.github.com/repos/dolphin23-jp/Summon-unit/issues/32/comments \
+              --data-binary @/tmp/t030-comment.json
+            exit 1
           fi
           rm -rf .agent
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
           git commit -m "T030 add manual action confirmed previews"
           git push origin HEAD:agent/t030-manual-preview
