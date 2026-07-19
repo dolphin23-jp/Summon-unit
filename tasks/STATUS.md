@@ -33,5 +33,6 @@
 - [x] T031 — [終了画面・モバイル・アクセシビリティ](T031_RESULT_MOBILE_ACCESSIBILITY.md)
 - [x] T032 — [プレイヤーデータ・編成モデル](T032_PLAYER_DATA_FORMATION_MODEL.md)
 - [x] T033 — [編成UI・技習得・図鑑](T033_FORMATION_SKILL_ENCYCLOPEDIA_UI.md)
+- [x] T034 — [経済・解析度](T034_ECONOMY_ANALYSIS.md)
 
-T001～T033 complete. Next: T034.
+T001～T034 complete. Next: T035.
