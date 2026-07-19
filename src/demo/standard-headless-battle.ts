@@ -38,17 +38,45 @@ export const STANDARD_HEADLESS_SKILLS: readonly SkillDefinition[] = Object.freez
   Object.freeze({ id: 'skill.demo-beta', slotType: 'INNATE', actionCost: 105, targetType: 'SINGLE_ENEMY', damageMultiplierPermille: 1050 }),
   Object.freeze({ id: 'skill.demo-gamma', slotType: 'INNATE', actionCost: 95, targetType: 'SINGLE_ENEMY', damageMultiplierPermille: 1200 }),
   Object.freeze({ id: 'skill.demo-delta', slotType: 'INNATE', actionCost: 110, targetType: 'SINGLE_ENEMY', damageMultiplierPermille: 1150 }),
+  Object.freeze({
+    id: 'skill.demo-generic',
+    slotType: 'GENERIC',
+    actionCost: 90,
+    targetType: 'SINGLE_ENEMY',
+    reachMethod: 'SNIPE',
+    damageMultiplierPermille: 850,
+  }),
+  Object.freeze({
+    id: 'skill.demo-bloom',
+    slotType: 'BLOOM',
+    actionCost: 135,
+    targetType: 'SINGLE_ENEMY',
+    reachMethod: 'SNIPE',
+    damageMultiplierPermille: 1800,
+  }),
 ])
+
+const MANUAL_ONLY_SKILL_POLICIES = Object.freeze([
+  Object.freeze({ skillId: 'skill.demo-generic', policy: 'AUTO_DISABLED' as const }),
+  Object.freeze({ skillId: 'skill.demo-bloom', policy: 'AUTO_DISABLED' as const }),
+])
+
+const MANUAL_LOADOUT = Object.freeze(['skill.demo-generic', 'skill.demo-bloom'])
 
 export const STANDARD_HEADLESS_BATTLE: HeadlessBattleDefinition = Object.freeze({
   species: STANDARD_HEADLESS_SPECIES,
   skills: STANDARD_HEADLESS_SKILLS,
   initialActionCost: 100,
   maxActions: 300,
+  aiConfigurations: Object.freeze({
+    'ally.alpha': Object.freeze({ individualStrategy: 'STANDARD' as const, teamStrategy: 'STABLE_CLEAR' as const, skillPolicies: MANUAL_ONLY_SKILL_POLICIES }),
+    'ally.beta': Object.freeze({ individualStrategy: 'STANDARD' as const, teamStrategy: 'STABLE_CLEAR' as const, skillPolicies: MANUAL_ONLY_SKILL_POLICIES }),
+    'ally.gamma': Object.freeze({ individualStrategy: 'STANDARD' as const, teamStrategy: 'STABLE_CLEAR' as const, skillPolicies: MANUAL_ONLY_SKILL_POLICIES }),
+  }),
   units: Object.freeze([
-    Object.freeze({ battleUnitId: 'ally.alpha', speciesId: 'species.demo-alpha', position: Object.freeze({ side: 'ALLY' as const, row: 0 as const, column: 0 as const }), tiePriority: 0 }),
-    Object.freeze({ battleUnitId: 'ally.beta', speciesId: 'species.demo-beta', position: Object.freeze({ side: 'ALLY' as const, row: 1 as const, column: 0 as const }), tiePriority: 1 }),
-    Object.freeze({ battleUnitId: 'ally.gamma', speciesId: 'species.demo-gamma', position: Object.freeze({ side: 'ALLY' as const, row: 2 as const, column: 1 as const }), tiePriority: 2 }),
+    Object.freeze({ battleUnitId: 'ally.alpha', speciesId: 'species.demo-alpha', position: Object.freeze({ side: 'ALLY' as const, row: 0 as const, column: 0 as const }), equippedSkillIds: MANUAL_LOADOUT, tiePriority: 0 }),
+    Object.freeze({ battleUnitId: 'ally.beta', speciesId: 'species.demo-beta', position: Object.freeze({ side: 'ALLY' as const, row: 1 as const, column: 0 as const }), equippedSkillIds: MANUAL_LOADOUT, tiePriority: 1 }),
+    Object.freeze({ battleUnitId: 'ally.gamma', speciesId: 'species.demo-gamma', position: Object.freeze({ side: 'ALLY' as const, row: 2 as const, column: 1 as const }), equippedSkillIds: MANUAL_LOADOUT, tiePriority: 2 }),
     Object.freeze({ battleUnitId: 'enemy.delta', speciesId: 'species.demo-delta', position: Object.freeze({ side: 'ENEMY' as const, row: 0 as const, column: 1 as const }), tiePriority: 3 }),
     Object.freeze({ battleUnitId: 'enemy.alpha', speciesId: 'species.demo-alpha', position: Object.freeze({ side: 'ENEMY' as const, row: 1 as const, column: 2 as const }), tiePriority: 4 }),
     Object.freeze({ battleUnitId: 'enemy.beta', speciesId: 'species.demo-beta', position: Object.freeze({ side: 'ENEMY' as const, row: 2 as const, column: 2 as const }), tiePriority: 5 }),
