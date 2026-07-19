@@ -126,7 +126,7 @@ export function previewSingleTargetSkillDamage(
     input.target.effects,
     'DEFENSE',
   )
-  const skillAttributeId = resolveSkillAttributeId(input.skill, input.actorSpecies.attributeId)
+  const skillAttributeId = resolveSkillAttributeId(input.skill)
   const attributeMultiplierPermille = getAttributeMultiplierPermille(
     skillAttributeId,
     input.targetSpecies.attributeId,
