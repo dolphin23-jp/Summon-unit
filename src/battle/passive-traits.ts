@@ -83,7 +83,7 @@ export function assertValidPassiveTraitDefinition(trait: PassiveTraitDefinition)
     if (!PASSIVE_TRAIT_ABILITY_KINDS.includes(ability.kind)) {
       throw new Error(`trait.abilities[${index}].kind is invalid`)
     }
-    let key: string
+    let key = ''
     switch (ability.kind) {
       case 'CONSTANT_STAT_MODIFIER':
         assertNonEmptyId(ability.effectId, `trait.abilities[${index}].effectId`)
@@ -129,14 +129,7 @@ export function assertValidPassiveTraitDefinition(trait: PassiveTraitDefinition)
 function freezeContext(context: PassiveTraitPipelineContext): PassiveTraitPipelineContext {
   return Object.freeze({
     ...context,
-    pendingEffects: Object.freeze(
-      context.pendingEffects.map((effect) =>
-        Object.freeze({
-          ...effect,
-          duration: Object.freeze({ ...effect.duration }),
-        }),
-      ),
-    ),
+    pendingEffects: Object.freeze([...context.pendingEffects]),
   })
 }
 
@@ -182,10 +175,11 @@ function appendPendingEffect(
   context: PassiveTraitPipelineContext,
   input: Omit<RegisterActiveEffectInput, 'applicationSequence'>,
 ): PassiveTraitPipelineContext {
-  const effect: RegisterActiveEffectInput = {
+  const effect: RegisterActiveEffectInput = Object.freeze({
     ...input,
+    duration: Object.freeze({ ...input.duration }),
     applicationSequence: context.nextApplicationSequence,
-  }
+  })
   return freezeContext({
     ...context,
     nextApplicationSequence: context.nextApplicationSequence + 1,
@@ -237,64 +231,61 @@ export function compilePassiveTraitHooks(
     trait.abilities.forEach((ability, index) => {
       const id = `passive-trait:${trait.id}:${index}:${ability.kind}`
       if (ability.kind === 'CONSTANT_STAT_MODIFIER') {
-        hooks.push(
-          Object.freeze({
-            id,
-            stage: 'DAMAGE_HEALING_MODIFIERS',
-            priority: 100,
-            apply: (context) =>
-              context.phase !== 'INITIALIZE'
-                ? context
-                : appendPendingEffect(context, {
-                    effectId: ability.effectId,
-                    sourceBattleUnitId: context.ownerBattleUnitId,
-                    targetBattleUnitId: context.ownerBattleUnitId,
-                    strength: ability.strength,
-                    stackLimit: 1,
-                    duration: { unit: 'BATTLE', remaining: null },
-                    duplicateScope: 'TARGET',
-                    appliedAt: context.currentTime,
-                  }),
-          }),
-        )
+        const hook: EffectResolutionHook<PassiveTraitPipelineContext> = Object.freeze({
+          id,
+          stage: 'DAMAGE_HEALING_MODIFIERS',
+          priority: 100,
+          apply: (context) =>
+            context.phase !== 'INITIALIZE'
+              ? context
+              : appendPendingEffect(context, {
+                  effectId: ability.effectId,
+                  sourceBattleUnitId: context.ownerBattleUnitId,
+                  targetBattleUnitId: context.ownerBattleUnitId,
+                  strength: ability.strength,
+                  stackLimit: 1,
+                  duration: { unit: 'BATTLE', remaining: null },
+                  duplicateScope: 'TARGET',
+                  appliedAt: context.currentTime,
+                }),
+        })
+        hooks.push(hook)
         return
       }
 
       if (ability.kind === 'ON_HIT_REACTION') {
-        hooks.push(
-          Object.freeze({
-            id,
-            stage: 'POST_HIT_HEAL_REACTIONS',
-            priority: 100,
-            apply: (context) =>
-              context.phase !== 'ON_HIT'
-                ? context
-                : appendPendingEffect(context, {
-                    effectId: ability.effectId,
-                    sourceBattleUnitId: context.ownerBattleUnitId,
-                    targetBattleUnitId: context.ownerBattleUnitId,
-                    strength: ability.strength,
-                    stackLimit: 1,
-                    duration: {
-                      unit: 'TARGET_ACTIONS',
-                      remaining: ability.targetActionDuration,
-                    },
-                    duplicateScope: 'TARGET',
-                    appliedAt: context.currentTime,
-                  }),
-          }),
-        )
+        const hook: EffectResolutionHook<PassiveTraitPipelineContext> = Object.freeze({
+          id,
+          stage: 'POST_HIT_HEAL_REACTIONS',
+          priority: 100,
+          apply: (context) =>
+            context.phase !== 'ON_HIT'
+              ? context
+              : appendPendingEffect(context, {
+                  effectId: ability.effectId,
+                  sourceBattleUnitId: context.ownerBattleUnitId,
+                  targetBattleUnitId: context.ownerBattleUnitId,
+                  strength: ability.strength,
+                  stackLimit: 1,
+                  duration: {
+                    unit: 'TARGET_ACTIONS',
+                    remaining: ability.targetActionDuration,
+                  },
+                  duplicateScope: 'TARGET',
+                  appliedAt: context.currentTime,
+                }),
+        })
+        hooks.push(hook)
         return
       }
 
-      hooks.push(
-        Object.freeze({
-          id,
-          stage: 'STATUS_CHANGES',
-          priority: 100,
-          apply: (context) => applyStatusOverride(context, ability),
-        }),
-      )
+      const hook: EffectResolutionHook<PassiveTraitPipelineContext> = Object.freeze({
+        id,
+        stage: 'STATUS_CHANGES',
+        priority: 100,
+        apply: (context) => applyStatusOverride(context, ability),
+      })
+      hooks.push(hook)
     })
   }
 
