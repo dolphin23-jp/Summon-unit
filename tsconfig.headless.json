@@ -16,11 +16,14 @@
   "include": [
     "scripts/headless-battle-demo.ts",
     "scripts/ai-regression-benchmark.ts",
+    "scripts/vertical-slice-balance.ts",
     "scripts/validate-content.ts",
     "src/ai/**/*.ts",
+    "src/balance/**/*.ts",
     "src/battle/**/*.ts",
     "src/content/**/*.ts",
-    "src/demo/**/*.ts"
+    "src/demo/**/*.ts",
+    "src/progression/**/*.ts"
   ],
   "exclude": ["**/*.test.ts", "src/**/*.tsx"]
 }
