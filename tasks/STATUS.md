@@ -20,5 +20,6 @@
 - [x] T018 — [状態異常一式](T018_STATUS_CONDITIONS.md)
 - [x] T019 — [対象選択・固有特性・時間操作・待機・技使用制約](T019_TARGETING_TRAITS_TIME_USAGE.md)
 - [x] T020 — [障壁・肩代わり](T020_BARRIERS_GUARD_SHARE.md)
+- [x] T021 — [到達方式・範囲マスク・強制移動](T021_REACH_AREA_FORCED_MOVEMENT.md)
 
-T001～T020 complete. Next: T021.
+T001～T021 complete. Next: T022.
