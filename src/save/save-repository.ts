@@ -22,6 +22,7 @@ export interface SaveRepository {
     readonly slotId: SaveSlotId
     readonly generationId: string
     readonly maximumBackupGenerations: number
+    readonly preferredBackupGenerationId?: string
   }): Promise<SaveSlotPointer>
   deleteGeneration(generationId: string): Promise<void>
   deleteSlot(slotId: SaveSlotId): Promise<void>
@@ -31,6 +32,7 @@ export interface SavePlayerDataAtomicInput {
   readonly slotId: SaveSlotId
   readonly generationId: string
   readonly savedAtEpochMs: number
+  readonly preferredBackupGenerationId?: string
 }
 
 export interface SavePlayerDataAtomicResult {
@@ -77,6 +79,7 @@ export async function savePlayerDataAtomic(
       slotId: input.slotId,
       generationId: temporary.generationId,
       maximumBackupGenerations: MAX_SAVE_BACKUP_GENERATIONS,
+      preferredBackupGenerationId: input.preferredBackupGenerationId,
     })
     committed = true
     if (pointer.currentGenerationId !== verified.generationId) {
