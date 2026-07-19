@@ -136,7 +136,14 @@ function App() {
               (battleSession.serial * 7919 + attempt * 3571) % 10_000,
           })
         }
-        onSettlement={(settlement) => updatePlayerData(settlement.playerData)}
+        onSettlement={(settlement) => {
+          updatePlayerData(settlement.playerData)
+          if (settlement.victory) {
+            setBattleSession((current) =>
+              current === null ? null : { ...current, fastModeAvailable: true },
+            )
+          }
+        }}
         onOpenFormation={() => {
           setBattleSession(null)
           setScreen('COLLECTION')
