@@ -116,6 +116,7 @@ export class IndexedDbSaveRepository implements SaveRepository {
     readonly slotId: SaveSlotId
     readonly generationId: string
     readonly maximumBackupGenerations: number
+    readonly preferredBackupGenerationId?: string
   }): Promise<SaveSlotPointer> {
     assertBackupLimit(input.maximumBackupGenerations)
     const database = await this.databasePromise
@@ -163,7 +164,22 @@ export class IndexedDbSaveRepository implements SaveRepository {
             previous === undefined
               ? []
               : [previous.currentGenerationId, ...previous.backupGenerationIds]
-          const uniquePrevious = previousGenerationIds.filter(
+          if (
+            input.preferredBackupGenerationId !== undefined &&
+            !previousGenerationIds.includes(input.preferredBackupGenerationId)
+          ) {
+            fail(
+              new Error(
+                `preferred backup generation is not in the slot: ${input.preferredBackupGenerationId}`,
+              ),
+            )
+            return
+          }
+          const backupCandidates = [
+            input.preferredBackupGenerationId,
+            ...previousGenerationIds,
+          ].filter((generationId): generationId is string => generationId !== undefined)
+          const uniquePrevious = backupCandidates.filter(
             (generationId, index, values) =>
               generationId !== input.generationId && values.indexOf(generationId) === index,
           )
