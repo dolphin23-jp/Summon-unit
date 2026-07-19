@@ -95,14 +95,15 @@ function getSkill(
   context: AiConfiguredDecisionContext,
   evaluation: AiActionEvaluation,
 ): SkillDefinition | null {
-  if (evaluation.preview.kind !== 'USE_SKILL') {
+  const candidate = evaluation.preview.candidate
+  if (!('skillId' in candidate)) {
     return null
   }
   const skill = context.input.availableSkills.find(
-    (candidate) => candidate.id === evaluation.preview.candidate.skillId,
+    (available) => available.id === candidate.skillId,
   )
   if (skill === undefined) {
-    throw new Error(`evaluated skill is missing: ${evaluation.preview.candidate.skillId}`)
+    throw new Error(`evaluated skill is missing: ${candidate.skillId}`)
   }
   return skill
 }
