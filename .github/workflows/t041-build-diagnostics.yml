@@ -1,0 +1,23 @@
+name: T041 Build Diagnostics
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-diagnostics:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+      - name: Build with concise failure output
+        run: |
+          pnpm build > /tmp/t041-build.log 2>&1 || {
+            tail -80 /tmp/t041-build.log
+            exit 1
+          }
