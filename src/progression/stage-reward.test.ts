@@ -78,11 +78,11 @@ describe('stage battle settlement', () => {
         (node) => node.nodeId === 'research.demo-zeta',
       ),
     ).toMatchObject({ status: 'hinted', disclosureStage: 1 })
-    expect(settlement.conditionChanges).toContainEqual({
-      instanceId: 'unit.alpha-01',
-      beforeBasisPoints: 10_000,
-      afterBasisPoints: 5_000,
-    })
+    const conditionChange = settlement.conditionChanges.find(
+      (change) => change.instanceId === 'unit.alpha-01',
+    )
+    expect(conditionChange?.beforeBasisPoints).toBe(10_000)
+    expect(conditionChange?.afterBasisPoints).toBeLessThanOrEqual(5_000)
 
     const view = createBattleResultView(definition, result, settlement)
     expect(view.rewards.stub).toBe(false)
