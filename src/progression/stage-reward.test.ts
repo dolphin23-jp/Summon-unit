@@ -25,7 +25,11 @@ function createWinningBattle(): HeadlessBattleDefinition {
       STANDARD_HEADLESS_BATTLE.units.map((unit) => {
         const instanceId = allyInstanceIds.get(unit.battleUnitId)
         if (instanceId !== undefined) {
-          return Object.freeze({ ...unit, battleUnitId: `ally:${instanceId}` })
+          return Object.freeze({
+            ...unit,
+            battleUnitId: `ally:${instanceId}`,
+            ...(unit.battleUnitId === 'ally.alpha' ? { initialHp: 46 } : {}),
+          })
         }
         return Object.freeze({ ...unit, initialHp: 1 })
       }),
@@ -74,7 +78,11 @@ describe('stage battle settlement', () => {
         (node) => node.nodeId === 'research.demo-zeta',
       ),
     ).toMatchObject({ status: 'hinted', disclosureStage: 1 })
-    expect(settlement.conditionChanges.length).toBeGreaterThan(0)
+    expect(settlement.conditionChanges).toContainEqual({
+      instanceId: 'unit.alpha-01',
+      beforeBasisPoints: 10_000,
+      afterBasisPoints: 5_000,
+    })
 
     const view = createBattleResultView(definition, result, settlement)
     expect(view.rewards.stub).toBe(false)
