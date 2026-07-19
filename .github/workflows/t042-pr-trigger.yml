@@ -1,4 +1,4 @@
-name: Apply T042 application integration
+name: Normalize T042 stable snapshots
 
 on:
   pull_request:
@@ -13,16 +13,16 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: agent/t042-export-import-battle-resume
-      - name: Patch application integration
+      - name: Normalize stable snapshot JSON
         run: |
-          if grep -q "exportCurrentSave" src/App.tsx; then
+          if grep -q "const serializable" src/battle/interactive-battle-runner.ts; then
             exit 0
           fi
-          python tools/t042_patch_app.py
-      - name: Commit application integration
+          python tools/t042_fix_snapshot_json.py
+      - name: Commit stable snapshot normalization
         run: |
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add src/App.tsx
-          git commit -m "Integrate save transfer and battle resume" || true
+          git add src/battle/interactive-battle-runner.ts
+          git commit -m "Normalize stable battle snapshots for JSON" || true
           git push
