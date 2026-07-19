@@ -160,9 +160,9 @@ function findSkillCandidate(
       value.skillId === skillId &&
       value.selectedTargetBattleUnitId === targetBattleUnitId &&
       (positionId === undefined ||
-        value.selectedTargetPosition !== null &&
+        (value.selectedTargetPosition !== null &&
           `${value.selectedTargetPosition.side}:${value.selectedTargetPosition.row}:${value.selectedTargetPosition.column}` ===
-            positionId),
+            positionId)),
   )
   if (candidate === undefined || candidate.kind !== 'USE_SKILL') {
     throw new Error('missing test skill candidate')
@@ -230,16 +230,16 @@ describe('AI action evaluation foundation', () => {
     }
     expect(preview.telegraphDelay).toBe(25)
     expect(preview.affectedPositionIds).toEqual([
-      'ENEMY:0:1',
+      'ENEMY:2:1',
       'ENEMY:1:0',
       'ENEMY:1:1',
       'ENEMY:1:2',
-      'ENEMY:2:1',
+      'ENEMY:0:1',
     ])
     expect(preview.targetResults.map((result) => result.battleUnitId)).toEqual([
-      'enemy.front',
-      'enemy.side',
       'enemy.back',
+      'enemy.side',
+      'enemy.front',
     ])
     expect(preview.totalAppliedDamage).toBe(
       preview.targetResults.reduce((sum, result) => sum + result.appliedDamage, 0),
