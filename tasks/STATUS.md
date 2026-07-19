@@ -34,5 +34,6 @@
 - [x] T032 — [プレイヤーデータ・編成モデル](T032_PLAYER_DATA_FORMATION_MODEL.md)
 - [x] T033 — [編成UI・技習得・図鑑](T033_FORMATION_SKILL_ENCYCLOPEDIA_UI.md)
 - [x] T034 — [経済・解析度](T034_ECONOMY_ANALYSIS.md)
+- [x] T035 — [研究網・情報開示・試験研究](T035_RESEARCH_NETWORK_TRIAL.md)
 
-T001～T034 complete. Next: T035.
+T001～T035 complete. Next: T036.
