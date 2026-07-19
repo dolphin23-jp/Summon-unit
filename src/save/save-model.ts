@@ -79,12 +79,20 @@ function calculateChecksumFromJson(json: string): string {
   return (hash >>> 0).toString(16).padStart(8, '0')
 }
 
+export function calculateStoredPlayerDataChecksum(playerData: unknown): string {
+  const json = JSON.stringify(playerData)
+  if (json === undefined) {
+    throw new Error('save playerData must be JSON serializable')
+  }
+  return calculateChecksumFromJson(json)
+}
+
 export function calculatePlayerDataChecksum(
   playerData: PlayerData,
   catalog: PlayerDataContentCatalog,
 ): string {
   const normalized = createStagePlayerData(playerData, catalog)
-  return calculateChecksumFromJson(JSON.stringify(normalized))
+  return calculateStoredPlayerDataChecksum(normalized)
 }
 
 export function createSaveGenerationRecord(
@@ -104,27 +112,45 @@ export function createSaveGenerationRecord(
     slotId: input.slotId,
     savedAtEpochMs: input.savedAtEpochMs,
     state,
-    checksum: calculateChecksumFromJson(JSON.stringify(playerData)),
+    checksum: calculateStoredPlayerDataChecksum(playerData),
     playerData,
   })
+}
+
+export function validateSaveGenerationEnvelope(
+  record: SaveGenerationRecord,
+): SaveGenerationRecord {
+  assertNonEmptyString(record.generationId, 'save generationId')
+  assertSaveSlotId(record.slotId)
+  assertSafeIntegerAtLeast(record.savedAtEpochMs, 0, 'save savedAtEpochMs')
+  if (record.state !== 'TEMPORARY' && record.state !== 'COMMITTED') {
+    throw new Error(`save state is invalid: ${String(record.state)}`)
+  }
+  assertNonEmptyString(record.checksum, 'save checksum')
+  const checksum = calculateStoredPlayerDataChecksum(record.playerData)
+  if (record.checksum !== checksum) {
+    throw new Error(`save generation checksum mismatch: ${record.generationId}`)
+  }
+  return record
 }
 
 export function validateSaveGenerationRecord(
   record: SaveGenerationRecord,
   catalog: PlayerDataContentCatalog,
 ): SaveGenerationRecord {
+  const envelope = validateSaveGenerationEnvelope(record)
   const normalized = createSaveGenerationRecord(
     {
-      generationId: record.generationId,
-      slotId: record.slotId,
-      savedAtEpochMs: record.savedAtEpochMs,
-      state: record.state,
-      playerData: record.playerData,
+      generationId: envelope.generationId,
+      slotId: envelope.slotId,
+      savedAtEpochMs: envelope.savedAtEpochMs,
+      state: envelope.state,
+      playerData: envelope.playerData,
     },
     catalog,
   )
-  if (record.checksum !== normalized.checksum) {
-    throw new Error(`save generation checksum mismatch: ${record.generationId}`)
+  if (envelope.checksum !== normalized.checksum) {
+    throw new Error(`save generation checksum mismatch after normalization: ${record.generationId}`)
   }
   return normalized
 }
