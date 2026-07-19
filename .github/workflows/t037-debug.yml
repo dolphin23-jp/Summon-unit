@@ -1,6 +1,9 @@
 name: T037 Debug Build
 
 on:
+  pull_request:
+    branches:
+      - main
   push:
     branches:
       - agent/t037-research-ui-facility
