@@ -4,11 +4,13 @@ import type { Side } from '../battle/board'
 import {
   createInteractiveBattleRunner,
   type HeadlessBattleDefinition,
+  type HeadlessBattleRunResult,
   type InteractiveBattleRunner,
   type InteractiveBattleSnapshot,
   type InteractiveManualActionOption,
 } from '../battle/headless-battle-runner'
 import { STANDARD_INTERACTIVE_BATTLE } from '../demo/standard-headless-battle'
+import type { StageBattleSettlement } from '../progression/stage-reward'
 import { BattleDecisionPanel } from './BattleDecisionPanel'
 import {
   BattleResultScreen,
@@ -108,11 +110,22 @@ function statusLabel(
 export interface MinimalBattleScreenProps {
   readonly definition?: HeadlessBattleDefinition
   readonly onOpenFormation?: () => void
+  readonly onOpenResearch?: () => void
+  readonly onNextStage?: () => void
+  readonly settleResult?: (
+    result: HeadlessBattleRunResult,
+    attempt: number,
+  ) => StageBattleSettlement
+  readonly onSettlement?: (settlement: StageBattleSettlement) => void
 }
 
 export function MinimalBattleScreen({
   definition = STANDARD_INTERACTIVE_BATTLE,
   onOpenFormation,
+  onOpenResearch,
+  onNextStage,
+  settleResult,
+  onSettlement,
 }: MinimalBattleScreenProps) {
   const [runner, setRunner] = useState(() => createRunner(definition))
   const [snapshot, setSnapshot] = useState(() => runner.getSnapshot())
@@ -123,6 +136,8 @@ export function MinimalBattleScreen({
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null)
   const [motionLevel, setMotionLevel] = useState<BattleMotionLevel>(getInitialMotionLevel)
   const [navigationNotice, setNavigationNotice] = useState<string | null>(null)
+  const [settlement, setSettlement] = useState<StageBattleSettlement | null>(null)
+  const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
     setSnapshot(runner.getSnapshot())
@@ -138,6 +153,15 @@ export function MinimalBattleScreen({
       setAutoRequested(false)
     }
   }, [isTerminal])
+
+  useEffect(() => {
+    if (!isTerminal || settlement !== null || settleResult === undefined) {
+      return
+    }
+    const nextSettlement = settleResult(runner.getResult(), attempt)
+    setSettlement(nextSettlement)
+    onSettlement?.(nextSettlement)
+  }, [attempt, isTerminal, onSettlement, runner, settlement, settleResult])
 
   useEffect(() => {
     if (!isPlaying) {
@@ -164,8 +188,11 @@ export function MinimalBattleScreen({
     [definition, previewOption, snapshot],
   )
   const resultView = useMemo(
-    () => (isTerminal ? createBattleResultView(definition, runner.getResult()) : null),
-    [definition, isTerminal, runner, snapshot.totalActions],
+    () =>
+      isTerminal
+        ? createBattleResultView(definition, runner.getResult(), settlement)
+        : null,
+    [definition, isTerminal, runner, settlement, snapshot.totalActions],
   )
 
   const reset = () => {
@@ -174,6 +201,8 @@ export function MinimalBattleScreen({
     setSelectedActionKey(null)
     setSelectedCandidateId(null)
     setNavigationNotice(null)
+    setSettlement(null)
+    setAttempt((current) => current + 1)
     setRunner(createRunner(definition))
   }
 
@@ -223,10 +252,18 @@ export function MinimalBattleScreen({
       onOpenFormation()
       return
     }
+    if (action === 'RESEARCH' && onOpenResearch !== undefined) {
+      onOpenResearch()
+      return
+    }
+    if (action === 'NEXT_STAGE' && onNextStage !== undefined) {
+      onNextStage()
+      return
+    }
     const message: Readonly<Record<Exclude<BattleResultNavigationAction, 'RETRY'>, string>> = {
       FORMATION: '編成画面への導線が設定されていません。',
-      RESEARCH: '研究画面はT034以降で接続します。報酬・解析度はまだ保存されません。',
-      NEXT_STAGE: '次ステージ導線はT038で接続します。現在は結果確認のみです。',
+      RESEARCH: '研究画面への導線が設定されていません。',
+      NEXT_STAGE: '次ステージ選択はT039で地域画面へ接続します。',
     }
     setNavigationNotice(message[action])
   }
