@@ -1,0 +1,19 @@
+name: T035 Debug
+
+on:
+  pull_request:
+
+jobs:
+  concise-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run concise test output
+        shell: bash
+        run: |
+          set -o pipefail
+          git clone --quiet --depth=1 --branch "$GITHUB_HEAD_REF" "https://github.com/$GITHUB_REPOSITORY.git" repo
+          cd repo
+          corepack enable
+          corepack prepare pnpm@10.13.1 --activate >/dev/null
+          pnpm install --frozen-lockfile --reporter=silent
+          pnpm test 2>&1 | tail -n 80
