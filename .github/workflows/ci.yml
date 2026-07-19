@@ -31,25 +31,25 @@ jobs:
         run: pnpm install --no-frozen-lockfile
 
       - name: Test
-        run: pnpm test
-
-      - name: Headless demo
-        id: headless
+        id: test
         continue-on-error: true
         run: |
           set -o pipefail
-          pnpm demo:headless 2>&1 | tee /tmp/t030-headless.log
+          pnpm test 2>&1 | tee /tmp/t030-test-second.log
 
-      - name: Upload headless log
-        if: steps.headless.outcome == 'failure'
+      - name: Upload test log
+        if: steps.test.outcome == 'failure'
         uses: actions/upload-artifact@v4
         with:
-          name: t030-headless-log
-          path: /tmp/t030-headless.log
+          name: t030-test-second-log
+          path: /tmp/t030-test-second.log
 
-      - name: Stop on headless failure
-        if: steps.headless.outcome == 'failure'
+      - name: Stop on test failure
+        if: steps.test.outcome == 'failure'
         run: exit 1
+
+      - name: Headless demo
+        run: pnpm demo:headless > /tmp/headless-battle-demo.json
 
       - name: AI regression benchmark
         run: pnpm benchmark:ai
