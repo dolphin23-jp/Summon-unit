@@ -1,6 +1,11 @@
 import {
+  ATTRIBUTE_MULTIPLIER_SCALE,
+  getAttributeMultiplierPermille,
+} from '../content/attribute'
+import {
   DAMAGE_MULTIPLIER_SCALE,
   assertValidSkillDefinition,
+  resolveSkillAttributeId,
   type SkillDefinition,
 } from '../content/skill-definition'
 import {
@@ -13,27 +18,39 @@ import {
   type BattleTime,
   type UnitActionSchedule,
 } from './action-scheduling'
+import { getModifiedBattleStatValue } from './stat-modifiers'
 import {
   assertValidBattleUnitState,
   withBattleUnitHp,
   type BattleUnitState,
 } from './unit-state'
 
-export interface SingleTargetSkillUseInput {
+export interface SingleTargetDamagePreviewInput {
   readonly actor: BattleUnitState
   readonly actorSpecies: MonsterSpecies
-  readonly actorSchedule: UnitActionSchedule
   readonly target: BattleUnitState
   readonly targetSpecies: MonsterSpecies
   readonly skill: SkillDefinition
+}
+
+export interface SingleTargetDamagePreview {
+  readonly calculatedDamage: number
+  readonly effectiveAttack: number
+  readonly effectiveDefense: number
+  readonly attributeMultiplierPermille: number
+}
+
+export interface SingleTargetSkillUseInput extends SingleTargetDamagePreviewInput {
+  readonly actorSchedule: UnitActionSchedule
   readonly currentTime: BattleTime
 }
 
-export interface SingleTargetSkillUseResult {
+export interface SingleTargetSkillUseResult extends SingleTargetDamagePreview {
   readonly target: BattleUnitState
   readonly actorSchedule: UnitActionSchedule
-  readonly calculatedDamage: number
   readonly appliedDamage: number
+  readonly effectiveActionCost: number
+  readonly effectiveSpeed: number
 }
 
 function assertSafeIntegerAtLeast(value: number, minimum: number, field: string): void {
@@ -42,13 +59,17 @@ function assertSafeIntegerAtLeast(value: number, minimum: number, field: string)
   }
 }
 
-function assertValidUseInput(input: SingleTargetSkillUseInput): void {
+function assertValidPreviewInput(input: SingleTargetDamagePreviewInput): void {
   assertValidMonsterSpecies(input.actorSpecies)
   assertValidMonsterSpecies(input.targetSpecies)
   assertValidBattleUnitState(input.actor, input.actorSpecies)
   assertValidBattleUnitState(input.target, input.targetSpecies)
-  assertValidUnitActionSchedule(input.actorSchedule)
   assertValidSkillDefinition(input.skill)
+}
+
+function assertValidUseInput(input: SingleTargetSkillUseInput): void {
+  assertValidPreviewInput(input)
+  assertValidUnitActionSchedule(input.actorSchedule)
   assertSafeIntegerAtLeast(input.currentTime, 0, 'currentTime')
 }
 
@@ -56,6 +77,7 @@ export function calculateSingleTargetDamage(
   attack: number,
   defense: number,
   damageMultiplierPermille: number,
+  attributeMultiplierPermille: number = ATTRIBUTE_MULTIPLIER_SCALE,
 ): number {
   assertSafeIntegerAtLeast(attack, 0, 'attack')
   assertSafeIntegerAtLeast(defense, 0, 'defense')
@@ -64,10 +86,21 @@ export function calculateSingleTargetDamage(
     1,
     'damageMultiplierPermille',
   )
+  assertSafeIntegerAtLeast(
+    attributeMultiplierPermille,
+    1,
+    'attributeMultiplierPermille',
+  )
 
-  const numerator = BigInt(attack) * BigInt(damageMultiplierPermille) * 100n
+  const numerator =
+    BigInt(attack) *
+    BigInt(damageMultiplierPermille) *
+    BigInt(attributeMultiplierPermille) *
+    100n
   const denominator =
-    BigInt(DAMAGE_MULTIPLIER_SCALE) * (100n + BigInt(defense))
+    BigInt(DAMAGE_MULTIPLIER_SCALE) *
+    BigInt(ATTRIBUTE_MULTIPLIER_SCALE) *
+    (100n + BigInt(defense))
   const roundedDamage = (numerator + denominator / 2n) / denominator
   const damage = roundedDamage < 1n ? 1n : roundedDamage
 
@@ -76,6 +109,41 @@ export function calculateSingleTargetDamage(
   }
 
   return Number(damage)
+}
+
+export function previewSingleTargetSkillDamage(
+  input: SingleTargetDamagePreviewInput,
+): SingleTargetDamagePreview {
+  assertValidPreviewInput(input)
+
+  const effectiveAttack = getModifiedBattleStatValue(
+    input.actorSpecies.stats.attack,
+    input.actor.effects,
+    'ATTACK',
+  )
+  const effectiveDefense = getModifiedBattleStatValue(
+    input.targetSpecies.stats.defense,
+    input.target.effects,
+    'DEFENSE',
+  )
+  const skillAttributeId = resolveSkillAttributeId(input.skill, input.actorSpecies.attributeId)
+  const attributeMultiplierPermille = getAttributeMultiplierPermille(
+    skillAttributeId,
+    input.targetSpecies.attributeId,
+  )
+  const calculatedDamage = calculateSingleTargetDamage(
+    effectiveAttack,
+    effectiveDefense,
+    input.skill.damageMultiplierPermille,
+    attributeMultiplierPermille,
+  )
+
+  return Object.freeze({
+    calculatedDamage,
+    effectiveAttack,
+    effectiveDefense,
+    attributeMultiplierPermille,
+  })
 }
 
 export function canUseSingleTargetInnateSkill(input: SingleTargetSkillUseInput): boolean {
@@ -123,24 +191,32 @@ export function useSingleTargetInnateSkill(
   assertValidUseInput(input)
   assertCanUseSingleTargetInnateSkill(input)
 
-  const calculatedDamage = calculateSingleTargetDamage(
-    input.actorSpecies.stats.attack,
-    input.targetSpecies.stats.defense,
-    input.skill.damageMultiplierPermille,
-  )
-  const nextHp = Math.max(0, input.target.hp - calculatedDamage)
+  const preview = previewSingleTargetSkillDamage(input)
+  const nextHp = Math.max(0, input.target.hp - preview.calculatedDamage)
   const target = withBattleUnitHp(input.target, input.targetSpecies, nextHp)
+  const effectiveActionCost = getModifiedBattleStatValue(
+    input.skill.actionCost,
+    input.actor.effects,
+    'ACTION_COST',
+  )
+  const effectiveSpeed = getModifiedBattleStatValue(
+    input.actorSpecies.stats.speed,
+    input.actor.effects,
+    'SPEED',
+  )
   const actorSchedule = rescheduleUnitActionAfterAction(
     input.actorSchedule,
     input.currentTime,
-    input.skill.actionCost,
-    input.actorSpecies.stats.speed,
+    effectiveActionCost,
+    effectiveSpeed,
   )
 
   return Object.freeze({
+    ...preview,
     target,
     actorSchedule,
-    calculatedDamage,
     appliedDamage: input.target.hp - target.hp,
+    effectiveActionCost,
+    effectiveSpeed,
   })
 }
