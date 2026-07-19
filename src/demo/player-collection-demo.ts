@@ -1,10 +1,6 @@
 import type { PlayerDataContentCatalog } from '../progression/player-data'
 import { createPlayerData } from '../progression/player-data'
 import {
-  createGenericSkillLearningState,
-  type GenericSkillLearningState,
-} from '../progression/generic-skill-learning'
-import {
   STANDARD_HEADLESS_SPECIES,
   STANDARD_INTERACTIVE_SKILLS,
 } from './standard-headless-battle'
@@ -22,9 +18,17 @@ export const T033_GENERIC_SKILL_COSTS: Readonly<Record<string, number>> = Object
 
 export const T033_INITIAL_PLAYER_DATA = createPlayerData(
   {
-    schemaVersion: 1,
-    gameVersion: '0.0.0-t033',
-    contentVersion: 'demo-t033',
+    schemaVersion: 2,
+    gameVersion: '0.0.0-t034',
+    contentVersion: 'demo-t034',
+    economy: {
+      currency: 520,
+      researchData: 180,
+      catalysts: [
+        { catalystId: 'catalyst.demo-forest', amount: 3 },
+        { catalystId: 'catalyst.demo-core', amount: 1 },
+      ],
+    },
     collection: {
       speciesStates: [
         {
@@ -190,14 +194,3 @@ export const T033_INITIAL_PLAYER_DATA = createPlayerData(
   },
   T033_PLAYER_CATALOG,
 )
-
-export const T033_INITIAL_LEARNING_STATE: GenericSkillLearningState =
-  createGenericSkillLearningState(
-    [
-      { instanceId: 'unit.alpha-01', currency: 180 },
-      { instanceId: 'unit.beta-01', currency: 140 },
-      { instanceId: 'unit.gamma-01', currency: 120 },
-      { instanceId: 'unit.delta-01', currency: 220 },
-    ],
-    T033_INITIAL_PLAYER_DATA,
-  )

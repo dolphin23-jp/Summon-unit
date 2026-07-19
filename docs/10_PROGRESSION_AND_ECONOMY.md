@@ -32,7 +32,59 @@
 
 ### 個別触媒
 
-地域・強敵・ボス固有素材です。
+地域・強敵・ボス固有素材です。触媒は表示名ではなく固定`catalystId`と数量で保存します。
+
+## T034実装モデル
+
+PlayerDataは次の経済状態を持ちます。
+
+```ts
+interface EconomyState {
+  currency: number;
+  researchData: number;
+  catalysts: { catalystId: string; amount: number }[];
+}
+```
+
+数量はすべて非負の安全な整数です。触媒は固定ID順へ正規化し、残高0は保存しません。
+
+### 原子的トランザクション
+
+一つの取引で次を同時に増減できます。
+
+- 基本通貨
+- 研究データ
+- 任意数の個別触媒
+
+差分はすべて検証・集約してから確定します。一つでも負残高または安全な整数範囲外になる場合、取引全体を拒否し、一部だけ更新した状態を外部へ公開しません。
+
+```ts
+interface EconomyTransaction {
+  currencyDelta?: number;
+  researchDataDelta?: number;
+  catalystDeltas?: { catalystId: string; amount: number }[];
+}
+```
+
+同じ触媒IDの複数差分は固定的に集約します。入力状態は変更せず、成功時だけ新しいfreeze済み状態を返します。
+
+### 汎用技習得
+
+T034から汎用技習得は共通の基本通貨を消費します。通貨減少と個体の習得済み技追加を同時に確定し、T033の一時的な個体別訓練通貨は使用しません。
+
+## 解析度
+
+解析度は種単位、0～10000の整数basis pointsです。増加源は固定5種類です。
+
+1. 味方として使用 (`ALLY_USE`)
+2. 敵として遭遇・撃破 (`ENEMY_ENCOUNTER`)
+3. 技の使用・観察 (`SKILL_OBSERVATION`)
+4. 解析データ投入 (`DATA_INVESTMENT`)
+5. 同種標本消費 (`SPECIMEN_CONSUMPTION`)
+
+同じ種・同じ増加源の入力は集約し、種ID順、続いて上記の増加源順で適用します。10000を超える分は切り捨て、要求量と実際に適用された量を記録します。
+
+研究データ・触媒消費を伴う解析は、経済差分と解析度増加を一つの`applyPlayerProgressionTransaction`で同時確定できます。
 
 ## 報酬
 
@@ -41,6 +93,8 @@
 - 地域ポイント交換
 
 運が悪くても一定周回で必要素材へ到達できます。
+
+T034は資源と解析度の取引境界までを実装します。戦闘結果画面の報酬スタブをPlayerDataへ自動反映する処理はT038で接続します。
 
 ## 召喚
 

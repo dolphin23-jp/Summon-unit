@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import {
-  T033_INITIAL_LEARNING_STATE,
   T033_INITIAL_PLAYER_DATA,
   T033_PLAYER_CATALOG,
 } from '../demo/player-collection-demo'
@@ -12,16 +11,12 @@ import {
   saveFormationPreset,
   updateFormationMemberLoadout,
 } from './formation-editor'
-import {
-  getGenericSkillLearningBalance,
-  learnGenericSkill,
-} from './generic-skill-learning'
+import { learnGenericSkill } from './generic-skill-learning'
 
-describe('T033 generic skill learning', () => {
-  it('consumes only the selected instance currency and permanently learns the skill', () => {
+describe('T033 generic skill learning through T034 economy', () => {
+  it('atomically spends basic currency and permanently learns the skill', () => {
     const result = learnGenericSkill(
       T033_INITIAL_PLAYER_DATA,
-      T033_INITIAL_LEARNING_STATE,
       'unit.delta-01',
       'skill.demo-generic-focus',
       100,
@@ -32,33 +27,34 @@ describe('T033 generic skill learning', () => {
       (instance) => instance.instanceId === 'unit.delta-01',
     )
     expect(delta?.learnedGenericSkillIds).toEqual(['skill.demo-generic-focus'])
-    expect(getGenericSkillLearningBalance(result.learningState, 'unit.delta-01')).toBe(120)
-    expect(getGenericSkillLearningBalance(result.learningState, 'unit.alpha-01')).toBe(180)
+    expect(result.playerData.economy.currency).toBe(
+      T033_INITIAL_PLAYER_DATA.economy.currency - 100,
+    )
+    expect(result.playerData.economy.researchData).toBe(
+      T033_INITIAL_PLAYER_DATA.economy.researchData,
+    )
     expect(
       T033_INITIAL_PLAYER_DATA.collection.unitInstances.find(
         (instance) => instance.instanceId === 'unit.delta-01',
       )?.learnedGenericSkillIds,
     ).toEqual([])
     expect(Object.isFrozen(result.playerData)).toBe(true)
-    expect(Object.isFrozen(result.learningState)).toBe(true)
   })
 
   it('rejects insufficient currency and duplicate or non-generic learning', () => {
     expect(() =>
       learnGenericSkill(
         T033_INITIAL_PLAYER_DATA,
-        T033_INITIAL_LEARNING_STATE,
         'unit.delta-01',
         'skill.demo-generic-focus',
-        500,
+        5000,
         T033_PLAYER_CATALOG,
       ),
-    ).toThrow('insufficient generic skill currency')
+    ).toThrow('insufficient basic currency')
 
     expect(() =>
       learnGenericSkill(
         T033_INITIAL_PLAYER_DATA,
-        T033_INITIAL_LEARNING_STATE,
         'unit.alpha-01',
         'skill.demo-generic',
         60,
@@ -69,7 +65,6 @@ describe('T033 generic skill learning', () => {
     expect(() =>
       learnGenericSkill(
         T033_INITIAL_PLAYER_DATA,
-        T033_INITIAL_LEARNING_STATE,
         'unit.delta-01',
         'skill.demo-bloom',
         60,

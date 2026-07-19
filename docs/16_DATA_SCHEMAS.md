@@ -12,6 +12,7 @@ type EffectId = string;
 type RecipeId = string;
 type StageId = string;
 type ItemId = string;
+type CatalystId = string;
 type BattleId = string;
 type FormationId = string;
 ```
@@ -23,7 +24,7 @@ type FormationId = string;
 ```ts
 type Side = 'ALLY' | 'ENEMY';
 type Column = 0 | 1 | 2;
-type LocalRow = 0 | 1 | 2; // front, middle, back は変換関数で扱う
+type LocalRow = 0 | 1 | 2;
 
 interface BoardPosition {
   side: Side;
@@ -120,19 +121,49 @@ interface BattleEvent {
 
 状態更新はイベントを生成し、UIはイベントを購読します。
 
-## プレイヤー状態（T032時点）
+## プレイヤー状態（T034時点）
 
-T032ではコレクションと編成の境界を具体化します。経済、研究、地域進行、戦闘中断状態はT034以降で同じトップレベルへ合成します。
+T034ではコレクション、編成、経済を同じPlayerDataへ統合します。研究網、地域進行、戦闘中断状態は後続タスクで同じトップレベルへ合成します。
 
 ```ts
 interface PlayerData {
   schemaVersion: number;
   gameVersion: string;
   contentVersion: string;
+  economy: EconomyState;
   collection: PlayerCollectionState;
   formations: PlayerFormationState;
 }
+```
 
+デモPlayerDataは経済フィールド追加に伴いschemaVersion 2です。IndexedDB永続化とmigrationは未実装のため、公開済みセーブの変換はまだ発生しません。
+
+## 経済
+
+```ts
+interface EconomyState {
+  currency: number;
+  researchData: number;
+  catalysts: CatalystBalance[];
+}
+
+interface CatalystBalance {
+  catalystId: CatalystId;
+  amount: number;
+}
+
+interface EconomyTransaction {
+  currencyDelta?: number;
+  researchDataDelta?: number;
+  catalystDeltas?: { catalystId: CatalystId; amount: number }[];
+}
+```
+
+状態の数量は非負の安全な整数です。取引差分は正負の安全な整数を許可し、全結果を検証してから一括確定します。触媒は固定ID順へ正規化し、0残高は保存しません。
+
+## コレクション
+
+```ts
 interface PlayerCollectionState {
   speciesStates: PlayerSpeciesState[];
   unitInstances: PlayerUnitInstance[];
@@ -158,7 +189,46 @@ interface PlayerUnitInstance {
 }
 ```
 
-図鑑段階と統計キーはコンテンツ追加を妨げない固定文字列IDとします。解析度とconditionは0～10000の整数basis pointsです。
+図鑑段階と統計キーは固定文字列IDです。解析度とconditionは0～10000の整数basis pointsです。
+
+## 解析度取引
+
+```ts
+type AnalysisGainSource =
+  | 'ALLY_USE'
+  | 'ENEMY_ENCOUNTER'
+  | 'SKILL_OBSERVATION'
+  | 'DATA_INVESTMENT'
+  | 'SPECIMEN_CONSUMPTION';
+
+interface AnalysisGain {
+  speciesId: SpeciesId;
+  source: AnalysisGainSource;
+  amount: number;
+}
+
+interface AppliedAnalysisGain {
+  speciesId: SpeciesId;
+  source: AnalysisGainSource;
+  requestedAmount: number;
+  appliedAmount: number;
+  before: number;
+  after: number;
+}
+```
+
+同じ種・同じ増加源は集約し、種ID順、増加源の固定順で適用します。10000を超える分は切り捨てます。
+
+経済差分と解析増加を同時に扱う場合は次の境界を使用します。
+
+```ts
+interface PlayerProgressionTransaction {
+  economy?: EconomyTransaction;
+  analysisGains?: AnalysisGain[];
+}
+```
+
+経済または解析のどちらかが不正なら結果を返さず、部分適用を公開しません。
 
 ## 編成・ロードアウト
 
@@ -173,7 +243,7 @@ interface PlayerFormationState {
 interface PlayerFormation {
   formationId: FormationId;
   name: string;
-  members: FormationMember[]; // 0～9体
+  members: FormationMember[];
 }
 
 interface FormationMember {
@@ -203,13 +273,12 @@ interface PlayerDataRepository {
 }
 ```
 
-T032はメモリアダプタを実装します。IndexedDB、JSON export/import、クラウド同期は同じRepositoryインターフェースの別アダプタとします。
+メモリアダプタは経済を含むPlayerData全体を再検証して保存します。IndexedDB、JSON export/import、クラウド同期は同じRepositoryインターフェースの別アダプタとします。
 
 ## 将来の完全なプレイヤーセーブ
 
 ```ts
 interface PlayerSave extends PlayerData {
-  economy: EconomyState;
   research: ResearchState;
   world: WorldProgressState;
   runs: { activeBattle: ActiveBattleSnapshot | null; activeExpedition: unknown | null };
@@ -218,7 +287,9 @@ interface PlayerSave extends PlayerData {
 
 ## 不変条件
 
-- 数量は負にならない
+- 基本通貨、研究データ、触媒数量は負にならない
+- 数量・差分・解析増加は安全な整数
+- 解析度は0～10000
 - 同じspeciesIdの種状態は一つ
 - 同じinstanceIdは一つ
 - 所持個体には対応する種状態が存在する
@@ -227,9 +298,9 @@ interface PlayerSave extends PlayerData {
 - 装備汎用技は個体が習得済み
 - 開花技は種マスターに属し、種状態で解放済み
 - AI技ポリシーは固有技と現在の装備技だけを参照する
-- `activeBattle` はstableスナップショットのみ
+- `activeBattle`はstableスナップショットのみ
 - 表示名は参照キーに使わない
 
 ## スキーマ検証
 
-T032は依存を追加せず、純粋TypeScriptのランタイム検証と正規化を実装します。将来、JSON import境界を追加する際はZod等の導入を別タスクで判断します。
+T034は依存を追加せず、純粋TypeScriptのランタイム検証と正規化を実装します。将来、JSON import境界を追加する際はZod等の導入を別タスクで判断します。
