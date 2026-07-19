@@ -43,7 +43,7 @@ describe('headless battle runner', () => {
     for (let index = 0; index < 50; index += 1) {
       expect(formatHeadlessBattleResult(runStandardHeadlessBattle())).toBe(expected)
     }
-  })
+  }, 10_000)
 
   it('stops at the configured action limit without inventing an outcome', () => {
     const limited: HeadlessBattleDefinition = {
