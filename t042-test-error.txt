@@ -1,0 +1,180 @@
+ [32m✓[39m src/battle/passive-traits.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/battle/boss-phase-runner-integration.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 52[2mms[22m[39m
+ [32m✓[39m src/save/save-transfer.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 51[2mms[22m[39m
+ [32m✓[39m src/battle/wait-action.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m src/progression/progression-notifications.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/battle/effect-event-log.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/content/skill-reach-definition.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/battle/status-event-log.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m src/battle/interactive-battle-runner.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 257[2mms[22m[39m
+ [32m✓[39m src/content/status-resistance.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/ui/battle-replay.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 4173[2mms[22m[39m
+   [33m[2m✓[22m[39m minimal battle UI replay model[2m > [22mproduces identical replay frames across repeated fresh runs [33m 3714[2mms[22m[39m
+ [32m✓[39m src/battle/time-manipulation.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/ui/battle-result-view.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 241[2mms[22m[39m
+ [32m✓[39m src/battle/movement-stat-modifiers.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/content/attribute.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [31m❯[39m src/battle/interactive-battle-stable-snapshot.test.ts [2m([22m[2m3 tests[22m[2m | [22m[31m2 failed[39m[2m)[22m[32m 149[2mms[22m[39m
+[31m   [31m×[31m interactive battle stable snapshots[2m > [22mround-trips through JSON and resumes to the same deterministic result[39m[32m 103[2mms[22m[39m
+[31m     → expected { snapshotVersion: 1, …(13) } to deeply equal { snapshotVersion: 1, …(13) }[39m
+[31m   [31m×[31m interactive battle stable snapshots[2m > [22mpreserves a pending request for the next ally manual action[39m[32m 35[2mms[22m[39m
+[31m     → expected { …(9) } to deeply equal { …(9) }[39m
+   [32m✓[39m interactive battle stable snapshots[2m > [22mrefuses to capture the partially processed manual selection state[32m 9[2mms[22m[39m
+ [32m✓[39m src/battle/headless-battle-runner.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 3786[2mms[22m[39m
+   [33m[2m✓[22m[39m headless battle runner[2m > [22mreturns byte-identical JSON for repeated fresh executions [33m 3488[2mms[22m[39m
+ [32m✓[39m src/content/monster-species.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/battle/barrier-guard-event-log.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 24[2mms[22m[39m
+ [32m✓[39m src/save/local-save-settings.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/content/skill-telegraph-definition.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/progression/stage-battle.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 1746[2mms[22m[39m
+   [33m[2m✓[22m[39m instant stage simulation[2m > [22mreuses the headless runner and produces byte-identical deterministic results [33m 1739[2mms[22m[39m
+ [32m✓[39m src/toolchain.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/ui/minimal-battle-speed.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/demo/ai-regression-benchmark.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 858[2mms[22m[39m
+   [33m[2m✓[22m[39m AI regression benchmark[2m > [22mreturns byte-identical benchmark JSON for 100 runs [33m 801[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 2 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m src/battle/interactive-battle-stable-snapshot.test.ts[2m > [22minteractive battle stable snapshots[2m > [22mround-trips through JSON and resumes to the same deterministic result
+[31m[1mAssertionError[22m: expected { snapshotVersion: 1, …(13) } to deeply equal { snapshotVersion: 1, …(13) }[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[33m@@ -300,26 +300,26 @@[39m
+[2m          "value": 0,[22m
+[2m        },[22m
+[2m        {[22m
+[2m          "id": "attack.overkill-penalty",[22m
+[2m          "priority": 12,[22m
+[32m-         "value": -0,[39m
+[31m+         "value": 0,[39m
+[2m        },[22m
+[2m        {[22m
+[2m          "id": "attack.heavy-skill-waste-penalty",[22m
+[2m          "priority": 13,[22m
+[32m-         "value": -0,[39m
+[31m+         "value": 0,[39m
+[2m        },[22m
+[2m        {[22m
+[2m          "id": "support.actual-healing",[22m
+[2m          "priority": 20,[22m
+[2m          "value": 0,[22m
+[2m        },[22m
+[2m        {[22m
+[2m          "id": "support.overheal-penalty",[22m
+[2m          "priority": 21,[22m
+[32m-         "value": -0,[39m
+[31m+         "value": 0,[39m
+[2m        },[22m
+[2m        {[22m
+[2m          "id": "support.rescue-before-enemy-action",[22m
+[2m          "priority": 22,[22m
+[2m          "value": 0,[22m
+[33m@@ -350,16 +350,16 @@[39m
+[2m          "value": 0,[22m
+[2m        },[22m
+[2m        {[22m
+[2m          "id": "position.static-danger-penalty",[22m
+[2m          "priority": 33,[22m
+[32m-         "value": -0,[39m
+[31m+         "value": 0,[39m
+[2m        },[22m
+[2m        {[22m
+[2m          "id": "position.backtrack-penalty",[22m
+[2m          "priority": 34,[22m
+[32m-         "value": -0,[39m
+[31m+         "value": 0,[39m
+[2m        },[22m
+[2m        {[22m
+[2m          "id": "telegraph.response",[22m
+[2m          "priority": 40,[22m
+[2m          "value": 0,[22m
+
+[36m [2m❯[22m src/battle/interactive-battle-stable-snapshot.test.ts:[2m18:42[22m[39m
+    [90m 16| [39m    const restored = createInteractiveBattleRunner(STANDARD_HEADLESS_B…
+    [90m 17| [39m
+    [90m 18| [39m    [34mexpect[39m(restored[33m.[39m[34mgetStableSnapshot[39m())[33m.[39m[34mtoEqual[39m(stable)
+    [90m   | [39m                                         [31m^[39m
+    [90m 19| [39m    [34mrunUntilTerminal[39m(original)
+    [90m 20| [39m    [34mrunUntilTerminal[39m(restored)
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m src/battle/interactive-battle-stable-snapshot.test.ts[2m > [22minteractive battle stable snapshots[2m > [22mpreserves a pending request for the next ally manual action
+[31m[1mAssertionError[22m: expected { …(9) } to deeply equal { …(9) }[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[33m@@ -278,26 +278,26 @@[39m
+[2m          "value": 0,[22m
+[2m        },[22m
+[2m        {[22m
+[2m          "id": "attack.overkill-penalty",[22m
+[2m          "priority": 12,[22m
+[32m-         "value": -0,[39m
+[31m+         "value": 0,[39m
+[2m        },[22m
+[2m        {[22m
+[2m          "id": "attack.heavy-skill-waste-penalty",[22m
+[2m          "priority": 13,[22m
+[32m-         "value": -0,[39m
+[31m+         "value": 0,[39m
+[2m        },[22m
+[2m        {[22m
+[2m          "id": "support.actual-healing",[22m
+[2m          "priority": 20,[22m
+[2m          "value": 0,[22m
+[2m        },[22m
+[2m        {[22m
+[2m          "id": "support.overheal-penalty",[22m
+[2m          "priority": 21,[22m
+[32m-         "value": -0,[39m
+[31m+         "value": 0,[39m
+[2m        },[22m
+[2m        {[22m
+[2m          "id": "support.rescue-before-enemy-action",[22m
+[2m          "priority": 22,[22m
+[2m          "value": 0,[22m
+[33m@@ -328,16 +328,16 @@[39m
+[2m          "value": 0,[22m
+[2m        },[22m
+[2m        {[22m
+[2m          "id": "position.static-danger-penalty",[22m
+[2m          "priority": 33,[22m
+[32m-         "value": -0,[39m
+[31m+         "value": 0,[39m
+[2m        },[22m
+[2m        {[22m
+[2m          "id": "position.backtrack-penalty",[22m
+[2m          "priority": 34,[22m
+[32m-         "value": -0,[39m
+[31m+         "value": 0,[39m
+[2m        },[22m
+[2m        {[22m
+[2m          "id": "telegraph.response",[22m
+[2m          "priority": 40,[22m
+[2m          "value": 0,[22m
+
+[36m [2m❯[22m src/battle/interactive-battle-stable-snapshot.test.ts:[2m42:19[22m[39m
+    [90m 40| [39m    }
+    [90m 41| [39m
+    [90m 42| [39m    [34mexpect[39m(right)[33m.[39m[34mtoEqual[39m(left)
+    [90m   | [39m                  [31m^[39m
+    [90m 43| [39m    [34mexpect[39m(right[33m.[39mstatus)[33m.[39m[34mtoBe[39m([32m'AWAITING_MANUAL_ACTION'[39m)
+    [90m 44| [39m  })
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m69 passed[39m[22m[90m (70)[39m
+[2m      Tests [22m [1m[31m2 failed[39m[22m[2m | [22m[1m[32m395 passed[39m[22m[90m (397)[39m
+[2m   Start at [22m 17:31:41
+[2m   Duration [22m 16.83s[2m (transform 2.21s, setup 0ms, collect 7.57s, tests 18.55s, environment 16ms, prepare 7.94s)[22m
+
+
+::error file=/home/runner/work/Summon-unit/Summon-unit/src/battle/interactive-battle-stable-snapshot.test.ts,title=src/battle/interactive-battle-stable-snapshot.test.ts > interactive battle stable snapshots > round-trips through JSON and resumes to the same deterministic result,line=18,column=42::AssertionError: expected { snapshotVersion: 1, …(13) } to deeply equal { snapshotVersion: 1, …(13) }%0A%0A- Expected%0A+ Received%0A%0A@@ -300,26 +300,26 @@%0A          "value": 0,%0A        },%0A        {%0A          "id": "attack.overkill-penalty",%0A          "priority": 12,%0A-         "value": -0,%0A+         "value": 0,%0A        },%0A        {%0A          "id": "attack.heavy-skill-waste-penalty",%0A          "priority": 13,%0A-         "value": -0,%0A+         "value": 0,%0A        },%0A        {%0A          "id": "support.actual-healing",%0A          "priority": 20,%0A          "value": 0,%0A        },%0A        {%0A          "id": "support.overheal-penalty",%0A          "priority": 21,%0A-         "value": -0,%0A+         "value": 0,%0A        },%0A        {%0A          "id": "support.rescue-before-enemy-action",%0A          "priority": 22,%0A          "value": 0,%0A@@ -350,16 +350,16 @@%0A          "value": 0,%0A        },%0A        {%0A          "id": "position.static-danger-penalty",%0A          "priority": 33,%0A-         "value": -0,%0A+         "value": 0,%0A        },%0A        {%0A          "id": "position.backtrack-penalty",%0A          "priority": 34,%0A-         "value": -0,%0A+         "value": 0,%0A        },%0A        {%0A          "id": "telegraph.response",%0A          "priority": 40,%0A          "value": 0,%0A%0A ❯ src/battle/interactive-battle-stable-snapshot.test.ts:18:42%0A%0A
+
+::error file=/home/runner/work/Summon-unit/Summon-unit/src/battle/interactive-battle-stable-snapshot.test.ts,title=src/battle/interactive-battle-stable-snapshot.test.ts > interactive battle stable snapshots > preserves a pending request for the next ally manual action,line=42,column=19::AssertionError: expected { …(9) } to deeply equal { …(9) }%0A%0A- Expected%0A+ Received%0A%0A@@ -278,26 +278,26 @@%0A          "value": 0,%0A        },%0A        {%0A          "id": "attack.overkill-penalty",%0A          "priority": 12,%0A-         "value": -0,%0A+         "value": 0,%0A        },%0A        {%0A          "id": "attack.heavy-skill-waste-penalty",%0A          "priority": 13,%0A-         "value": -0,%0A+         "value": 0,%0A        },%0A        {%0A          "id": "support.actual-healing",%0A          "priority": 20,%0A          "value": 0,%0A        },%0A        {%0A          "id": "support.overheal-penalty",%0A          "priority": 21,%0A-         "value": -0,%0A+         "value": 0,%0A        },%0A        {%0A          "id": "support.rescue-before-enemy-action",%0A          "priority": 22,%0A          "value": 0,%0A@@ -328,16 +328,16 @@%0A          "value": 0,%0A        },%0A        {%0A          "id": "position.static-danger-penalty",%0A          "priority": 33,%0A-         "value": -0,%0A+         "value": 0,%0A        },%0A        {%0A          "id": "position.backtrack-penalty",%0A          "priority": 34,%0A-         "value": -0,%0A+         "value": 0,%0A        },%0A        {%0A          "id": "telegraph.response",%0A          "priority": 40,%0A          "value": 0,%0A%0A ❯ src/battle/interactive-battle-stable-snapshot.test.ts:42:19%0A%0A
+ ELIFECYCLE  Test failed. See above for more details.
