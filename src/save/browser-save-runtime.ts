@@ -11,7 +11,9 @@ import {
   listSaveSlotSummaries,
   loadSaveSlot,
   savePlayerDataAtomic,
+  type LoadSaveSlotOptions,
   type SaveRepository,
+  type SaveSlotMigrationReceipt,
 } from './save-repository'
 
 let generationSequence = 0
@@ -24,6 +26,24 @@ export function createRuntimeSaveGenerationId(
   return `${slotId}:generation:${savedAtEpochMs}:${generationSequence}`
 }
 
+interface BrowserMigrationGenerationInput {
+  readonly slotId: SaveSlotId
+  readonly savedAtEpochMs: number
+}
+
+export function createBrowserLoadSaveOptions(
+  now: () => number = Date.now,
+): LoadSaveSlotOptions {
+  return Object.freeze({
+    now,
+    createMigrationGenerationId: ({
+      slotId,
+      savedAtEpochMs,
+    }: BrowserMigrationGenerationInput) =>
+      createRuntimeSaveGenerationId(slotId, savedAtEpochMs),
+  })
+}
+
 export function createBrowserSaveRepository(): IndexedDbSaveRepository | null {
   return isIndexedDbAvailable() ? new IndexedDbSaveRepository() : null
 }
@@ -34,6 +54,7 @@ export interface BrowserSaveBootstrapResult {
   readonly summaries: readonly SaveSlotSummary[]
   readonly createdInitialSave: boolean
   readonly recoveredFromBackup: boolean
+  readonly migration: SaveSlotMigrationReceipt | null
 }
 
 export async function bootstrapBrowserSaveSystem(input: {
@@ -44,15 +65,18 @@ export async function bootstrapBrowserSaveSystem(input: {
   readonly now?: () => number
 }): Promise<BrowserSaveBootstrapResult> {
   const now = input.now ?? Date.now
+  const loadOptions = createBrowserLoadSaveOptions(now)
   const settings = loadLocalSaveSettings(input.storage)
   const loaded = await loadSaveSlot(
     input.repository,
     settings.activeSlotId,
     input.catalog,
+    loadOptions,
   )
   let playerData: PlayerData
   let createdInitialSave = false
   let recoveredFromBackup = false
+  let migration: SaveSlotMigrationReceipt | null = null
   if (loaded === null) {
     const savedAtEpochMs = now()
     const saved = await savePlayerDataAtomic(
@@ -70,13 +94,19 @@ export async function bootstrapBrowserSaveSystem(input: {
   } else {
     playerData = loaded.playerData
     recoveredFromBackup = loaded.recoveredFromBackup
+    migration = loaded.migration
   }
-  const summaries = await listSaveSlotSummaries(input.repository, input.catalog)
+  const summaries = await listSaveSlotSummaries(
+    input.repository,
+    input.catalog,
+    loadOptions,
+  )
   return Object.freeze({
     playerData,
     settings: settings ?? DEFAULT_LOCAL_SAVE_SETTINGS,
     summaries,
     createdInitialSave,
     recoveredFromBackup,
+    migration,
   })
 }

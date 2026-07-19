@@ -1,11 +1,19 @@
 import type { PlayerData, PlayerDataContentCatalog } from '../progression/player-data'
 import {
+  DEFAULT_PLAYER_DATA_MIGRATION_PLAN,
+  getPlayerDataSchemaVersion,
+  migratePlayerDataToCurrent,
+  type AppliedPlayerDataMigration,
+  type PlayerDataMigrationPlan,
+} from './save-migration'
+import {
   MAX_SAVE_BACKUP_GENERATIONS,
   SAVE_SLOT_IDS,
   createCommittedSaveGeneration,
   createEmptySaveSlotSummary,
   createSaveGenerationRecord,
   createSaveSlotSummary,
+  validateSaveGenerationEnvelope,
   validateSaveGenerationRecord,
   type SaveGenerationRecord,
   type SaveSlotId,
@@ -22,6 +30,7 @@ export interface SaveRepository {
     readonly slotId: SaveSlotId
     readonly generationId: string
     readonly maximumBackupGenerations: number
+    readonly preferredBackupGenerationId?: string
   }): Promise<SaveSlotPointer>
   deleteGeneration(generationId: string): Promise<void>
   deleteSlot(slotId: SaveSlotId): Promise<void>
@@ -31,6 +40,7 @@ export interface SavePlayerDataAtomicInput {
   readonly slotId: SaveSlotId
   readonly generationId: string
   readonly savedAtEpochMs: number
+  readonly preferredBackupGenerationId?: string
 }
 
 export interface SavePlayerDataAtomicResult {
@@ -39,11 +49,45 @@ export interface SavePlayerDataAtomicResult {
   readonly pointer: SaveSlotPointer
 }
 
+export interface SaveSlotMigrationReceipt {
+  readonly sourceGenerationId: string
+  readonly backupGenerationId: string
+  readonly fromSchemaVersion: number
+  readonly toSchemaVersion: number
+  readonly appliedMigrations: readonly AppliedPlayerDataMigration[]
+}
+
 export interface LoadSaveSlotResult {
   readonly playerData: PlayerData
   readonly record: SaveGenerationRecord
   readonly pointer: SaveSlotPointer
   readonly recoveredFromBackup: boolean
+  readonly migration: SaveSlotMigrationReceipt | null
+}
+
+export interface LoadSaveSlotOptions {
+  readonly migrationPlan?: PlayerDataMigrationPlan
+  readonly now?: () => number
+  readonly createMigrationGenerationId?: (input: {
+    readonly slotId: SaveSlotId
+    readonly savedAtEpochMs: number
+    readonly sourceGenerationId: string
+    readonly fromSchemaVersion: number
+    readonly toSchemaVersion: number
+  }) => string
+}
+
+let migrationGenerationSequence = 0
+
+function createDefaultMigrationGenerationId(input: {
+  readonly slotId: SaveSlotId
+  readonly savedAtEpochMs: number
+  readonly sourceGenerationId: string
+  readonly fromSchemaVersion: number
+  readonly toSchemaVersion: number
+}): string {
+  migrationGenerationSequence += 1
+  return `${input.slotId}:migration:${input.savedAtEpochMs}:${input.fromSchemaVersion}-${input.toSchemaVersion}:${migrationGenerationSequence}`
 }
 
 export async function savePlayerDataAtomic(
@@ -77,6 +121,7 @@ export async function savePlayerDataAtomic(
       slotId: input.slotId,
       generationId: temporary.generationId,
       maximumBackupGenerations: MAX_SAVE_BACKUP_GENERATIONS,
+      preferredBackupGenerationId: input.preferredBackupGenerationId,
     })
     committed = true
     if (pointer.currentGenerationId !== verified.generationId) {
@@ -91,35 +136,87 @@ export async function savePlayerDataAtomic(
   }
 }
 
+function validateCommittedEnvelope(
+  record: SaveGenerationRecord,
+  slotId: SaveSlotId,
+): SaveGenerationRecord {
+  const envelope = validateSaveGenerationEnvelope(record)
+  if (envelope.state !== 'COMMITTED') throw new Error('not committed')
+  if (envelope.slotId !== slotId) throw new Error(`belongs to ${envelope.slotId}`)
+  return envelope
+}
+
 export async function loadSaveSlot(
   repository: SaveRepository,
   slotId: SaveSlotId,
   catalog: PlayerDataContentCatalog,
+  options: LoadSaveSlotOptions = {},
 ): Promise<LoadSaveSlotResult | null> {
   const pointer = await repository.readSlotPointer(slotId)
   if (pointer === null) return null
+  const migrationPlan = options.migrationPlan ?? DEFAULT_PLAYER_DATA_MIGRATION_PLAN
+  const now = options.now ?? Date.now
+  const createMigrationGenerationId =
+    options.createMigrationGenerationId ?? createDefaultMigrationGenerationId
   const generationIds = [pointer.currentGenerationId, ...pointer.backupGenerationIds]
   const failures: string[] = []
+
   for (let index = 0; index < generationIds.length; index += 1) {
     const generationId = generationIds[index]
-    const record = await repository.readGeneration(generationId)
-    if (record === null) {
+    const stored = await repository.readGeneration(generationId)
+    if (stored === null) {
       failures.push(`${generationId}: missing`)
       continue
     }
     try {
-      const validated = validateSaveGenerationRecord(record, catalog)
-      if (validated.state !== 'COMMITTED') {
-        throw new Error('not committed')
+      const envelope = validateCommittedEnvelope(stored, slotId)
+      const sourceSchemaVersion = getPlayerDataSchemaVersion(envelope.playerData)
+      if (sourceSchemaVersion === migrationPlan.targetSchemaVersion) {
+        const validated = validateSaveGenerationRecord(envelope, catalog)
+        return Object.freeze({
+          playerData: validated.playerData,
+          record: validated,
+          pointer,
+          recoveredFromBackup: index > 0,
+          migration: null,
+        })
       }
-      if (validated.slotId !== slotId) {
-        throw new Error(`belongs to ${validated.slotId}`)
-      }
+
+      const migrated = migratePlayerDataToCurrent(
+        envelope.playerData,
+        catalog,
+        migrationPlan,
+      )
+      const savedAtEpochMs = now()
+      const saved = await savePlayerDataAtomic(
+        repository,
+        migrated.playerData,
+        catalog,
+        {
+          slotId,
+          generationId: createMigrationGenerationId({
+            slotId,
+            savedAtEpochMs,
+            sourceGenerationId: envelope.generationId,
+            fromSchemaVersion: migrated.originalSchemaVersion,
+            toSchemaVersion: migrationPlan.targetSchemaVersion,
+          }),
+          savedAtEpochMs,
+          preferredBackupGenerationId: envelope.generationId,
+        },
+      )
       return Object.freeze({
-        playerData: validated.playerData,
-        record: validated,
-        pointer,
+        playerData: saved.playerData,
+        record: saved.record,
+        pointer: saved.pointer,
         recoveredFromBackup: index > 0,
+        migration: Object.freeze({
+          sourceGenerationId: envelope.generationId,
+          backupGenerationId: envelope.generationId,
+          fromSchemaVersion: migrated.originalSchemaVersion,
+          toSchemaVersion: migrationPlan.targetSchemaVersion,
+          appliedMigrations: migrated.appliedMigrations,
+        }),
       })
     } catch (error) {
       failures.push(`${generationId}: ${error instanceof Error ? error.message : String(error)}`)
@@ -131,10 +228,11 @@ export async function loadSaveSlot(
 export async function listSaveSlotSummaries(
   repository: SaveRepository,
   catalog: PlayerDataContentCatalog,
+  options: LoadSaveSlotOptions = {},
 ): Promise<readonly SaveSlotSummary[]> {
   const summaries = await Promise.all(
     SAVE_SLOT_IDS.map(async (slotId) => {
-      const loaded = await loadSaveSlot(repository, slotId, catalog)
+      const loaded = await loadSaveSlot(repository, slotId, catalog, options)
       return loaded === null
         ? createEmptySaveSlotSummary(slotId)
         : createSaveSlotSummary({
