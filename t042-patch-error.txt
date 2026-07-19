@@ -1,1 +1,0 @@
-pattern not found in src/battle/interactive-battle-runner.ts: '      this.setBossActionSkills(this.bossPhase.actionSkillIds)\n  }\n}\n\ngetSnapshot(): InteractiveBattl'
