@@ -4,12 +4,10 @@ on:
   pull_request:
     branches:
       - main
-  push:
-    branches:
-      - agent/t037-research-ui-facility
 
 permissions:
   contents: read
+  pull-requests: write
 
 jobs:
   build:
@@ -25,9 +23,19 @@ jobs:
         run: pnpm install --no-frozen-lockfile >/dev/null
       - name: Concise build diagnostics
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set +e
           pnpm build > build.log 2>&1
           status=$?
-          tail -n 100 build.log
+          if [ "$status" -ne 0 ]; then
+            {
+              echo '### T037 concise build diagnostics'
+              echo '```text'
+              tail -n 100 build.log
+              echo '```'
+            } > build-comment.md
+            gh pr comment "${{ github.event.pull_request.number }}" --body-file build-comment.md
+          fi
           exit $status
