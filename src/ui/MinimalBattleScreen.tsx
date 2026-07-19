@@ -31,7 +31,14 @@ import { MobileDisclosure } from './MobileDisclosure'
 
 const STEP_MS = 420
 
-type BattleSpeed = 1 | 2 | 4
+export type BattleSpeed = 1 | 2 | 4 | 8
+
+const STANDARD_BATTLE_SPEEDS: readonly BattleSpeed[] = Object.freeze([1, 2, 4])
+const CLEARED_BATTLE_SPEEDS: readonly BattleSpeed[] = Object.freeze([1, 2, 4, 8])
+
+export function getBattleSpeedOptions(allowFastMode: boolean): readonly BattleSpeed[] {
+  return allowFastMode ? CLEARED_BATTLE_SPEEDS : STANDARD_BATTLE_SPEEDS
+}
 
 const MOTION_LABELS: Readonly<Record<BattleMotionLevel, string>> = Object.freeze({
   STANDARD: '標準',
@@ -109,6 +116,7 @@ function statusLabel(
 
 export interface MinimalBattleScreenProps {
   readonly definition?: HeadlessBattleDefinition
+  readonly allowFastMode?: boolean
   readonly onOpenFormation?: () => void
   readonly onOpenResearch?: () => void
   readonly onNextStage?: () => void
@@ -121,6 +129,7 @@ export interface MinimalBattleScreenProps {
 
 export function MinimalBattleScreen({
   definition = STANDARD_INTERACTIVE_BATTLE,
+  allowFastMode = false,
   onOpenFormation,
   onOpenResearch,
   onNextStage,
@@ -143,6 +152,10 @@ export function MinimalBattleScreen({
     setSnapshot(runner.getSnapshot())
     return runner.subscribe(setSnapshot)
   }, [runner])
+
+  useEffect(() => {
+    if (!allowFastMode && speed === 8) setSpeed(4)
+  }, [allowFastMode, speed])
 
   const isTerminal =
     snapshot.status === 'BATTLE_ENDED' || snapshot.status === 'ACTION_LIMIT_REACHED'
@@ -263,7 +276,7 @@ export function MinimalBattleScreen({
     const message: Readonly<Record<Exclude<BattleResultNavigationAction, 'RETRY'>, string>> = {
       FORMATION: '編成画面への導線が設定されていません。',
       RESEARCH: '研究画面への導線が設定されていません。',
-      NEXT_STAGE: '次ステージ選択はT039で地域画面へ接続します。',
+      NEXT_STAGE: '地域・ステージ画面への導線が設定されていません。',
     }
     setNavigationNotice(message[action])
   }
@@ -318,7 +331,7 @@ export function MinimalBattleScreen({
         </button>
         <div className="speed-control" aria-label="AUTO速度">
           <span>速度</span>
-          {([1, 2, 4] as const).map((candidate) => (
+          {getBattleSpeedOptions(allowFastMode).map((candidate) => (
             <button
               key={candidate}
               type="button"
@@ -329,6 +342,7 @@ export function MinimalBattleScreen({
               ×{candidate}
             </button>
           ))}
+          {allowFastMode && <small className="battle-fast-mode-label">クリア済み</small>}
         </div>
         <div className="motion-control" role="group" aria-label="演出レベル">
           <span>演出</span>
