@@ -4,10 +4,8 @@ import {
   type HeadlessBattleRunResult,
 } from '../battle/headless-battle-runner'
 import type { MonsterSpecies } from '../content/monster-species'
-import {
-  VERTICAL_SLICE_T046_STAGE_RECORDS,
-  VERTICAL_SLICE_T046_WORLD_CATALOG,
-} from '../content/vertical-slice-t046'
+import { VERTICAL_SLICE_T046_BALANCED_CATALOG } from '../content/vertical-slice-t046-balanced-master'
+import { VERTICAL_SLICE_T046_STAGE_RECORDS } from '../content/vertical-slice-t046'
 import type { VerticalSliceStageRecord } from '../content/vertical-slice-world'
 import {
   VERTICAL_SLICE_BALANCE_MAX_ACTIONS,
@@ -64,8 +62,8 @@ function definitionFor(record: VerticalSliceStageRecord, profileId: string): Hea
   )
   if (profile === undefined) throw new Error(`unknown benchmark profile: ${profileId}`)
   return Object.freeze({
-    species: VERTICAL_SLICE_T046_WORLD_CATALOG.species,
-    skills: VERTICAL_SLICE_T046_WORLD_CATALOG.skills,
+    species: VERTICAL_SLICE_T046_BALANCED_CATALOG.species,
+    skills: VERTICAL_SLICE_T046_BALANCED_CATALOG.skills,
     units: Object.freeze([...profile.units, ...record.definition.enemyFormation.units]),
     aiConfigurations: Object.freeze({
       ...record.definition.enemyFormation.aiConfigurations,
