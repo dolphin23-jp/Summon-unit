@@ -5,12 +5,14 @@ import { createBattleState } from '../battle/defeat-and-victory'
 import { createOccupyingBoardObjectState } from '../battle/occupying-board-object'
 import { createBattleUnitState } from '../battle/unit-state'
 import {
+  compareAiActionEvaluations,
   composeAiScore,
   enumerateAiActionCandidates,
   evaluateAiActionCandidates,
   evaluateAiActionPreview,
   previewAiActionCandidate,
   selectBestAiActionEvaluation,
+  type AiActionEvaluation,
   type AiActionResultPreview,
   type AiEvaluationInput,
   type AiPreviewScorer,
@@ -171,6 +173,13 @@ function findSkillCandidate(
   return candidate
 }
 
+function overrideEvaluation(
+  base: AiActionEvaluation,
+  overrides: Partial<AiActionEvaluation>,
+): AiActionEvaluation {
+  return Object.freeze({ ...base, ...overrides })
+}
+
 describe('AI action evaluation foundation', () => {
   it('enumerates skill-target and movement candidates in a stable order', () => {
     const input = createInput()
@@ -284,7 +293,7 @@ describe('AI action evaluation foundation', () => {
     })
   })
 
-  it('evaluates pluggable scorers and uses fixed candidate tie rules', () => {
+  it('evaluates pluggable scorers and follows the documented fixed tie hierarchy', () => {
     const input = createInput()
     const scorers: readonly AiPreviewScorer[] = Object.freeze([
       Object.freeze({
@@ -308,16 +317,63 @@ describe('AI action evaluation foundation', () => {
     ])
 
     const tied = evaluateAiActionCandidates(input, [])
-    expect(tied[0]?.preview.kind).toBe('USE_SKILL')
-    expect(tied.map((evaluation) => evaluation.tieBreakKey)).toEqual(
-      [...tied.map((evaluation) => evaluation.tieBreakKey)].sort((left, right) => {
-        const leftKind = left.startsWith('skill:') ? 0 : 1
-        const rightKind = right.startsWith('skill:') ? 0 : 1
-        return leftKind !== rightKind
-          ? leftKind - rightKind
-          : left.localeCompare(right)
-      }),
-    )
+    const cheapest = tied[0]
+    expect(cheapest?.actionCost).toBe(60)
+    expect(cheapest?.preview.kind).toBe('USE_SKILL')
+    if (cheapest === undefined) {
+      throw new Error('expected a tied evaluation')
+    }
+
+    const common = {
+      score: composeAiScore([]),
+      actionCost: 80,
+      defeatsTarget: false,
+      targetHpRatioNumerator: 1,
+      targetHpRatioDenominator: 2,
+      boardPriority: 5,
+      tieBreakKey: 'candidate.b',
+    } satisfies Partial<AiActionEvaluation>
+    const baseline = overrideEvaluation(cheapest, common)
+
+    expect(
+      compareAiActionEvaluations(
+        overrideEvaluation(baseline, { score: composeAiScore([{ id: 'x', priority: 0, value: 1 }]) }),
+        baseline,
+      ),
+    ).toBeLessThan(0)
+    expect(
+      compareAiActionEvaluations(
+        overrideEvaluation(baseline, { actionCost: 79 }),
+        baseline,
+      ),
+    ).toBeLessThan(0)
+    expect(
+      compareAiActionEvaluations(
+        overrideEvaluation(baseline, { defeatsTarget: true }),
+        baseline,
+      ),
+    ).toBeLessThan(0)
+    expect(
+      compareAiActionEvaluations(
+        overrideEvaluation(baseline, {
+          targetHpRatioNumerator: 1,
+          targetHpRatioDenominator: 3,
+        }),
+        baseline,
+      ),
+    ).toBeLessThan(0)
+    expect(
+      compareAiActionEvaluations(
+        overrideEvaluation(baseline, { boardPriority: 4 }),
+        baseline,
+      ),
+    ).toBeLessThan(0)
+    expect(
+      compareAiActionEvaluations(
+        overrideEvaluation(baseline, { tieBreakKey: 'candidate.a' }),
+        baseline,
+      ),
+    ).toBeLessThan(0)
   })
 
   it('returns byte-identical candidates, previews, and evaluations for 100 runs', () => {
