@@ -1,0 +1,31 @@
+name: T037 Debug Build
+
+on:
+  push:
+    branches:
+      - agent/t037-research-ui-facility
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Enable pnpm
+        run: corepack enable && corepack prepare pnpm@10.13.1 --activate
+      - name: Install quietly
+        run: pnpm install --frozen-lockfile --reporter=silent >/dev/null
+      - name: Concise build diagnostics
+        shell: bash
+        run: |
+          set +e
+          pnpm build > build.log 2>&1
+          status=$?
+          tail -n 100 build.log
+          exit $status
