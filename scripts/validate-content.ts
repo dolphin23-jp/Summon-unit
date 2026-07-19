@@ -1,3 +1,15 @@
-import { ACTIVE_CONTENT_VALIDATION } from '../src/content/runtime-content-validation'
+import {
+  ACTIVE_CONTENT_VALIDATION,
+  AUTHORED_VERTICAL_SLICE_CONTENT_VALIDATION,
+} from '../src/content/runtime-content-validation'
 
-console.log(JSON.stringify(ACTIVE_CONTENT_VALIDATION, null, 2))
+console.log(
+  JSON.stringify(
+    {
+      active: ACTIVE_CONTENT_VALIDATION,
+      verticalSlice: AUTHORED_VERTICAL_SLICE_CONTENT_VALIDATION,
+    },
+    null,
+    2,
+  ),
+)
