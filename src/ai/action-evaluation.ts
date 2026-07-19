@@ -1,6 +1,4 @@
-import {
-  getAttributeMultiplierPermille,
-} from '../content/attribute'
+import { getAttributeMultiplierPermille } from '../content/attribute'
 import {
   assertValidMonsterSpecies,
   type MonsterSpecies,
@@ -14,6 +12,7 @@ import {
   type SkillId,
 } from '../content/skill-definition'
 import {
+  ALL_BOARD_POSITIONS,
   getBoardPositionId,
   type BoardPosition,
 } from '../battle/board'
@@ -46,12 +45,12 @@ import {
   type BattleUnitState,
 } from '../battle/unit-state'
 
-export const AI_ACTION_KIND_PRIORITY = Object.freeze({
+const CANDIDATE_KIND_PRIORITY = Object.freeze({
   USE_SKILL: 0,
   MOVE: 1,
 } as const)
 
-export type AiActionKind = keyof typeof AI_ACTION_KIND_PRIORITY
+export type AiActionKind = keyof typeof CANDIDATE_KIND_PRIORITY
 
 export interface AiEvaluationInput {
   readonly battle: BattleState
@@ -142,11 +141,18 @@ export interface AiPreviewScorer {
 export interface AiActionEvaluation {
   readonly preview: AiActionResultPreview
   readonly score: AiScoreBreakdown
-  readonly kindPriority: number
+  readonly actionCost: number
+  readonly defeatsTarget: boolean
+  readonly targetHpRatioNumerator: number
+  readonly targetHpRatioDenominator: number
+  readonly boardPriority: number
   readonly tieBreakKey: string
 }
 
 const EMPTY_OBJECTS: readonly OccupyingBoardObjectState[] = Object.freeze([])
+const BOARD_POSITION_PRIORITY = new Map(
+  ALL_BOARD_POSITIONS.map((position, index) => [getBoardPositionId(position), index]),
+)
 
 function assertNonEmptyId(value: string, field: string): void {
   if (value.trim().length === 0) {
@@ -169,7 +175,7 @@ function compareIds(left: string, right: string): number {
 
 function compareCandidates(left: AiActionCandidate, right: AiActionCandidate): number {
   const kindDifference =
-    AI_ACTION_KIND_PRIORITY[left.kind] - AI_ACTION_KIND_PRIORITY[right.kind]
+    CANDIDATE_KIND_PRIORITY[left.kind] - CANDIDATE_KIND_PRIORITY[right.kind]
   return kindDifference !== 0
     ? kindDifference
     : compareIds(left.candidateId, right.candidateId)
@@ -389,7 +395,10 @@ function getSkillAffectedTargets(
 ): readonly BattleUnitState[] {
   const orderedIds =
     reach.reachMethod === 'PIERCE'
-      ? [...reach.traversedBattleUnitIds, ...area.targets.map((target) => target.battleUnitId)]
+      ? [
+          ...reach.traversedBattleUnitIds,
+          ...area.targets.map((target) => target.battleUnitId),
+        ]
       : area.targets.map((target) => target.battleUnitId)
   const seen = new Set<string>()
   const targets: BattleUnitState[] = []
@@ -533,7 +542,11 @@ function previewSkillCandidate(
   return Object.freeze({
     kind: 'USE_SKILL',
     candidate,
-    actionCost: skill.actionCost,
+    actionCost: getModifiedBattleStatValue(
+      skill.actionCost,
+      actor.effects,
+      'ACTION_COST',
+    ),
     affectedPositionIds: Object.freeze(
       area.positions.map((position) => getBoardPositionId(position)),
     ),
@@ -566,7 +579,11 @@ function previewMoveCandidate(
   return Object.freeze({
     kind: 'MOVE',
     candidate,
-    actionCost: NORMAL_MOVEMENT_ACTION_COST,
+    actionCost: getModifiedBattleStatValue(
+      NORMAL_MOVEMENT_ACTION_COST,
+      actor.effects,
+      'ACTION_COST',
+    ),
     affectedPositionIds: Object.freeze([
       getBoardPositionId(actor.position),
       getBoardPositionId(candidate.destination),
@@ -644,6 +661,46 @@ function validateScorers(
   return Object.freeze(ordered)
 }
 
+function getPrimaryTargetResult(
+  preview: AiActionResultPreview,
+): AiPredictedTargetResult | null {
+  if (preview.kind === 'MOVE' || preview.targetResults.length === 0) {
+    return null
+  }
+  const primaryBattleUnitId =
+    preview.reach.actualTargetBattleUnitId ??
+    preview.reach.selectedTargetBattleUnitId
+  if (primaryBattleUnitId !== null) {
+    const primary = preview.targetResults.find(
+      (result) => result.battleUnitId === primaryBattleUnitId,
+    )
+    if (primary !== undefined) {
+      return primary
+    }
+  }
+  return [...preview.targetResults].sort((left, right) => {
+    const leftScaled = BigInt(left.hpBefore) * BigInt(right.maxHp)
+    const rightScaled = BigInt(right.hpBefore) * BigInt(left.maxHp)
+    if (leftScaled !== rightScaled) {
+      return leftScaled < rightScaled ? -1 : 1
+    }
+    return compareIds(left.battleUnitId, right.battleUnitId)
+  })[0] ?? null
+}
+
+function getPreviewBoardPriority(preview: AiActionResultPreview): number {
+  const positionId =
+    preview.kind === 'MOVE'
+      ? preview.toPositionId
+      : preview.candidate.selectedTargetPosition === null
+        ? preview.affectedPositionIds[0]
+        : getBoardPositionId(preview.candidate.selectedTargetPosition)
+  if (positionId === undefined) {
+    return Number.MAX_SAFE_INTEGER
+  }
+  return BOARD_POSITION_PRIORITY.get(positionId) ?? Number.MAX_SAFE_INTEGER
+}
+
 export function evaluateAiActionPreview(
   preview: AiActionResultPreview,
   scorers: readonly AiPreviewScorer[],
@@ -658,12 +715,35 @@ export function evaluateAiActionPreview(
       value,
     })
   })
+  const primaryTarget = getPrimaryTargetResult(preview)
   return Object.freeze({
     preview,
     score: composeAiScore(components),
-    kindPriority: AI_ACTION_KIND_PRIORITY[preview.kind],
+    actionCost: preview.actionCost,
+    defeatsTarget:
+      preview.kind === 'USE_SKILL' &&
+      preview.defeatedTargetBattleUnitIds.length > 0,
+    targetHpRatioNumerator: primaryTarget?.hpBefore ?? 1,
+    targetHpRatioDenominator: primaryTarget?.maxHp ?? 1,
+    boardPriority: getPreviewBoardPriority(preview),
     tieBreakKey: preview.candidate.candidateId,
   })
+}
+
+function compareTargetHpRatio(
+  left: AiActionEvaluation,
+  right: AiActionEvaluation,
+): number {
+  const leftScaled =
+    BigInt(left.targetHpRatioNumerator) *
+    BigInt(right.targetHpRatioDenominator)
+  const rightScaled =
+    BigInt(right.targetHpRatioNumerator) *
+    BigInt(left.targetHpRatioDenominator)
+  if (leftScaled === rightScaled) {
+    return 0
+  }
+  return leftScaled < rightScaled ? -1 : 1
 }
 
 export function compareAiActionEvaluations(
@@ -673,8 +753,18 @@ export function compareAiActionEvaluations(
   if (left.score.total !== right.score.total) {
     return left.score.total > right.score.total ? -1 : 1
   }
-  if (left.kindPriority !== right.kindPriority) {
-    return left.kindPriority - right.kindPriority
+  if (left.actionCost !== right.actionCost) {
+    return left.actionCost - right.actionCost
+  }
+  if (left.defeatsTarget !== right.defeatsTarget) {
+    return left.defeatsTarget ? -1 : 1
+  }
+  const hpRatioDifference = compareTargetHpRatio(left, right)
+  if (hpRatioDifference !== 0) {
+    return hpRatioDifference
+  }
+  if (left.boardPriority !== right.boardPriority) {
+    return left.boardPriority - right.boardPriority
   }
   return compareIds(left.tieBreakKey, right.tieBreakKey)
 }
