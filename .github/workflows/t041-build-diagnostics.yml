@@ -3,12 +3,18 @@ name: T041 Build Diagnostics
 on:
   pull_request:
     branches: [main]
+    paths-ignore: [t041-build-error.txt]
+
+permissions:
+  contents: write
 
 jobs:
   build-diagnostics:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: agent/t041-save-migration-framework
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -16,9 +22,15 @@ jobs:
           corepack enable
           corepack prepare pnpm@10.13.1 --activate
       - run: pnpm install --no-frozen-lockfile
-      - name: Build with concise failure output
+      - name: Capture build failure
         run: |
-          pnpm build > /tmp/t041-build.log 2>&1 || {
-            tail -80 /tmp/t041-build.log
-            exit 1
-          }
+          set +e
+          pnpm build > /tmp/t041-build.log 2>&1
+          status=$?
+          tail -120 /tmp/t041-build.log > t041-build-error.txt
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add t041-build-error.txt
+          git commit -m "Capture T041 build diagnostics" || true
+          git push
+          exit $status
