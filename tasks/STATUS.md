@@ -39,5 +39,6 @@
 - [x] T037 — [研究UI・施設段階](T037_RESEARCH_UI_FACILITY.md)
 - [x] T038 — [ステージマスター・報酬・ボス拡張](T038_STAGE_REWARD_BOSS.md)
 - [x] T039 — [地域UI・高速化・進行通知](T039_REGION_UI_FAST_SIM_NOTIFICATIONS.md)
+- [x] T040 — [IndexedDB永続化](T040_INDEXEDDB_PERSISTENCE.md)
 
-T001～T039 complete. Next: T040.
+T001～T040 complete. Next: T041.

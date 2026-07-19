@@ -1,0 +1,163 @@
+import { SAVE_SLOT_IDS, type SaveSlotId, type SaveSlotSummary } from '../save/save-model'
+
+function formatSavedAt(epochMs: number | null): string {
+  if (epochMs === null) return '未保存'
+  return new Intl.DateTimeFormat('ja-JP', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  }).format(new Date(epochMs))
+}
+
+function slotNumber(slotId: SaveSlotId): string {
+  return slotId.split('-').at(-1) ?? slotId
+}
+
+export interface SaveSlotScreenProps {
+  readonly summaries: readonly SaveSlotSummary[]
+  readonly activeSlotId: SaveSlotId
+  readonly autosaveEnabled: boolean
+  readonly busy: boolean
+  readonly notice: string | null
+  readonly onSaveToSlot: (slotId: SaveSlotId) => void
+  readonly onLoadSlot: (slotId: SaveSlotId) => void
+  readonly onDeleteSlot: (slotId: SaveSlotId) => void
+  readonly onAutosaveChange: (enabled: boolean) => void
+  readonly onBack: () => void
+}
+
+export function SaveSlotScreen({
+  summaries,
+  activeSlotId,
+  autosaveEnabled,
+  busy,
+  notice,
+  onSaveToSlot,
+  onLoadSlot,
+  onDeleteSlot,
+  onAutosaveChange,
+  onBack,
+}: SaveSlotScreenProps) {
+  const summaryBySlot = new Map(summaries.map((summary) => [summary.slotId, summary]))
+
+  return (
+    <main className="save-app">
+      <header className="save-header collection-header">
+        <div>
+          <p className="eyebrow">SAVE REPOSITORY</p>
+          <h1>セーブスロット管理</h1>
+          <p>
+            PlayerDataはIndexedDBへ保存し、現在世代と最大3件のバックアップを保持します。
+          </p>
+        </div>
+        <button type="button" className="collection-button" onClick={onBack} disabled={busy}>
+          ゲームへ戻る
+        </button>
+      </header>
+
+      <section className="save-settings collection-panel" aria-labelledby="save-settings-title">
+        <div>
+          <p className="panel-heading__kicker">DEVICE SETTINGS</p>
+          <h2 id="save-settings-title">端末設定</h2>
+        </div>
+        <label className="save-autosave-toggle">
+          <input
+            type="checkbox"
+            checked={autosaveEnabled}
+            disabled={busy}
+            onChange={(event) => onAutosaveChange(event.target.checked)}
+          />
+          <span>
+            <strong>進行変更時に自動保存</strong>
+            <small>この設定と使用中スロットだけをlocalStorageへ保存します。</small>
+          </span>
+        </label>
+      </section>
+
+      {notice !== null && (
+        <p className="collection-notice save-notice" role="status">
+          {notice}
+        </p>
+      )}
+
+      <section className="save-slot-grid" aria-label="セーブスロット一覧">
+        {SAVE_SLOT_IDS.map((slotId) => {
+          const summary = summaryBySlot.get(slotId)
+          const empty = summary?.empty ?? true
+          const active = slotId === activeSlotId
+          return (
+            <article
+              key={slotId}
+              className={`save-slot-card collection-panel${active ? ' is-active' : ''}${empty ? ' is-empty' : ''}`}
+            >
+              <header className="save-slot-card__header">
+                <div>
+                  <p className="panel-heading__kicker">SAVE SLOT {slotNumber(slotId)}</p>
+                  <h2>スロット {slotNumber(slotId)}</h2>
+                </div>
+                <span className="save-slot-card__state">
+                  {active ? '使用中' : empty ? '空き' : '保存済み'}
+                </span>
+              </header>
+
+              {empty || summary === undefined ? (
+                <div className="save-slot-card__empty">
+                  <strong>保存データなし</strong>
+                  <p>現在の進行を保存すると、このスロットが使用中になります。</p>
+                </div>
+              ) : (
+                <>
+                  <dl className="save-slot-metadata">
+                    <div><dt>保存日時</dt><dd>{formatSavedAt(summary.savedAtEpochMs)}</dd></div>
+                    <div><dt>基本通貨</dt><dd>{summary.currency}</dd></div>
+                    <div><dt>研究データ</dt><dd>{summary.researchData}</dd></div>
+                    <div><dt>所持個体</dt><dd>{summary.ownedUnitCount}</dd></div>
+                    <div><dt>クリア</dt><dd>{summary.completedStageCount}ステージ</dd></div>
+                    <div><dt>バックアップ</dt><dd>{summary.backupCount}世代</dd></div>
+                    <div><dt>schema</dt><dd>{summary.schemaVersion}</dd></div>
+                    <div><dt>content</dt><dd>{summary.contentVersion}</dd></div>
+                  </dl>
+                  {summary.recoveredFromBackup && (
+                    <p className="save-recovery-warning" role="status">
+                      現在世代を検証できなかったため、バックアップ世代を表示しています。
+                    </p>
+                  )}
+                </>
+              )}
+
+              <div className="save-slot-card__actions">
+                <button
+                  type="button"
+                  className="collection-button collection-button--primary"
+                  disabled={busy}
+                  onClick={() => onSaveToSlot(slotId)}
+                >
+                  {empty ? '現在の進行を保存' : '現在の進行で上書き'}
+                </button>
+                <button
+                  type="button"
+                  className="collection-button"
+                  disabled={busy || empty || active}
+                  onClick={() => onLoadSlot(slotId)}
+                >
+                  {active ? '現在使用中' : 'このスロットをロード'}
+                </button>
+                <button
+                  type="button"
+                  className="collection-button collection-button--danger"
+                  disabled={busy || empty || active}
+                  onClick={() => onDeleteSlot(slotId)}
+                >
+                  {active ? '使用中は削除不可' : 'スロットを削除'}
+                </button>
+              </div>
+            </article>
+          )
+        })}
+      </section>
+    </main>
+  )
+}
