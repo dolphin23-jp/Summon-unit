@@ -138,11 +138,11 @@ export function assertValidBattleState(battle: BattleState): void {
 
   const allyCount = countUnitsOnSide(battle.units, 'ALLY')
   const enemyCount = countUnitsOnSide(battle.units, 'ENEMY')
-  if (allyCount < 1 || allyCount > 9) {
-    throw new Error('battle must contain between 1 and 9 ally units')
+  if (allyCount < 1) {
+    throw new Error('battle must contain at least one ally unit')
   }
-  if (enemyCount < 1 || enemyCount > 9) {
-    throw new Error('battle must contain between 1 and 9 enemy units')
+  if (enemyCount < 1) {
+    throw new Error('battle must contain at least one enemy unit')
   }
 
   const occupiedUnitIds = new Set<string>()
@@ -221,6 +221,15 @@ export function createBattleState(input: CreateBattleStateInput): BattleState {
     if (unit.defeated) {
       throw new Error('initial battle units must not be defeated')
     }
+  }
+
+  const allyCount = countUnitsOnSide(input.units, 'ALLY')
+  const enemyCount = countUnitsOnSide(input.units, 'ENEMY')
+  if (allyCount < 1 || allyCount > 9) {
+    throw new Error('battle must contain between 1 and 9 ally units')
+  }
+  if (enemyCount < 1 || enemyCount > 9) {
+    throw new Error('battle must contain between 1 and 9 enemy units')
   }
 
   const battle = freezeBattleState({
