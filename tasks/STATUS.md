@@ -17,5 +17,6 @@
 - [x] T015 — [最小盤面UI](T015_MINIMAL_BATTLE_UI.md)
 - [x] T016 — [効果フレームワーク骨格](T016_EFFECT_FRAMEWORK.md)
 - [x] T017 — [属性・バフデバフ・状態耐性](T017_ATTRIBUTES_BUFFS_RESISTANCE.md)
+- [ ] T018 — [状態異常一式](T018_STATUS_CONDITIONS.md)
 
-T001～T017 complete. Next: T018.
+T018 in progress.
