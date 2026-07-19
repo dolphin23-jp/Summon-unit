@@ -15,15 +15,22 @@
 - JSONエクスポート・インポート
 - 将来のクラウドはRepository Adapterで追加
 
+T040ではPlayerData全体をIndexedDBへ保存します。localStorageへ保存するのは使用中スロットIDと自動保存ON/OFFだけです。PlayerData、資源、研究、編成、地域進行はlocalStorageへ複製しません。
+
 ## セーブスロット
 
-最大3を基準とします。
+固定3スロットを使用します。
 
-各スロット:
+- `slot-1`
+- `slot-2`
+- `slot-3`
 
-- 現行
-- 直前バックアップ
-- 最大3世代候補
+各スロットは次を保持します。
+
+- 現在世代1件
+- 新しい順のバックアップ世代最大3件
+
+保存日時や世代IDは保存管理用メタデータであり、PlayerDataへ追加しません。スロット間でgenerationとpointerを共有しません。
 
 ## 経済
 
@@ -104,6 +111,17 @@ interface PlayerFacilityState {
 
 施設更新は基本通貨、研究データ、施設段階を一つの結果として返します。資源不足では段階だけを上げません。施設上限を超える試験・確定・開花研究は、資源・標本・研究状態を変更する前に拒否します。
 
+## ステージ進行
+
+T038～T039のPlayerDataは次を保存します。
+
+- クリア済み固定`stageId`
+- 精算済み固定`settlementId`
+- 地域ごとのポイント
+- 受取済み地域ポイント報酬ID
+
+地域名、ステージ名、敵編成、報酬定義、解放条件はセーブへ複製せず、`contentVersion`に対応するマスターを参照します。
+
 ## 戦闘中断
 
 戦闘は処理途中ではなく`stable`状態だけ保存します。
@@ -119,14 +137,49 @@ interface PlayerFacilityState {
 - defeat / revive counters
 - manual inputs
 
-処理中に終了した場合は直前のstableへ戻ります。
+処理中に終了した場合は直前のstableへ戻ります。T040はPlayerDataの永続化だけを扱い、戦闘中断スナップショットはT042で実装します。
+
+## generationレコード
+
+T040のIndexedDBはPlayerDataを直接スロットキーへ上書きしません。保存ごとに独立したgenerationレコードを作成します。
+
+```ts
+interface SaveGenerationRecord {
+  generationId: string;
+  slotId: 'slot-1' | 'slot-2' | 'slot-3';
+  savedAtEpochMs: number;
+  state: 'TEMPORARY' | 'COMMITTED';
+  checksum: string;
+  playerData: PlayerData;
+}
+```
+
+generationのPlayerDataは`createStagePlayerData`で経済、研究、施設、編成、ステージ進行まで再検証・正規化します。チェックサムは正規化済みPlayerDataから算出します。
+
+## slot pointer
+
+```ts
+interface SaveSlotPointer {
+  slotId: 'slot-1' | 'slot-2' | 'slot-3';
+  currentGenerationId: string;
+  backupGenerationIds: string[];
+  updatedAtEpochMs: number;
+}
+```
+
+`backupGenerationIds`は新しい順で最大3件です。currentが読めない、チェックサム不一致、PlayerData検証失敗の場合は、バックアップを新しい順に検証して最初の有効世代を復元します。
 
 ## アトミック保存
 
-1. 仮領域へ書く
-2. 整合性検証
-3. 現行ポインタ切替
-4. 旧現行をバックアップ
+1. 新generationを`TEMPORARY`として仮領域へ書く
+2. IndexedDBから再読込する
+3. PlayerData全体とチェックサムを検証する
+4. 単一のreadwrite transactionで次を確定する
+   - generationを`COMMITTED`へ変更
+   - current pointerを新generationへ切り替える
+   - 旧currentをバックアップ先頭へ移動する
+   - 最大数を超えた旧バックアップを削除する
+5. 検証またはtransactionが失敗した場合は仮generationを削除し、旧pointerを維持する
 
 資源だけ減って成果が増えない状態を保存しません。T034のメモリ内トランザクションは経済差分と解析度増加を一つの結果として返し、T035の試験研究は研究データ消費、判定結果、不正解署名、追加ヒントを一つのPlayerData結果として返します。
 
@@ -140,6 +193,18 @@ T036は次を一つのPlayerData結果として返します。
 
 T037は施設更新、および施設レア度ゲートを通過した試験・確定・開花研究について、施設状態を失わない一つのPlayerData結果を返します。
 
+T038～T039は勝敗、報酬、地域ポイント、解析度、研究ヒント、個体condition、二重精算防止IDを一つのPlayerData結果として返します。T040はその完成済みPlayerDataだけを世代単位で保存します。
+
+## 保存操作とUI
+
+- 起動時にlocalStorageの使用中スロットを読み、IndexedDBのcurrentを復元する
+- 使用中スロットが空の場合は初期PlayerDataを保存する
+- PlayerData変更時は自動保存要求を直列化する
+- 3スロットの保存日時、資源、所持個体数、クリア数、バージョン、バックアップ数を表示する
+- 空きスロットへの保存、上書き、ロード、非使用中スロット削除を行える
+- 使用中スロットは削除できない
+- IndexedDB未対応時はゲームを継続し、永続化不可を通知する
+
 ## バージョン
 
 - schemaVersion
@@ -150,9 +215,9 @@ migrationは1段階ずつ、変換前バックアップを保持します。T034
 
 T036は既存の経済、研究、種状態、個体、編成フィールドを更新するだけであり、新しいPlayerData保存フィールドを追加しません。このためschemaVersionは3のままです。
 
-T037デモは研究施設段階を追加するためschemaVersion 4を使用します。IndexedDB migrationは未実装ですが、メモリ内の旧入力は施設マスターがある場合に段階1へ補完します。
+T037デモは研究施設段階を追加するためschemaVersion 4を使用します。T038はステージ進行を追加しschemaVersion 5、T039デモは地域進行マスターとの接続に合わせてschemaVersion 6を使用します。
 
-IndexedDB永続化とJSON import/exportは未実装です。公開済みセーブの永続変換はまだ発生しません。
+T040はPlayerDataへ新しいゲーム進行フィールドを追加せず、外側へgenerationとslot pointerを追加します。このためデモPlayerDataのschemaVersionは6のままです。IndexedDB永続化は実装済みですが、旧schemaを一段ずつ変換するmigrationはT041、JSON import/exportはT042で実装します。
 
 ## コンテンツ変更
 
