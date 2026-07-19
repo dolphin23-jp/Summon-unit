@@ -18,7 +18,8 @@ jobs:
           if grep -q "INTERACTIVE_BATTLE_STABLE_SNAPSHOT_VERSION" src/battle/interactive-battle-runner.ts; then
             exit 0
           fi
-          python - <<'PY'
+          set +e
+          python - <<'PY' > /tmp/t042-patch.log 2>&1
           from pathlib import Path
           source = Path('.github/workflows/t042-integration-patch.yml').read_text()
           start_marker = "          python - <<'PY'\n"
@@ -29,6 +30,16 @@ jobs:
           script = '\n'.join(line[10:] if line.startswith('          ') else line for line in lines)
           exec(compile(script, 't042-embedded-patch.py', 'exec'))
           PY
+          status=$?
+          if [ $status -ne 0 ]; then
+            cp /tmp/t042-patch.log t042-patch-error.txt
+            git config user.name github-actions[bot]
+            git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+            git add t042-patch-error.txt
+            git commit -m "Capture T042 patch diagnostics" || true
+            git push
+            exit $status
+          fi
       - name: Commit integration
         run: |
           git config user.name github-actions[bot]
