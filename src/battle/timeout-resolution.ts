@@ -7,6 +7,8 @@ export const HP_RATIO_MICRO_SCALE = 1_000_000
 export const TIMEOUT_TIE_POLICIES = ['DRAW', 'ALLY_DEFEAT'] as const
 export type TimeoutTiePolicy = (typeof TIMEOUT_TIE_POLICIES)[number]
 
+type ComparedTimeoutOutcome = 'ALLY_VICTORY' | 'ALLY_DEFEAT'
+
 export type TimeoutDecisiveCriterion =
   | 'LIVING_UNIT_COUNT'
   | 'REMAINING_HP_RATIO'
@@ -117,7 +119,10 @@ function createSideMetrics(
   })
 }
 
-function compareMetric(allyValue: number, enemyValue: number): BattleOutcome | null {
+function compareMetric(
+  allyValue: number,
+  enemyValue: number,
+): ComparedTimeoutOutcome | null {
   if (allyValue === enemyValue) {
     return null
   }
