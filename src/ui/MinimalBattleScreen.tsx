@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { BattleOutcome } from '../battle/defeat-and-victory'
 import type { Side } from '../battle/board'
 import {
@@ -7,6 +7,7 @@ import {
   type HeadlessBattleRunResult,
   type InteractiveBattleRunner,
   type InteractiveBattleSnapshot,
+  type InteractiveBattleStableSnapshot,
   type InteractiveManualActionOption,
 } from '../battle/headless-battle-runner'
 import { STANDARD_INTERACTIVE_BATTLE } from '../demo/standard-headless-battle'
@@ -46,8 +47,11 @@ const MOTION_LABELS: Readonly<Record<BattleMotionLevel, string>> = Object.freeze
   MINIMAL: '最小',
 })
 
-function createRunner(definition: HeadlessBattleDefinition): InteractiveBattleRunner {
-  return createInteractiveBattleRunner(definition)
+function createRunner(
+  definition: HeadlessBattleDefinition,
+  stableSnapshot?: InteractiveBattleStableSnapshot,
+): InteractiveBattleRunner {
+  return createInteractiveBattleRunner(definition, stableSnapshot)
 }
 
 function getInitialMotionLevel(): BattleMotionLevel {
@@ -117,6 +121,12 @@ function statusLabel(
 export interface MinimalBattleScreenProps {
   readonly definition?: HeadlessBattleDefinition
   readonly allowFastMode?: boolean
+  readonly initialStableSnapshot?: InteractiveBattleStableSnapshot
+  readonly initialAttempt?: number
+  readonly onStableSnapshot?: (
+    snapshot: InteractiveBattleStableSnapshot,
+    attempt: number,
+  ) => void
   readonly onOpenFormation?: () => void
   readonly onOpenResearch?: () => void
   readonly onNextStage?: () => void
@@ -130,13 +140,18 @@ export interface MinimalBattleScreenProps {
 export function MinimalBattleScreen({
   definition = STANDARD_INTERACTIVE_BATTLE,
   allowFastMode = false,
+  initialStableSnapshot,
+  initialAttempt = 0,
+  onStableSnapshot,
   onOpenFormation,
   onOpenResearch,
   onNextStage,
   settleResult,
   onSettlement,
 }: MinimalBattleScreenProps) {
-  const [runner, setRunner] = useState(() => createRunner(definition))
+  const [runner, setRunner] = useState(() =>
+    createRunner(definition, initialStableSnapshot),
+  )
   const [snapshot, setSnapshot] = useState(() => runner.getSnapshot())
   const [autoRequested, setAutoRequested] = useState(false)
   const [speed, setSpeed] = useState<BattleSpeed>(1)
@@ -146,7 +161,12 @@ export function MinimalBattleScreen({
   const [motionLevel, setMotionLevel] = useState<BattleMotionLevel>(getInitialMotionLevel)
   const [navigationNotice, setNavigationNotice] = useState<string | null>(null)
   const [settlement, setSettlement] = useState<StageBattleSettlement | null>(null)
-  const [attempt, setAttempt] = useState(0)
+  const [attempt, setAttempt] = useState(initialAttempt)
+  const stableSnapshotCallbackRef = useRef(onStableSnapshot)
+
+  useEffect(() => {
+    stableSnapshotCallbackRef.current = onStableSnapshot
+  }, [onStableSnapshot])
 
   useEffect(() => {
     setSnapshot(runner.getSnapshot())
@@ -156,6 +176,11 @@ export function MinimalBattleScreen({
   useEffect(() => {
     if (!allowFastMode && speed === 8) setSpeed(4)
   }, [allowFastMode, speed])
+
+  useEffect(() => {
+    if (snapshot.status === 'AWAITING_MANUAL_ACTION') return
+    stableSnapshotCallbackRef.current?.(runner.getStableSnapshot(), attempt)
+  }, [attempt, runner, snapshot.manualAllyActionRequested, snapshot.status, snapshot.totalActions])
 
   const isTerminal =
     snapshot.status === 'BATTLE_ENDED' || snapshot.status === 'ACTION_LIMIT_REACHED'

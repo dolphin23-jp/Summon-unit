@@ -26,6 +26,8 @@ export interface SaveSlotScreenProps {
   readonly onLoadSlot: (slotId: SaveSlotId) => void
   readonly onDeleteSlot: (slotId: SaveSlotId) => void
   readonly onAutosaveChange: (enabled: boolean) => void
+  readonly onExportJson: () => void
+  readonly onImportJson: (json: string) => void
   readonly onBack: () => void
 }
 
@@ -39,6 +41,8 @@ export function SaveSlotScreen({
   onLoadSlot,
   onDeleteSlot,
   onAutosaveChange,
+  onExportJson,
+  onImportJson,
   onBack,
 }: SaveSlotScreenProps) {
   const summaryBySlot = new Map(summaries.map((summary) => [summary.slotId, summary]))
@@ -75,6 +79,37 @@ export function SaveSlotScreen({
             <small>この設定と使用中スロットだけをlocalStorageへ保存します。</small>
           </span>
         </label>
+      </section>
+
+      <section className="save-transfer collection-panel" aria-labelledby="save-transfer-title">
+        <div>
+          <p className="panel-heading__kicker">PORTABLE JSON</p>
+          <h2 id="save-transfer-title">エクスポート・インポート</h2>
+          <p>使用中スロットの進行とstable戦闘スナップショットを、整合性チェック付きJSONで移動できます。</p>
+        </div>
+        <div className="save-transfer__actions">
+          <button
+            type="button"
+            className="collection-button"
+            disabled={busy}
+            onClick={onExportJson}
+          >
+            使用中スロットをJSON保存
+          </button>
+          <label className={`collection-button save-import-button${busy ? ' is-disabled' : ''}`}>
+            JSONを使用中スロットへ読込
+            <input
+              type="file"
+              accept="application/json,.json"
+              disabled={busy}
+              onChange={(event) => {
+                const file = event.target.files?.[0]
+                event.target.value = ''
+                if (file !== undefined) void file.text().then(onImportJson)
+              }}
+            />
+          </label>
+        </div>
       </section>
 
       {notice !== null && (
@@ -119,6 +154,7 @@ export function SaveSlotScreen({
                     <div><dt>バックアップ</dt><dd>{summary.backupCount}世代</dd></div>
                     <div><dt>schema</dt><dd>{summary.schemaVersion}</dd></div>
                     <div><dt>content</dt><dd>{summary.contentVersion}</dd></div>
+                    <div><dt>中断戦闘</dt><dd>{summary.resumableBattleStageId ?? 'なし'}</dd></div>
                   </dl>
                   {summary.recoveredFromBackup && (
                     <p className="save-recovery-warning" role="status">

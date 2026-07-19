@@ -1,4 +1,5 @@
 import type { PlayerData, PlayerDataContentCatalog } from '../progression/player-data'
+import type { SavedBattleSession } from './save-state'
 import {
   DEFAULT_PLAYER_DATA_MIGRATION_PLAN,
   getPlayerDataSchemaVersion,
@@ -41,12 +42,14 @@ export interface SavePlayerDataAtomicInput {
   readonly generationId: string
   readonly savedAtEpochMs: number
   readonly preferredBackupGenerationId?: string
+  readonly activeBattle?: SavedBattleSession | null
 }
 
 export interface SavePlayerDataAtomicResult {
   readonly playerData: PlayerData
   readonly record: SaveGenerationRecord
   readonly pointer: SaveSlotPointer
+  readonly activeBattle: SavedBattleSession | null
 }
 
 export interface SaveSlotMigrationReceipt {
@@ -63,6 +66,7 @@ export interface LoadSaveSlotResult {
   readonly pointer: SaveSlotPointer
   readonly recoveredFromBackup: boolean
   readonly migration: SaveSlotMigrationReceipt | null
+  readonly activeBattle: SavedBattleSession | null
 }
 
 export interface LoadSaveSlotOptions {
@@ -102,6 +106,7 @@ export async function savePlayerDataAtomic(
       slotId: input.slotId,
       savedAtEpochMs: input.savedAtEpochMs,
       playerData,
+      activeBattle: input.activeBattle ?? null,
       state: 'TEMPORARY',
     },
     catalog,
@@ -128,7 +133,12 @@ export async function savePlayerDataAtomic(
       throw new Error('save repository committed a different generation')
     }
     const record = createCommittedSaveGeneration(verified)
-    return Object.freeze({ playerData: record.playerData, record, pointer })
+    return Object.freeze({
+      playerData: record.playerData,
+      record,
+      pointer,
+      activeBattle: record.activeBattle ?? null,
+    })
   } finally {
     if (!committed) {
       await repository.deleteGeneration(temporary.generationId).catch(() => undefined)
@@ -179,6 +189,7 @@ export async function loadSaveSlot(
           pointer,
           recoveredFromBackup: index > 0,
           migration: null,
+          activeBattle: validated.activeBattle ?? null,
         })
       }
 
@@ -203,6 +214,7 @@ export async function loadSaveSlot(
           }),
           savedAtEpochMs,
           preferredBackupGenerationId: envelope.generationId,
+          activeBattle: envelope.activeBattle ?? null,
         },
       )
       return Object.freeze({
@@ -217,6 +229,7 @@ export async function loadSaveSlot(
           toSchemaVersion: migrationPlan.targetSchemaVersion,
           appliedMigrations: migrated.appliedMigrations,
         }),
+        activeBattle: saved.activeBattle,
       })
     } catch (error) {
       failures.push(`${generationId}: ${error instanceof Error ? error.message : String(error)}`)

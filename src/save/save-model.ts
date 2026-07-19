@@ -1,5 +1,6 @@
 import type { PlayerData, PlayerDataContentCatalog } from '../progression/player-data'
 import { createStagePlayerData } from '../progression/stage-reward'
+import { normalizeSavedBattleSession, type SavedBattleSession } from './save-state'
 
 export const SAVE_SLOT_IDS = Object.freeze(['slot-1', 'slot-2', 'slot-3'] as const)
 export type SaveSlotId = (typeof SAVE_SLOT_IDS)[number]
@@ -15,6 +16,8 @@ export interface SaveGenerationRecord {
   readonly state: SaveGenerationState
   readonly checksum: string
   readonly playerData: PlayerData
+  readonly activeBattle?: SavedBattleSession | null
+  readonly activeBattleChecksum?: string | null
 }
 
 export interface SaveSlotPointer {
@@ -38,6 +41,7 @@ export interface SaveSlotSummary {
   readonly ownedUnitCount: number | null
   readonly completedStageCount: number | null
   readonly recoveredFromBackup: boolean
+  readonly resumableBattleStageId: string | null
 }
 
 export interface CreateSaveGenerationInput {
@@ -45,6 +49,7 @@ export interface CreateSaveGenerationInput {
   readonly slotId: SaveSlotId
   readonly savedAtEpochMs: number
   readonly playerData: PlayerData
+  readonly activeBattle?: SavedBattleSession | null
   readonly state?: SaveGenerationState
 }
 
@@ -87,6 +92,25 @@ export function calculateStoredPlayerDataChecksum(playerData: unknown): string {
   return calculateChecksumFromJson(json)
 }
 
+function canonicalizeJson(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonicalizeJson)
+  if (value !== null && typeof value === 'object') {
+    const result: Record<string, unknown> = {}
+    for (const key of Object.keys(value as Record<string, unknown>).sort()) {
+      const child = (value as Record<string, unknown>)[key]
+      if (child !== undefined) result[key] = canonicalizeJson(child)
+    }
+    return result
+  }
+  return value
+}
+
+export function calculateCanonicalJsonChecksum(value: unknown): string {
+  const json = JSON.stringify(canonicalizeJson(value))
+  if (json === undefined) throw new Error('value must be JSON serializable')
+  return calculateChecksumFromJson(json)
+}
+
 export function calculatePlayerDataChecksum(
   playerData: PlayerData,
   catalog: PlayerDataContentCatalog,
@@ -107,6 +131,10 @@ export function createSaveGenerationRecord(
     throw new Error(`save state is invalid: ${String(state)}`)
   }
   const playerData = createStagePlayerData(input.playerData, catalog)
+  const activeBattle =
+    input.activeBattle === null || input.activeBattle === undefined
+      ? null
+      : normalizeSavedBattleSession(input.activeBattle)
   return Object.freeze({
     generationId: input.generationId,
     slotId: input.slotId,
@@ -114,6 +142,9 @@ export function createSaveGenerationRecord(
     state,
     checksum: calculateStoredPlayerDataChecksum(playerData),
     playerData,
+    activeBattle,
+    activeBattleChecksum:
+      activeBattle === null ? null : calculateCanonicalJsonChecksum(activeBattle),
   })
 }
 
@@ -131,7 +162,27 @@ export function validateSaveGenerationEnvelope(
   if (record.checksum !== checksum) {
     throw new Error(`save generation checksum mismatch: ${record.generationId}`)
   }
-  return record
+  const activeBattle = record.activeBattle ?? null
+  const activeBattleChecksum = record.activeBattleChecksum ?? null
+  if (activeBattle === null && activeBattleChecksum !== null) {
+    throw new Error(`save generation battle checksum has no battle: ${record.generationId}`)
+  }
+  if (activeBattle !== null && activeBattleChecksum === null) {
+    throw new Error(`save generation battle checksum is missing: ${record.generationId}`)
+  }
+  const normalizedActiveBattle =
+    activeBattle === null ? null : normalizeSavedBattleSession(activeBattle)
+  if (
+    normalizedActiveBattle !== null &&
+    calculateCanonicalJsonChecksum(activeBattle) !== activeBattleChecksum
+  ) {
+    throw new Error(`save generation battle checksum mismatch: ${record.generationId}`)
+  }
+  return Object.freeze({
+    ...record,
+    activeBattle: normalizedActiveBattle,
+    activeBattleChecksum,
+  })
 }
 
 export function validateSaveGenerationRecord(
@@ -146,6 +197,7 @@ export function validateSaveGenerationRecord(
       savedAtEpochMs: envelope.savedAtEpochMs,
       state: envelope.state,
       playerData: envelope.playerData,
+      activeBattle: envelope.activeBattle ?? null,
     },
     catalog,
   )
@@ -205,6 +257,7 @@ export function createEmptySaveSlotSummary(slotId: SaveSlotId): SaveSlotSummary 
     ownedUnitCount: null,
     completedStageCount: null,
     recoveredFromBackup: false,
+    resumableBattleStageId: null,
   })
 }
 
@@ -231,5 +284,6 @@ export function createSaveSlotSummary(input: {
     ownedUnitCount: record.playerData.collection.unitInstances.length,
     completedStageCount: record.playerData.stageProgress?.completedStageIds.length ?? 0,
     recoveredFromBackup,
+    resumableBattleStageId: record.activeBattle?.stageId ?? null,
   })
 }

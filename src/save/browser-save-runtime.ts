@@ -7,6 +7,7 @@ import {
   type LocalSettingsStorage,
 } from './local-save-settings'
 import { type SaveSlotId, type SaveSlotSummary } from './save-model'
+import type { SavedBattleSession } from './save-state'
 import {
   listSaveSlotSummaries,
   loadSaveSlot,
@@ -55,6 +56,7 @@ export interface BrowserSaveBootstrapResult {
   readonly createdInitialSave: boolean
   readonly recoveredFromBackup: boolean
   readonly migration: SaveSlotMigrationReceipt | null
+  readonly activeBattle: SavedBattleSession | null
 }
 
 export async function bootstrapBrowserSaveSystem(input: {
@@ -77,6 +79,7 @@ export async function bootstrapBrowserSaveSystem(input: {
   let createdInitialSave = false
   let recoveredFromBackup = false
   let migration: SaveSlotMigrationReceipt | null = null
+  let activeBattle: SavedBattleSession | null = null
   if (loaded === null) {
     const savedAtEpochMs = now()
     const saved = await savePlayerDataAtomic(
@@ -95,6 +98,7 @@ export async function bootstrapBrowserSaveSystem(input: {
     playerData = loaded.playerData
     recoveredFromBackup = loaded.recoveredFromBackup
     migration = loaded.migration
+    activeBattle = loaded.activeBattle
   }
   const summaries = await listSaveSlotSummaries(
     input.repository,
@@ -108,5 +112,6 @@ export async function bootstrapBrowserSaveSystem(input: {
     createdInitialSave,
     recoveredFromBackup,
     migration,
+    activeBattle,
   })
 }
