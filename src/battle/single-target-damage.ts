@@ -45,12 +45,15 @@ export interface SingleTargetSkillUseInput extends SingleTargetDamagePreviewInpu
   readonly currentTime: BattleTime
 }
 
-export interface SingleTargetSkillUseResult extends SingleTargetDamagePreview {
-  readonly target: BattleUnitState
+export interface SingleTargetSkillScheduleResult extends SingleTargetDamagePreview {
   readonly actorSchedule: UnitActionSchedule
-  readonly appliedDamage: number
   readonly effectiveActionCost: number
   readonly effectiveSpeed: number
+}
+
+export interface SingleTargetSkillUseResult extends SingleTargetSkillScheduleResult {
+  readonly target: BattleUnitState
+  readonly appliedDamage: number
 }
 
 function assertSafeIntegerAtLeast(value: number, minimum: number, field: string): void {
@@ -193,15 +196,13 @@ function assertCanUseSingleTargetInnateSkill(input: SingleTargetSkillUseInput): 
   }
 }
 
-export function useSingleTargetInnateSkill(
+export function scheduleSingleTargetInnateSkill(
   input: SingleTargetSkillUseInput,
-): SingleTargetSkillUseResult {
+): SingleTargetSkillScheduleResult {
   assertValidUseInput(input)
   assertCanUseSingleTargetInnateSkill(input)
 
   const preview = previewSingleTargetSkillDamage(input)
-  const nextHp = Math.max(0, input.target.hp - preview.calculatedDamage)
-  const target = withBattleUnitHp(input.target, input.targetSpecies, nextHp)
   const effectiveActionCost = getModifiedBattleStatValue(
     input.skill.actionCost,
     input.actor.effects,
@@ -221,10 +222,22 @@ export function useSingleTargetInnateSkill(
 
   return Object.freeze({
     ...preview,
-    target,
     actorSchedule,
-    appliedDamage: input.target.hp - target.hp,
     effectiveActionCost,
     effectiveSpeed,
+  })
+}
+
+export function useSingleTargetInnateSkill(
+  input: SingleTargetSkillUseInput,
+): SingleTargetSkillUseResult {
+  const scheduled = scheduleSingleTargetInnateSkill(input)
+  const nextHp = Math.max(0, input.target.hp - scheduled.calculatedDamage)
+  const target = withBattleUnitHp(input.target, input.targetSpecies, nextHp)
+
+  return Object.freeze({
+    ...scheduled,
+    target,
+    appliedDamage: input.target.hp - target.hp,
   })
 }
