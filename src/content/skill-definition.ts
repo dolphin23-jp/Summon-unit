@@ -75,6 +75,7 @@ export interface SkillDefinition {
   readonly slotType: SkillSlotType
   readonly attributeId?: AttributeInputId
   readonly actionCost: number
+  readonly telegraphDelay?: number | null
   readonly targetType: SkillTargetType
   readonly targetSelector?: SkillTargetSelector
   readonly reachMethod?: SkillReachMethod
@@ -196,6 +197,15 @@ export function resolveSkillChainTargetCount(skill: SkillDefinition): number {
   return count
 }
 
+export function resolveSkillTelegraphDelay(skill: SkillDefinition): number | null {
+  const delay = skill.telegraphDelay ?? null
+  if (delay === null) {
+    return null
+  }
+  assertSafeIntegerAtLeast(delay, 1, 'skill.telegraphDelay')
+  return delay
+}
+
 function assertCompatibleReachAndTarget(skill: SkillDefinition): void {
   const selector = resolveSkillTargetSelector(skill)
   const reachMethod = resolveSkillReachMethod(skill)
@@ -237,6 +247,7 @@ export function assertValidSkillDefinition(skill: SkillDefinition): void {
   assertCompatibleReachAndTarget(skill)
 
   assertSafeIntegerAtLeast(skill.actionCost, 1, 'skill.actionCost')
+  resolveSkillTelegraphDelay(skill)
   assertSafeIntegerAtLeast(
     skill.damageMultiplierPermille,
     1,
