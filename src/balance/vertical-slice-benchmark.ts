@@ -91,6 +91,7 @@ export interface VerticalSliceBalanceReport {
   readonly deterministic: true
   readonly sampleMatrix: {
     readonly profiles: number
+    readonly profilesPerStage: number
     readonly stages: number
     readonly battles: number
   }
@@ -354,10 +355,33 @@ function getSpeciesByBattleUnitId(
   return new Map(
     definition.units.map((battleUnit) => {
       const species = speciesById.get(battleUnit.speciesId)
-      if (species === undefined) throw new Error(`balance benchmark species is missing: ${battleUnit.speciesId}`)
+      if (species === undefined) {
+        throw new Error(`balance benchmark species is missing: ${battleUnit.speciesId}`)
+      }
       return [battleUnit.battleUnitId, species]
     }),
   )
+}
+
+function contributionFor(
+  contributions: Map<string, MutableContribution>,
+  side: 'ALLY' | 'ENEMY',
+  species: MonsterSpecies,
+): MutableContribution {
+  const key = `${side}\u0000${species.id}`
+  const existing = contributions.get(key)
+  if (existing !== undefined) return existing
+  const created: MutableContribution = {
+    side,
+    speciesId: species.id,
+    speed: species.stats.speed,
+    actions: 0,
+    appliedDamage: 0,
+    redirectedDamage: 0,
+    barrierAbsorbed: 0,
+  }
+  contributions.set(key, created)
+  return created
 }
 
 function collectSample(
@@ -369,7 +393,9 @@ function collectSample(
   contributions: Map<string, MutableContribution>,
 ): VerticalSliceBattleSampleMetrics {
   const speciesByUnitId = getSpeciesByBattleUnitId(definition)
-  const sideByUnitId = new Map(definition.units.map((battleUnit) => [battleUnit.battleUnitId, battleUnit.position.side]))
+  const sideByUnitId = new Map(
+    definition.units.map((battleUnit) => [battleUnit.battleUnitId, battleUnit.position.side]),
+  )
   let skillUses = 0
   let moves = 0
   let calculatedDamage = 0
@@ -396,18 +422,7 @@ function collectSample(
           const species = speciesByUnitId.get(sourceId)
           const side = sideByUnitId.get(sourceId)
           if (species !== undefined && side !== undefined) {
-            const key = `${side}\u0000${species.id}`
-            const existing = contributions.get(key) ?? {
-              side,
-              speciesId: species.id,
-              speed: species.stats.speed,
-              actions: 0,
-              appliedDamage: 0,
-              redirectedDamage: 0,
-              barrierAbsorbed: 0,
-            }
-            existing.appliedDamage += event.payload.appliedDamage
-            contributions.set(key, existing)
+            contributionFor(contributions, side, species).appliedDamage += event.payload.appliedDamage
           }
         }
         break
@@ -417,18 +432,8 @@ function collectSample(
         const species = speciesByUnitId.get(event.payload.guardBattleUnitId)
         const side = sideByUnitId.get(event.payload.guardBattleUnitId)
         if (species !== undefined && side !== undefined) {
-          const key = `${side}\u0000${species.id}`
-          const existing = contributions.get(key) ?? {
-            side,
-            speciesId: species.id,
-            speed: species.stats.speed,
-            actions: 0,
-            appliedDamage: 0,
-            redirectedDamage: 0,
-            barrierAbsorbed: 0,
-          }
-          existing.redirectedDamage += event.payload.redirectedDamage
-          contributions.set(key, existing)
+          contributionFor(contributions, side, species).redirectedDamage +=
+            event.payload.redirectedDamage
         }
         break
       }
@@ -437,18 +442,7 @@ function collectSample(
         const species = speciesByUnitId.get(event.payload.targetBattleUnitId)
         const side = sideByUnitId.get(event.payload.targetBattleUnitId)
         if (species !== undefined && side !== undefined) {
-          const key = `${side}\u0000${species.id}`
-          const existing = contributions.get(key) ?? {
-            side,
-            speciesId: species.id,
-            speed: species.stats.speed,
-            actions: 0,
-            appliedDamage: 0,
-            redirectedDamage: 0,
-            barrierAbsorbed: 0,
-          }
-          existing.barrierAbsorbed += event.payload.absorbedDamage
-          contributions.set(key, existing)
+          contributionFor(contributions, side, species).barrierAbsorbed += event.payload.absorbedDamage
         }
         break
       }
@@ -459,19 +453,9 @@ function collectSample(
 
   for (const unitSummary of result.summary.units) {
     const species = speciesByUnitId.get(unitSummary.battleUnitId)
-    if (species === undefined) continue
-    const key = `${unitSummary.side}\u0000${species.id}`
-    const existing = contributions.get(key) ?? {
-      side: unitSummary.side,
-      speciesId: species.id,
-      speed: species.stats.speed,
-      actions: 0,
-      appliedDamage: 0,
-      redirectedDamage: 0,
-      barrierAbsorbed: 0,
+    if (species !== undefined) {
+      contributionFor(contributions, unitSummary.side, species).actions += unitSummary.actionCount
     }
-    existing.actions += unitSummary.actionCount
-    contributions.set(key, existing)
   }
 
   return Object.freeze({
@@ -539,7 +523,9 @@ function freezeContributions(
           healing: 0,
           totalActionValue,
           actionValuePerActionPermille:
-            contribution.actions === 0 ? 0 : Math.round((totalActionValue * 1000) / contribution.actions),
+            contribution.actions === 0
+              ? 0
+              : Math.round((totalActionValue * 1000) / contribution.actions),
         })
       })
       .sort((left, right) => {
@@ -572,7 +558,9 @@ function speedValues(
           speed,
           ...value,
           actionValuePerActionPermille:
-            value.actions === 0 ? 0 : Math.round((value.totalActionValue * 1000) / value.actions),
+            value.actions === 0
+              ? 0
+              : Math.round((value.totalActionValue * 1000) / value.actions),
         }),
       ),
   )
@@ -581,7 +569,9 @@ function speedValues(
 function warningsFor(stages: readonly VerticalSliceStageBalanceMetrics[]): readonly string[] {
   const warnings: string[] = []
   for (const stage of stages) {
-    if (stage.timeoutRateBasisPoints > 0) warnings.push(`${stage.stageId}: action-limit timeout observed`)
+    if (stage.timeoutRateBasisPoints > 0) {
+      warnings.push(`${stage.stageId}: action-limit timeout observed`)
+    }
     if (stage.band === 'INTRO' && stage.winRateBasisPoints < 6700) {
       warnings.push(`${stage.stageId}: intro win rate is below 67%`)
     }
@@ -596,12 +586,11 @@ export function runVerticalSliceBalanceBenchmark(): VerticalSliceBalanceReport {
   const skillTotals = new Map<string, number>()
   const contributions = new Map<string, MutableContribution>()
   const sampleByStage = new Map<string, VerticalSliceBattleSampleMetrics[]>()
-  let profileCount = 0
 
   for (const record of VERTICAL_SLICE_STAGE_RECORDS) {
-    const band = stageBand(record)
-    const profiles = VERTICAL_SLICE_BENCHMARK_PROFILES.filter((candidate) => candidate.band === band)
-    profileCount = Math.max(profileCount, profiles.length)
+    const profiles = VERTICAL_SLICE_BENCHMARK_PROFILES.filter(
+      (candidate) => candidate.band === stageBand(record),
+    )
     for (const benchmarkProfile of profiles) {
       const definition = createBattleDefinition(record, benchmarkProfile)
       const result = runHeadlessBattle(definition)
@@ -628,19 +617,31 @@ export function runVerticalSliceBalanceBenchmark(): VerticalSliceBalanceReport {
   const totalActions = allSamples.reduce((total, sample) => total + sample.totalActions, 0)
   const totalSkillUses = allSamples.reduce((total, sample) => total + sample.skillUses, 0)
   const totalMoves = allSamples.reduce((total, sample) => total + sample.moves, 0)
-  const totalCalculatedDamage = allSamples.reduce((total, sample) => total + sample.calculatedDamage, 0)
+  const totalCalculatedDamage = allSamples.reduce(
+    (total, sample) => total + sample.calculatedDamage,
+    0,
+  )
   const totalOverkill = allSamples.reduce((total, sample) => total + sample.overkillDamage, 0)
   const allyVictories = allSamples.filter((sample) => sample.outcome === 'ALLY_VICTORY').length
   const enemyVictories = allSamples.filter((sample) => sample.outcome === 'ENEMY_VICTORY').length
   const draws = allSamples.length - allyVictories - enemyVictories
   const totalSkillSelections = [...skillTotals.values()].reduce((total, count) => total + count, 0)
   const speciesContributions = freezeContributions(contributions)
+  const profilesPerStage = Math.max(
+    ...VERTICAL_SLICE_STAGE_RECORDS.map(
+      (record) =>
+        VERTICAL_SLICE_BENCHMARK_PROFILES.filter(
+          (candidate) => candidate.band === stageBand(record),
+        ).length,
+    ),
+  )
 
   return Object.freeze({
     reportVersion: VERTICAL_SLICE_BALANCE_REPORT_VERSION,
     deterministic: true,
     sampleMatrix: Object.freeze({
       profiles: VERTICAL_SLICE_BENCHMARK_PROFILES.length,
+      profilesPerStage,
       stages: VERTICAL_SLICE_STAGE_RECORDS.length,
       battles: allSamples.length,
     }),
