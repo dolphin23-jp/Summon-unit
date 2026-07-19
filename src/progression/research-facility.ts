@@ -13,6 +13,7 @@ import {
   type TrialResearchResult,
   type TrialResearchSubmission,
 } from './research'
+import type { ResearchNodeDefinition } from './research-model'
 import type { T036ProgressionCatalog } from './t036-progression-model'
 import {
   assertResearchFacilityAllowsRarity,
@@ -34,6 +35,7 @@ declare module './player-data' {
 }
 
 export interface T037ProgressionCatalog extends T036ProgressionCatalog {
+  readonly researchNodes: readonly ResearchNodeDefinition[]
   readonly researchFacilityStages: readonly ResearchFacilityStageDefinition[]
 }
 

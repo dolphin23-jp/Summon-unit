@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { MonsterSpecies } from '../content/monster-species'
-import type { PlayerData, PlayerResearchNodeState } from '../progression/player-data'
+import type { PlayerData } from '../progression/player-data'
 import {
   completeFacilityFinalResearch,
   performFacilityTrialResearch,
@@ -9,6 +9,7 @@ import {
 } from '../progression/research-facility'
 import {
   RESEARCH_METHODS,
+  type PlayerResearchNodeState,
   type ResearchMethod,
   type ResearchNodeDefinition,
 } from '../progression/research-model'
