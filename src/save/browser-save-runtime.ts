@@ -6,14 +6,15 @@ import {
   type LocalSaveSettings,
   type LocalSettingsStorage,
 } from './local-save-settings'
-import {
-  listSaveSlotSummariesWithMigration,
-  loadSaveSlotWithMigration,
-  type SaveMigrationRuntime,
-  type SaveSlotMigrationReceipt,
-} from './save-migration'
 import { type SaveSlotId, type SaveSlotSummary } from './save-model'
-import { savePlayerDataAtomic, type SaveRepository } from './save-repository'
+import {
+  listSaveSlotSummaries,
+  loadSaveSlot,
+  savePlayerDataAtomic,
+  type LoadSaveSlotOptions,
+  type SaveRepository,
+  type SaveSlotMigrationReceipt,
+} from './save-repository'
 
 let generationSequence = 0
 
@@ -25,12 +26,12 @@ export function createRuntimeSaveGenerationId(
   return `${slotId}:generation:${savedAtEpochMs}:${generationSequence}`
 }
 
-export function createBrowserSaveMigrationRuntime(
+export function createBrowserLoadSaveOptions(
   now: () => number = Date.now,
-): SaveMigrationRuntime {
+): LoadSaveSlotOptions {
   return Object.freeze({
     now,
-    createGenerationId: ({ slotId, savedAtEpochMs }) =>
+    createMigrationGenerationId: ({ slotId, savedAtEpochMs }) =>
       createRuntimeSaveGenerationId(slotId, savedAtEpochMs),
   })
 }
@@ -56,13 +57,13 @@ export async function bootstrapBrowserSaveSystem(input: {
   readonly now?: () => number
 }): Promise<BrowserSaveBootstrapResult> {
   const now = input.now ?? Date.now
-  const migrationRuntime = createBrowserSaveMigrationRuntime(now)
+  const loadOptions = createBrowserLoadSaveOptions(now)
   const settings = loadLocalSaveSettings(input.storage)
-  const loaded = await loadSaveSlotWithMigration(
+  const loaded = await loadSaveSlot(
     input.repository,
     settings.activeSlotId,
     input.catalog,
-    migrationRuntime,
+    loadOptions,
   )
   let playerData: PlayerData
   let createdInitialSave = false
@@ -87,10 +88,10 @@ export async function bootstrapBrowserSaveSystem(input: {
     recoveredFromBackup = loaded.recoveredFromBackup
     migration = loaded.migration
   }
-  const summaries = await listSaveSlotSummariesWithMigration(
+  const summaries = await listSaveSlotSummaries(
     input.repository,
     input.catalog,
-    migrationRuntime,
+    loadOptions,
   )
   return Object.freeze({
     playerData,
