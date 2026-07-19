@@ -260,3 +260,65 @@
     transition: none;
   }
 }
+
+
+.save-transfer {
+  width: min(94rem, 100%);
+  margin: 0 auto 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.save-transfer h2,
+.save-transfer p {
+  margin-bottom: 0;
+}
+
+.save-transfer p:last-child {
+  margin-top: 0.45rem;
+  color: #91aaa9;
+  line-height: 1.5;
+}
+
+.save-transfer__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.55rem;
+}
+
+.save-import-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.save-import-button.is-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.save-import-button input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@media (max-width: 680px) {
+  .save-transfer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .save-transfer__actions,
+  .save-transfer__actions .collection-button {
+    width: 100%;
+  }
+}
