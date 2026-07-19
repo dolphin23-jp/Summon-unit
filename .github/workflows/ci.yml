@@ -40,14 +40,4 @@ jobs:
         run: pnpm lint
 
       - name: Build
-        shell: bash
-        run: |
-          set -o pipefail
-          pnpm build 2>&1 | tee /tmp/build-diagnostics.txt
-
-      - name: Upload build diagnostics
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-diagnostics
-          path: /tmp/build-diagnostics.txt
+        run: pnpm build
