@@ -168,9 +168,17 @@ function formation(
 
 function createInput(): PlayerData {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     gameVersion: '0.0.0',
-    contentVersion: 'content.test.1',
+    contentVersion: 'content.test.2',
+    economy: {
+      currency: 500,
+      researchData: 120,
+      catalysts: [
+        { catalystId: 'catalyst.z', amount: 1 },
+        { catalystId: 'catalyst.a', amount: 3 },
+      ],
+    },
     collection: {
       speciesStates: [
         {
@@ -212,10 +220,14 @@ function createInput(): PlayerData {
 }
 
 describe('player data and formation model', () => {
-  it('normalizes fixed IDs and keeps equipment on each formation member', () => {
+  it('normalizes fixed IDs, economy resources, and formation equipment', () => {
     const input = createInput()
     const normalized = createPlayerData(input, CATALOG)
 
+    expect(normalized.economy.catalysts.map((balance) => balance.catalystId)).toEqual([
+      'catalyst.a',
+      'catalyst.z',
+    ])
     expect(normalized.collection.speciesStates.map((state) => state.speciesId)).toEqual([
       SPECIES_A.id,
       SPECIES_B.id,
@@ -250,6 +262,7 @@ describe('player data and formation model', () => {
     ).toEqual([INNATE_A.id, GENERIC_B.id])
 
     expect(Object.isFrozen(normalized)).toBe(true)
+    expect(Object.isFrozen(normalized.economy.catalysts)).toBe(true)
     expect(Object.isFrozen(normalized.collection.unitInstances)).toBe(true)
     expect(Object.isFrozen(normalized.formations.formations[0]?.members)).toBe(true)
     expect(input.collection.unitInstances[0]?.instanceId).toBe('instance.b')
