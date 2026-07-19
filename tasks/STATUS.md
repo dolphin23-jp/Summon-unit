@@ -31,5 +31,6 @@
 - [x] T029 — [戦闘画面一式](T029_BATTLE_SCREEN_SUITE.md)
 - [x] T030 — [手動操作・確定前プレビュー](T030_MANUAL_ACTION_PREVIEW.md)
 - [x] T031 — [終了画面・モバイル・アクセシビリティ](T031_RESULT_MOBILE_ACCESSIBILITY.md)
+- [x] T032 — [プレイヤーデータ・編成モデル](T032_PLAYER_DATA_FORMATION_MODEL.md)
 
-T001～T031 complete. Next: T032.
+T001～T032 complete. Next: T033.

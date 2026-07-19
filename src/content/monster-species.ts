@@ -21,6 +21,7 @@ export interface MonsterSpecies {
   readonly tagIds: readonly string[]
   readonly stats: MonsterStats
   readonly innateSkillId: SkillId
+  readonly bloomSkillIds?: readonly SkillId[]
   readonly passiveTraitIds?: readonly string[]
 }
 
@@ -33,6 +34,17 @@ function assertNonEmptyString(value: string, fieldName: string): void {
 function assertIntegerAtLeast(value: number, minimum: number, fieldName: string): void {
   if (!Number.isInteger(value) || value < minimum) {
     throw new Error(`${fieldName} must be an integer greater than or equal to ${minimum}`)
+  }
+}
+
+function assertUniqueIds(ids: readonly string[], fieldName: string): void {
+  const seen = new Set<string>()
+  for (const id of ids) {
+    assertNonEmptyString(id, `${fieldName}[]`)
+    if (seen.has(id)) {
+      throw new Error(`${fieldName} must not contain duplicates: ${id}`)
+    }
+    seen.add(id)
   }
 }
 
@@ -56,13 +68,6 @@ export function assertValidMonsterSpecies(species: MonsterSpecies): void {
     assertNonEmptyString(tagId, 'species.tagIds[]')
   }
   assertValidStatusResistanceTags(species.tagIds)
-
-  const seenTraitIds = new Set<string>()
-  for (const traitId of species.passiveTraitIds ?? []) {
-    assertNonEmptyString(traitId, 'species.passiveTraitIds[]')
-    if (seenTraitIds.has(traitId)) {
-      throw new Error(`species.passiveTraitIds must not contain duplicates: ${traitId}`)
-    }
-    seenTraitIds.add(traitId)
-  }
+  assertUniqueIds(species.bloomSkillIds ?? [], 'species.bloomSkillIds')
+  assertUniqueIds(species.passiveTraitIds ?? [], 'species.passiveTraitIds')
 }
