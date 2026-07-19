@@ -7,16 +7,12 @@ import {
   type InteractiveBattleSnapshot,
 } from '../battle/headless-battle-runner'
 import { STANDARD_HEADLESS_BATTLE } from '../demo/standard-headless-battle'
+import { BattleDecisionPanel } from './BattleDecisionPanel'
+import { BattleTimelinePanel } from './BattleTimelinePanel'
 import { BattleUnitCard } from './BattleUnitCard'
-import {
-  applyBattleEventToReplayFrame,
-  createInitialBattleReplayFrame,
-  formatBattleEventForDisplay,
-  getBattleReplayBoardCells,
-} from './battle-replay'
+import { createBattleScreenView } from './battle-screen-view'
 
 const STEP_MS = 420
-const LOG_LIMIT = 8
 
 type BattleSpeed = 1 | 2 | 4
 
@@ -77,6 +73,8 @@ export function MinimalBattleScreen() {
   const [snapshot, setSnapshot] = useState(() => runner.getSnapshot())
   const [autoRequested, setAutoRequested] = useState(false)
   const [speed, setSpeed] = useState<BattleSpeed>(1)
+  const [detailedLog, setDetailedLog] = useState(false)
+  const [previewCandidateId, setPreviewCandidateId] = useState<string | null>(null)
 
   useEffect(() => {
     setSnapshot(runner.getSnapshot())
@@ -95,23 +93,24 @@ export function MinimalBattleScreen() {
     return () => window.clearTimeout(timer)
   }, [isPlaying, runner, snapshot.totalActions, speed])
 
-  const currentFrame = useMemo(() => {
-    let frame = createInitialBattleReplayFrame(STANDARD_HEADLESS_BATTLE)
-    for (const event of snapshot.log.events) {
-      frame = applyBattleEventToReplayFrame(frame, event)
-    }
-    return frame
-  }, [snapshot.log.events])
-
-  const boardCells = useMemo(
-    () => getBattleReplayBoardCells(currentFrame),
-    [currentFrame],
-  )
-  const recentEvents = snapshot.log.events.slice(-LOG_LIMIT).reverse()
   const pending = snapshot.pendingManualAction
+  useEffect(() => {
+    setPreviewCandidateId(pending?.recommendedCandidateId ?? null)
+  }, [pending])
+
+  const previewOption = useMemo(
+    () => pending?.options.find((option) => option.candidateId === previewCandidateId) ?? null,
+    [pending, previewCandidateId],
+  )
+  const view = useMemo(
+    () => createBattleScreenView(STANDARD_HEADLESS_BATTLE, snapshot, previewOption),
+    [previewOption, snapshot],
+  )
 
   const reset = () => {
     setAutoRequested(false)
+    setDetailedLog(false)
+    setPreviewCandidateId(null)
     setRunner(createRunner())
   }
 
@@ -131,16 +130,16 @@ export function MinimalBattleScreen() {
     <main className="battle-app">
       <header className="battle-header">
         <div>
-          <p className="eyebrow">INTERACTIVE DETERMINISTIC BATTLE</p>
+          <p className="eyebrow">TACTICAL BATTLE VIEW</p>
           <h1>Monster Research Tactics</h1>
           <p className="battle-header__description">
-            戦闘カーネルを1行動ずつ進め、AUTO観戦と次の味方行動への手動割込を切り替えます。
+            盤面状態、予約イベント、AI判断理由を同じ戦闘スナップショットから表示します。
           </p>
         </div>
         <div className="battle-metrics" aria-label="現在の状態">
           <div><span>仮想時刻</span><strong>{snapshot.currentVirtualTime}</strong></div>
           <div><span>行動</span><strong>{snapshot.totalActions}</strong></div>
-          <div><span>結果</span><strong>{outcomeLabel(currentFrame.outcome)}</strong></div>
+          <div><span>結果</span><strong>{outcomeLabel(snapshot.battle.outcome)}</strong></div>
         </div>
       </header>
 
@@ -154,7 +153,6 @@ export function MinimalBattleScreen() {
         >
           {isTerminal ? '戦闘完了' : isPlaying ? '一時停止' : 'AUTO開始'}
         </button>
-
         <button
           type="button"
           className="control-button"
@@ -163,7 +161,6 @@ export function MinimalBattleScreen() {
         >
           1行動進める
         </button>
-
         <button
           type="button"
           className="control-button"
@@ -177,7 +174,6 @@ export function MinimalBattleScreen() {
               ? '手動割込を取消'
               : '次の味方を手動'}
         </button>
-
         <div className="speed-control" aria-label="AUTO速度">
           <span>速度</span>
           {([1, 2, 4] as const).map((candidate) => (
@@ -192,28 +188,28 @@ export function MinimalBattleScreen() {
             </button>
           ))}
         </div>
-
         <button type="button" className="control-button" onClick={reset}>
           リセット
         </button>
       </nav>
 
       {pending !== null && (
-        <section className="log-panel" aria-labelledby="manual-action-title">
+        <section className="manual-panel" aria-labelledby="manual-action-title">
           <div className="panel-heading">
             <div>
               <p className="panel-heading__kicker">MANUAL INTERRUPT</p>
               <h2 id="manual-action-title">{pending.actorBattleUnitId} の行動</h2>
             </div>
+            <span className="manual-panel__hint">候補に触れると仮タイムラインを表示</span>
           </div>
-          <div className="battle-controls">
+          <div className="manual-options">
             {pending.options.map((option) => (
               <button
                 key={option.candidateId}
                 type="button"
-                className={option.recommended
-                  ? 'control-button control-button--primary'
-                  : 'control-button'}
+                className={`${option.recommended ? 'control-button control-button--primary' : 'control-button'}${previewCandidateId === option.candidateId ? ' control-button--previewing' : ''}`}
+                onPointerEnter={() => setPreviewCandidateId(option.candidateId)}
+                onFocus={() => setPreviewCandidateId(option.candidateId)}
                 onClick={() => runner.submitManualAction(option.candidateId)}
               >
                 {option.label}{option.recommended ? '（推奨）' : ''}
@@ -221,12 +217,12 @@ export function MinimalBattleScreen() {
             ))}
           </div>
           {pending.reasonLog !== null && (
-            <p className="log-empty">AI参考: {pending.reasonLog.oneLine}</p>
+            <p className="manual-panel__reason">AI参考: {pending.reasonLog.oneLine}</p>
           )}
         </section>
       )}
 
-      <div className="battle-layout">
+      <div className="battle-workspace">
         <section className="board-panel" aria-labelledby="board-title">
           <div className="panel-heading">
             <div>
@@ -236,22 +232,25 @@ export function MinimalBattleScreen() {
             <div className="side-legend" aria-label="陣営凡例">
               <span><b>A</b> 味方</span>
               <span><b>E</b> 相手</span>
+              <span><i>!</i> 予兆</span>
             </div>
           </div>
 
           <div className="battle-board">
-            {boardCells.map((cell) => {
+            {view.cells.map((cell) => {
               const side = cell.position.side
               const frontDivider = side === 'ALLY' && cell.position.row === 0
               const coordinate = `${sideLabel(side)} ${rowLabel(cell.position.row)} ${columnLabel(cell.position.column)}`
-
               return (
                 <div
                   key={cell.positionId}
-                  className={`board-cell board-cell--${side.toLowerCase()}${frontDivider ? ' board-cell--front-divider' : ''}`}
-                  aria-label={coordinate}
+                  className={`board-cell board-cell--${side.toLowerCase()}${frontDivider ? ' board-cell--front-divider' : ''}${cell.telegraphCount > 0 ? ' board-cell--telegraph' : ''}`}
+                  aria-label={`${coordinate}${cell.telegraphCount > 0 ? `、予兆${cell.telegraphCount}件` : ''}`}
                 >
                   <span className="board-cell__coordinate">{coordinate}</span>
+                  {cell.telegraphCount > 0 && (
+                    <span className="telegraph-marker" aria-hidden="true">! {cell.telegraphCount}</span>
+                  )}
                   {cell.unit === null ? (
                     <span className="board-cell__empty">空き</span>
                   ) : (
@@ -263,40 +262,15 @@ export function MinimalBattleScreen() {
           </div>
         </section>
 
-        <aside className="log-panel" aria-labelledby="log-title">
-          <div className="panel-heading">
-            <div>
-              <p className="panel-heading__kicker">LIVE EVENTS</p>
-              <h2 id="log-title">直近ログ</h2>
-            </div>
-            <span className={`play-state${isPlaying ? ' play-state--active' : ''}`}>
-              {statusLabel(snapshot, autoRequested, speed)}
-            </span>
-          </div>
+        <BattleTimelinePanel entries={view.timeline} />
 
-          {recentEvents.length === 0 ? (
-            <p className="log-empty">AUTO開始または1行動進めるを押してください。</p>
-          ) : (
-            <ol className="event-log" aria-live="polite">
-              {recentEvents.map((event) => (
-                <li key={event.id}>
-                  <span className="event-log__time">t={event.virtualTime}</span>
-                  <span>{formatBattleEventForDisplay(event)}</span>
-                </li>
-              ))}
-            </ol>
-          )}
-
-          {snapshot.lastDecisionLog !== null && (
-            <p className="log-empty">判断: {snapshot.lastDecisionLog.oneLine}</p>
-          )}
-
-          <div className={`outcome-card outcome-card--${currentFrame.outcome.toLowerCase()}`}>
-            <span>現在の判定</span>
-            <strong>{outcomeLabel(currentFrame.outcome)}</strong>
-            <small>{snapshot.totalActions}行動・{snapshot.log.events.length}イベント</small>
-          </div>
-        </aside>
+        <BattleDecisionPanel
+          events={snapshot.log.events}
+          decisionLog={view.lastDecisionLog}
+          detailed={detailedLog}
+          onDetailedChange={setDetailedLog}
+          statusText={statusLabel(snapshot, autoRequested, speed)}
+        />
       </div>
     </main>
   )
