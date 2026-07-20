@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  isBattleMotionLevel,
-  resolveInitialBattleMotionLevel,
-} from './battle-accessibility'
+import { isBattleMotionLevel, resolveInitialBattleMotionLevel } from './battle-accessibility'
 
 describe('battle motion accessibility', () => {
   it('treats prefers-reduced-motion as minimal animation regardless of stored preference', () => {

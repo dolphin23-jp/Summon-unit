@@ -57,10 +57,7 @@ function duration(base: number, playbackRate: number): number {
   return Math.max(80, Math.round(base / Math.max(1, playbackRate)))
 }
 
-function targetPosition(
-  options: FxMapperOptions,
-  battleUnitId: string | null,
-): string | null {
+function targetPosition(options: FxMapperOptions, battleUnitId: string | null): string | null {
   if (battleUnitId === null) return null
   return options.positionIdByBattleUnitId[battleUnitId] ?? null
 }
@@ -284,7 +281,9 @@ function mapEvent(event: BattleEvent, options: FxMapperOptions): readonly FxComm
           positionId,
           fromPositionId: null,
           toPositionId: null,
-          text: removed ? `${effectLabel(event.payload.effectId)}解除` : effectLabel(event.payload.effectId),
+          text: removed
+            ? `${effectLabel(event.payload.effectId)}解除`
+            : effectLabel(event.payload.effectId),
           tone: 'STATUS',
           color: event.payload.effectId.toLowerCase().includes('burn') ? '#ff886d' : '#c89be8',
           durationMs: duration(560, rate),

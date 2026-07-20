@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import type { BattleOutcome } from '../battle/defeat-and-victory'
-import type { Side } from '../battle/board'
+import { getBoardPositionId, type Side } from '../battle/board'
 import {
   createInteractiveBattleRunner,
   type HeadlessBattleDefinition,
@@ -10,6 +10,7 @@ import {
   type InteractiveBattleStableSnapshot,
   type InteractiveManualActionOption,
 } from '../battle/headless-battle-runner'
+import { VERTICAL_SLICE_SKILL_FX } from '../content/skill-fx'
 import { STANDARD_INTERACTIVE_BATTLE } from '../demo/standard-headless-battle'
 import type { StageBattleSettlement } from '../progression/stage-reward'
 import { BattleDecisionPanel } from './BattleDecisionPanel'
@@ -28,6 +29,8 @@ import { getManualActionKey, ManualActionPanel } from './ManualActionPanel'
 import { ConfirmDialog } from './ConfirmDialog'
 import { BattleMobileTabs, BattleTabPanel, type BattlePanelTab } from './BattleMobileTabs'
 import { UxHelpButton } from './UxHelpDialog'
+import { FxLayer } from './fx/FxLayer'
+import { mapBattleEventsToFxCommands, type FxCommand } from './fx/fx-mapper'
 
 const STEP_MS = 420
 
@@ -35,6 +38,12 @@ export type BattleSpeed = 1 | 2 | 4 | 8
 
 const STANDARD_BATTLE_SPEEDS: readonly BattleSpeed[] = Object.freeze([1, 2, 4])
 const CLEARED_BATTLE_SPEEDS: readonly BattleSpeed[] = Object.freeze([1, 2, 4, 8])
+const EMPTY_FX_COMMANDS: readonly FxCommand[] = Object.freeze([])
+
+interface FxBatch {
+  readonly id: number
+  readonly commands: readonly FxCommand[]
+}
 
 export function getBattleSpeedOptions(allowFastMode: boolean): readonly BattleSpeed[] {
   return allowFastMode ? CLEARED_BATTLE_SPEEDS : STANDARD_BATTLE_SPEEDS
@@ -164,7 +173,12 @@ export function MinimalBattleScreen({
   const [attempt, setAttempt] = useState(initialAttempt)
   const [pendingBattleAction, setPendingBattleAction] = useState<'RESET' | 'FORMATION' | null>(null)
   const [activePanel, setActivePanel] = useState<BattlePanelTab>('OPERATIONS')
+  const [fxBatch, setFxBatch] = useState<FxBatch>(() =>
+    Object.freeze({ id: 0, commands: EMPTY_FX_COMMANDS }),
+  )
   const stableSnapshotCallbackRef = useRef(onStableSnapshot)
+  const lastFxSequenceRef = useRef(snapshot.log.nextSequence)
+  const fxBatchIdRef = useRef(0)
 
   useEffect(() => {
     stableSnapshotCallbackRef.current = onStableSnapshot
@@ -173,6 +187,12 @@ export function MinimalBattleScreen({
   useEffect(() => {
     setSnapshot(runner.getSnapshot())
     return runner.subscribe(setSnapshot)
+  }, [runner])
+
+  useEffect(() => {
+    lastFxSequenceRef.current = runner.getSnapshot().log.nextSequence
+    fxBatchIdRef.current += 1
+    setFxBatch(Object.freeze({ id: fxBatchIdRef.current, commands: EMPTY_FX_COMMANDS }))
   }, [runner])
 
   useEffect(() => {
@@ -244,6 +264,62 @@ export function MinimalBattleScreen({
       ),
     [snapshot.battle.units],
   )
+  const positionIdByBattleUnitId = useMemo(
+    () =>
+      Object.freeze(
+        Object.fromEntries(
+          snapshot.battle.units.map((unit) => [
+            unit.battleUnitId,
+            getBoardPositionId(unit.position),
+          ]),
+        ),
+      ),
+    [snapshot.battle.units],
+  )
+
+  useEffect(() => {
+    const nextSequence = snapshot.log.nextSequence
+    const startSequence = lastFxSequenceRef.current
+    if (nextSequence < startSequence) {
+      lastFxSequenceRef.current = nextSequence
+      fxBatchIdRef.current += 1
+      setFxBatch(Object.freeze({ id: fxBatchIdRef.current, commands: EMPTY_FX_COMMANDS }))
+      return undefined
+    }
+    if (nextSequence === startSequence) return undefined
+
+    const events = snapshot.log.events.slice(startSequence, nextSequence)
+    lastFxSequenceRef.current = nextSequence
+    const commands = mapBattleEventsToFxCommands(events, {
+      motionLevel,
+      playbackRate: speed,
+      skipAnimations: speed === 8,
+      positionIdByBattleUnitId,
+      skills: definition.skills,
+      skillFx: VERTICAL_SLICE_SKILL_FX,
+    })
+    fxBatchIdRef.current += 1
+    const batchId = fxBatchIdRef.current
+    setFxBatch(Object.freeze({ id: batchId, commands }))
+    if (commands.length === 0) return undefined
+
+    const maxDuration = Math.max(...commands.map((command) => command.durationMs))
+    const timer = window.setTimeout(() => {
+      setFxBatch((current) =>
+        current.id === batchId
+          ? Object.freeze({ id: batchId, commands: EMPTY_FX_COMMANDS })
+          : current,
+      )
+    }, maxDuration + 120)
+    return () => window.clearTimeout(timer)
+  }, [
+    definition.skills,
+    motionLevel,
+    positionIdByBattleUnitId,
+    snapshot.log.events,
+    snapshot.log.nextSequence,
+    speed,
+  ])
 
   const reset = () => {
     setAutoRequested(false)
@@ -454,6 +530,7 @@ export function MinimalBattleScreen({
               )
             })}
           </div>
+          <FxLayer commands={fxBatch.commands} batchId={fxBatch.id} motionLevel={motionLevel} />
         </section>
 
         <BattleMobileTabs activeTab={activePanel} onChange={setActivePanel} />

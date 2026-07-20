@@ -32,6 +32,8 @@ describe('FxLayer', () => {
   })
 
   it('renders nothing in minimal mode', () => {
-    expect(renderToStaticMarkup(<FxLayer commands={[COMMAND]} batchId={1} motionLevel="MINIMAL" />)).toBe('')
+    expect(
+      renderToStaticMarkup(<FxLayer commands={[COMMAND]} batchId={1} motionLevel="MINIMAL" />),
+    ).toBe('')
   })
 })

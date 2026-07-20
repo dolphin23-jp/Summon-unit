@@ -59,7 +59,11 @@ function assertValidDefinition(definition: SkillFxDefinition, index: number): vo
   if (!/^#[0-9a-f]{6}$/i.test(definition.color)) {
     throw new Error(`${field}.color must be a six-digit hex color`)
   }
-  if (!Number.isSafeInteger(definition.durationMs) || definition.durationMs < 80 || definition.durationMs > 2_000) {
+  if (
+    !Number.isSafeInteger(definition.durationMs) ||
+    definition.durationMs < 80 ||
+    definition.durationMs > 2_000
+  ) {
     throw new Error(`${field}.durationMs must be an integer between 80 and 2000`)
   }
   if (!Number.isFinite(definition.scale) || definition.scale < 0.5 || definition.scale > 2.5) {

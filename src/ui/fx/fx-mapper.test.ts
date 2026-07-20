@@ -141,7 +141,11 @@ describe('battle FX mapper', () => {
   it('keeps only number pops and emphasis in reduced mode', () => {
     const commands = map('REDUCED')
     expect(commands.length).toBeGreaterThan(0)
-    expect(commands.every((command) => ['FLOAT_TEXT', 'ACTOR_FOCUS', 'HIT_FLASH'].includes(command.kind))).toBe(true)
+    expect(
+      commands.every((command) =>
+        ['FLOAT_TEXT', 'ACTOR_FOCUS', 'HIT_FLASH'].includes(command.kind),
+      ),
+    ).toBe(true)
     expect(commands.some((command) => command.kind === 'MOVE')).toBe(false)
     expect(commands.some((command) => command.kind === 'SKILL_PRESET')).toBe(false)
   })
@@ -160,6 +164,8 @@ describe('battle FX mapper', () => {
       skills: STANDARD_HEADLESS_BATTLE.skills,
     })
     expect(fast.map((command) => command.id)).toEqual(normal.map((command) => command.id))
-    expect(fast.every((command, index) => command.durationMs <= normal[index].durationMs)).toBe(true)
+    expect(fast.every((command, index) => command.durationMs <= normal[index].durationMs)).toBe(
+      true,
+    )
   })
 })
