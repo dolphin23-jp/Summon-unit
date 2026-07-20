@@ -27,6 +27,9 @@ interface Sample {
   readonly moves: number
   readonly calculatedDamage: number
   readonly overkillDamage: number
+  readonly modifiedHealing: number
+  readonly appliedHealing: number
+  readonly overheal: number
 }
 
 interface MutableContribution {
@@ -35,6 +38,7 @@ interface MutableContribution {
   readonly speed: number
   actions: number
   appliedDamage: number
+  healing: number
   redirectedDamage: number
   barrierAbsorbed: number
 }
@@ -99,6 +103,7 @@ function contribution(
     speed: species.stats.speed,
     actions: 0,
     appliedDamage: 0,
+    healing: 0,
     redirectedDamage: 0,
     barrierAbsorbed: 0,
   }
@@ -118,6 +123,9 @@ function sampleFrom(
   let moves = 0
   let calculatedDamage = 0
   let overkillDamage = 0
+  let modifiedHealing = 0
+  let appliedHealing = 0
+  let overheal = 0
 
   for (const event of result.log.events) {
     if (event.kind === 'skill_used') {
@@ -133,6 +141,15 @@ function sampleFrom(
       const side = sourceId === null ? undefined : sideMap.get(sourceId)
       if (species !== undefined && side !== undefined) {
         contribution(contributions, side, species).appliedDamage += event.payload.appliedDamage
+      }
+    } else if (event.kind === 'healing_applied') {
+      modifiedHealing += event.payload.modifiedHealing
+      appliedHealing += event.payload.appliedHealing
+      overheal += event.payload.overheal
+      const species = speciesMap.get(event.payload.sourceBattleUnitId)
+      const side = sideMap.get(event.payload.sourceBattleUnitId)
+      if (species !== undefined && side !== undefined) {
+        contribution(contributions, side, species).healing += event.payload.appliedHealing
       }
     } else if (event.kind === 'guard_shared') {
       const species = speciesMap.get(event.payload.guardBattleUnitId)
@@ -163,6 +180,9 @@ function sampleFrom(
     moves,
     calculatedDamage,
     overkillDamage,
+    modifiedHealing,
+    appliedHealing,
+    overheal,
   })
 }
 
@@ -207,10 +227,10 @@ function freezeContributions(
   return Object.freeze(
     [...mutable.values()]
       .map((value) => {
-        const totalActionValue = value.appliedDamage + value.redirectedDamage + value.barrierAbsorbed
+        const totalActionValue =
+          value.appliedDamage + value.healing + value.redirectedDamage + value.barrierAbsorbed
         return Object.freeze({
           ...value,
-          healing: 0,
           totalActionValue,
           actionValuePerActionPermille:
             value.actions === 0 ? 0 : Math.round((totalActionValue * 1000) / value.actions),
@@ -301,6 +321,15 @@ export function runVerticalSliceT046BalanceBenchmark(): VerticalSliceBalanceRepo
   )
   const totalSkillUses = [...skillUses.values()].reduce((total, uses) => total + uses, 0)
   const contributions = freezeContributions(mutableContributions)
+  const totalModifiedHealing = allSamples.reduce(
+    (total, sample) => total + sample.modifiedHealing,
+    0,
+  )
+  const totalAppliedHealing = allSamples.reduce(
+    (total, sample) => total + sample.appliedHealing,
+    0,
+  )
+  const totalOverheal = allSamples.reduce((total, sample) => total + sample.overheal, 0)
 
   return Object.freeze({
     reportVersion: VERTICAL_SLICE_BALANCE_REPORT_VERSION,
@@ -312,9 +341,12 @@ export function runVerticalSliceT046BalanceBenchmark(): VerticalSliceBalanceRepo
       battles: allSamples.length,
     }),
     capabilities: Object.freeze({
-      healingResolutionAvailable: false,
-      overhealRateBasisPoints: null,
-      note: 'The current runner executes SINGLE_ENEMY skills only; healing and overheal are explicitly unavailable.',
+      healingResolutionAvailable: true,
+      overhealRateBasisPoints: basisPoints(totalOverheal, totalModifiedHealing),
+      totalModifiedHealing,
+      totalAppliedHealing,
+      totalOverheal,
+      note: 'Healing is resolved by the same interactive/headless runner and measured from healing_applied events.',
     }),
     overall: aggregate(allSamples),
     stages,

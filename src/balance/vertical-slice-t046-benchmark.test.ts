@@ -11,8 +11,10 @@ describe('T046 vertical slice balance benchmark', () => {
       stages: 17,
       battles: 51,
     })
-    expect(REPORT.capabilities.healingResolutionAvailable).toBe(false)
-    expect(REPORT.capabilities.overhealRateBasisPoints).toBeNull()
+    expect(REPORT.capabilities.healingResolutionAvailable).toBe(true)
+    expect(REPORT.capabilities.totalModifiedHealing).toBeGreaterThan(0)
+    expect(REPORT.capabilities.totalAppliedHealing).toBeGreaterThan(0)
+    expect(REPORT.capabilities.overhealRateBasisPoints).toBeLessThanOrEqual(3500)
     expect(REPORT.stages).toHaveLength(17)
     expect(REPORT.stages.every((stage) => stage.samples === 3)).toBe(true)
     expect(REPORT.skills.length).toBeGreaterThan(0)

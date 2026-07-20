@@ -2,7 +2,7 @@ import type { AiDecisionConfiguration } from '../ai/strategy-presets'
 import type { HeadlessBattleUnitDefinition } from '../battle/headless-battle-runner'
 import type { BattleUnitId } from '../battle/unit-state'
 
-export const VERTICAL_SLICE_BALANCE_REPORT_VERSION = 1
+export const VERTICAL_SLICE_BALANCE_REPORT_VERSION = 2
 export const VERTICAL_SLICE_BALANCE_MAX_ACTIONS = 500
 
 export type VerticalSliceBalanceBand = 'INTRO' | 'REGION_A' | 'REGION_B'
@@ -68,8 +68,11 @@ export interface VerticalSliceBalanceReport {
     readonly battles: number
   }
   readonly capabilities: {
-    readonly healingResolutionAvailable: false
-    readonly overhealRateBasisPoints: null
+    readonly healingResolutionAvailable: true
+    readonly overhealRateBasisPoints: number
+    readonly totalModifiedHealing: number
+    readonly totalAppliedHealing: number
+    readonly totalOverheal: number
     readonly note: string
   }
   readonly overall: Omit<VerticalSliceStageBalanceMetrics, 'stageId' | 'band'>
