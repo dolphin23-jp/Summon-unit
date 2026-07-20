@@ -53,7 +53,7 @@ import { CollectionScreen } from './ui/CollectionScreen'
 import { HomeScreen } from './ui/HomeScreen'
 import { MinimalBattleScreen } from './ui/MinimalBattleScreen'
 import { T040RegionScreen as RegionScreen } from './ui/T040RegionScreen'
-import { ResearchScreen } from './ui/ResearchScreen'
+import { T048ResearchScreen } from './ui/T048ResearchScreen'
 import { SaveSlotScreen } from './ui/SaveSlotScreen'
 import { SummonScreen } from './ui/SummonScreen'
 
@@ -218,7 +218,7 @@ function App() {
         } else if (result.recoveredFromBackup) {
           setSaveNotice('現在世代を検証できなかったため、バックアップ世代から復元しました。')
         } else if (result.createdInitialSave) {
-          setSaveNotice('T047垂直スライスの初期進行を保存しました。')
+          setSaveNotice('v0.1垂直スライスの初期進行を保存しました。')
         }
       })
       .catch((error) => {
@@ -701,7 +701,7 @@ function App() {
             セーブスロット
           </button>
         </nav>
-        <ResearchScreen
+        <T048ResearchScreen
           playerData={playerData}
           catalog={VERTICAL_SLICE_RUNTIME_CATALOG}
           onPlayerDataChange={updatePlayerData}
