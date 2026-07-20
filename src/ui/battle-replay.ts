@@ -186,6 +186,12 @@ export function applyBattleEventToReplayFrame(
         hp: event.payload.hpAfter,
       }))
       break
+    case 'healing_applied':
+      units = updateUnit(units, event.payload.targetBattleUnitId, (unit) => ({
+        ...unit,
+        hp: event.payload.hpAfter,
+      }))
+      break
     case 'unit_defeated':
       units = updateUnit(units, event.payload.defeatedBattleUnitId, (unit) => ({
         ...unit,
@@ -312,6 +318,8 @@ export function formatBattleEventForDisplay(event: BattleEvent): string {
       return `${shortId(event.payload.targetBattleUnitId)}の障壁が${event.payload.absorbedDamage}吸収${event.payload.broken ? '・破壊' : ''}`
     case 'damage_applied':
       return `${shortId(event.payload.targetBattleUnitId)}に${event.payload.appliedDamage}ダメージ（HP ${event.payload.hpAfter}）`
+    case 'healing_applied':
+      return `${shortId(event.payload.targetBattleUnitId)}を${event.payload.appliedHealing}回復（過剰 ${event.payload.overheal} / HP ${event.payload.hpAfter}）`
     case 'effect_applied':
       return `${shortId(event.payload.targetBattleUnitId)}に${shortId(event.payload.effectId)}を付与`
     case 'effect_merged':
