@@ -60,11 +60,11 @@ describe('T048 release readiness', () => {
     ).toContain(skillId)
   })
 
-  it('records support resolution as unavailable until the runner accepts ally-target skills', () => {
-    expect(RELEASE_BALANCE_REPORT.capabilities).toEqual({
-      healingResolutionAvailable: false,
-      overhealRateBasisPoints: null,
-      note: 'The current runner executes SINGLE_ENEMY skills only; healing and overheal are explicitly unavailable.',
-    })
+  it('records resolved healing and a bounded overheal rate', () => {
+    expect(RELEASE_BALANCE_REPORT.capabilities.healingResolutionAvailable).toBe(true)
+    expect(RELEASE_BALANCE_REPORT.capabilities.totalModifiedHealing).toBeGreaterThan(0)
+    expect(RELEASE_BALANCE_REPORT.capabilities.totalAppliedHealing).toBeGreaterThan(0)
+    expect(RELEASE_BALANCE_REPORT.capabilities.totalOverheal).toBeGreaterThanOrEqual(0)
+    expect(RELEASE_BALANCE_REPORT.capabilities.overhealRateBasisPoints).toBeLessThanOrEqual(3500)
   })
 })

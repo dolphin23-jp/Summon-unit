@@ -38,7 +38,7 @@ import {
   type SkillReachResolution,
 } from '../battle/reach-and-area'
 import { calculateSingleTargetDamage } from '../battle/single-target-damage'
-import { getModifiedBattleStatValue } from '../battle/stat-modifiers'
+import { applyHealingReceivedModifier, getModifiedBattleStatValue } from '../battle/stat-modifiers'
 import {
   assertValidBattleUnitState,
   type BattleUnitId,
@@ -85,6 +85,9 @@ export interface AiPredictedTargetResult {
   readonly maxHp: number
   readonly calculatedDamage: number
   readonly appliedDamage: number
+  readonly rawHealing: number
+  readonly appliedHealing: number
+  readonly overheal: number
   readonly hpAfter: number
   readonly defeatsTarget: boolean
   readonly effectiveAttack: number | null
@@ -437,6 +440,11 @@ function previewTargetDamage(
   skill: SkillDefinition,
 ): AiPredictedTargetResult {
   if (actor.side === target.side) {
+    const rawHealing =
+      skill.healingPower === undefined
+        ? 0
+        : applyHealingReceivedModifier(skill.healingPower, target.effects)
+    const appliedHealing = Math.min(rawHealing, targetSpecies.stats.hp - target.hp)
     return Object.freeze({
       battleUnitId: target.battleUnitId,
       positionId: getBoardPositionId(target.position),
@@ -444,7 +452,10 @@ function previewTargetDamage(
       maxHp: targetSpecies.stats.hp,
       calculatedDamage: 0,
       appliedDamage: 0,
-      hpAfter: target.hp,
+      rawHealing,
+      appliedHealing,
+      overheal: rawHealing - appliedHealing,
+      hpAfter: target.hp + appliedHealing,
       defeatsTarget: false,
       effectiveAttack: null,
       effectiveDefense: null,
@@ -482,6 +493,9 @@ function previewTargetDamage(
     maxHp: targetSpecies.stats.hp,
     calculatedDamage,
     appliedDamage,
+    rawHealing: 0,
+    appliedHealing: 0,
+    overheal: 0,
     hpAfter,
     defeatsTarget: hpAfter === 0,
     effectiveAttack,

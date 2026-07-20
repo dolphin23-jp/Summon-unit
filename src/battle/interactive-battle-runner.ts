@@ -62,6 +62,7 @@ import {
   getGuardShareForProtectedUnit,
   type GuardShareState,
 } from './guard-share'
+import { resolveUnitHealing } from './healing'
 import { performNormalMovement } from './normal-movement'
 import { getSkillReachTargetCandidates } from './reach-and-area'
 import { getModifiedBattleStatValue } from './stat-modifiers'
@@ -656,7 +657,7 @@ function executeSkillDecision(
   const targetBattleUnitId =
     preview.reach.actualTargetBattleUnitId ?? preview.targetResults[0]?.battleUnitId
   if (targetBattleUnitId === null || targetBattleUnitId === undefined) {
-    throw new Error('damage skill requires at least one resolved target')
+    throw new Error('skill requires at least one resolved target')
   }
   const effectiveSpeed = getModifiedBattleStatValue(
     actorSpecies.stats.speed,
@@ -681,59 +682,80 @@ function executeSkillDecision(
     },
   })
 
-  for (const predicted of preview.targetResults) {
-    if (nextBattle.outcome !== 'ONGOING') {
-      break
+  if (skill.healingPower !== undefined) {
+    for (const predicted of preview.targetResults) {
+      const target = getRequiredUnit(nextBattle, predicted.battleUnitId)
+      if (target.defeated) continue
+      const targetSpecies = getRequiredSpecies(context.speciesById, target.speciesId)
+      const healing = resolveUnitHealing(target, targetSpecies, skill.healingPower)
+      nextBattle = replaceLivingUnit(nextBattle, healing.after)
+      nextLog = appendBattleEvent(nextLog, {
+        kind: 'healing_applied',
+        virtualTime: currentTime,
+        payload: {
+          sourceBattleUnitId: actor.battleUnitId,
+          targetBattleUnitId: target.battleUnitId,
+          skillId: skill.id,
+          baseHealing: healing.baseHealing,
+          modifiedHealing: healing.modifiedHealing,
+          appliedHealing: healing.appliedHealing,
+          overheal: healing.overheal,
+          hpBefore: healing.before.hp,
+          hpAfter: healing.after.hp,
+        },
+      })
     }
-    const target = getRequiredUnit(nextBattle, predicted.battleUnitId)
-    if (target.defeated || predicted.calculatedDamage === 0) {
-      continue
-    }
-    const targetSpecies = getRequiredSpecies(context.speciesById, target.speciesId)
-    const mitigation = resolveBarrierGuardDamage({
-      finalDamage: predicted.calculatedDamage,
-      target,
-      targetSpecies,
-      guard: getLivingGuard(nextBattle, target, context),
-    })
-    nextBattle = applyRecipientResolution(
-      nextBattle,
-      mitigation.target,
-      actor.battleUnitId,
-      currentTime,
-    )
-    if (mitigation.guardShare !== null && nextBattle.outcome === 'ONGOING') {
+  } else {
+    for (const predicted of preview.targetResults) {
+      if (nextBattle.outcome !== 'ONGOING') break
+      const target = getRequiredUnit(nextBattle, predicted.battleUnitId)
+      if (target.defeated || predicted.calculatedDamage === 0) continue
+      const targetSpecies = getRequiredSpecies(context.speciesById, target.speciesId)
+      const mitigation = resolveBarrierGuardDamage({
+        finalDamage: predicted.calculatedDamage,
+        target,
+        targetSpecies,
+        guard: getLivingGuard(nextBattle, target, context),
+      })
       nextBattle = applyRecipientResolution(
         nextBattle,
-        mitigation.guardShare.guard,
+        mitigation.target,
         actor.battleUnitId,
         currentTime,
       )
-      nextLog = recordGuardShared(nextLog, {
-        virtualTime: currentTime,
-        sourceBattleUnitId: actor.battleUnitId,
-        skillId: skill.id,
-        guardShare: mitigation.guardShare.guardShare,
-        finalDamage: mitigation.finalDamage,
-        retainedDamage: mitigation.guardShare.retainedDamage,
-        redirectedDamage: mitigation.guardShare.redirectedDamage,
-      })
-    }
-    nextLog = recordRecipientResolution(
-      nextLog,
-      mitigation.target,
-      actor.battleUnitId,
-      skill.id,
-      currentTime,
-    )
-    if (mitigation.guardShare !== null) {
+      if (mitigation.guardShare !== null && nextBattle.outcome === 'ONGOING') {
+        nextBattle = applyRecipientResolution(
+          nextBattle,
+          mitigation.guardShare.guard,
+          actor.battleUnitId,
+          currentTime,
+        )
+        nextLog = recordGuardShared(nextLog, {
+          virtualTime: currentTime,
+          sourceBattleUnitId: actor.battleUnitId,
+          skillId: skill.id,
+          guardShare: mitigation.guardShare.guardShare,
+          finalDamage: mitigation.finalDamage,
+          retainedDamage: mitigation.guardShare.retainedDamage,
+          redirectedDamage: mitigation.guardShare.redirectedDamage,
+        })
+      }
       nextLog = recordRecipientResolution(
         nextLog,
-        mitigation.guardShare.guard,
+        mitigation.target,
         actor.battleUnitId,
         skill.id,
         currentTime,
       )
+      if (mitigation.guardShare !== null) {
+        nextLog = recordRecipientResolution(
+          nextLog,
+          mitigation.guardShare.guard,
+          actor.battleUnitId,
+          skill.id,
+          currentTime,
+        )
+      }
     }
   }
 
@@ -953,19 +975,26 @@ function getUsableSkills(
   const usable = getRequiredSkillIds(context, actor.battleUnitId)
     .map((skillId) => getRequiredSkill(context.skillById, skillId))
     .filter((skill) => {
-      if (skill.targetType !== 'SINGLE_ENEMY') {
+      if (skill.targetType !== 'SINGLE_ENEMY' && skill.healingPower === undefined) {
         return false
       }
       return getSkillReachTargetCandidates(battle, actor.battleUnitId, skill).some(
-        (target) =>
-          canUseSkillWithUsageState({
-            usageBook,
-            skill,
-            actor,
-            actorSpecies,
-            target,
-            targetSpecies: getRequiredSpecies(context.speciesById, target.speciesId),
-          }),
+        (target) => {
+          const targetSpecies = getRequiredSpecies(context.speciesById, target.speciesId)
+          if (
+            !canUseSkillWithUsageState({
+              usageBook,
+              skill,
+              actor,
+              actorSpecies,
+              target,
+              targetSpecies,
+            })
+          ) {
+            return false
+          }
+          return skill.healingPower === undefined || target.hp < targetSpecies.stats.hp
+        },
       )
     })
   return Object.freeze(usable)
@@ -1069,7 +1098,6 @@ function getConfiguredDecision(
     configuration: context.aiConfigurations[actor.battleUnitId] ?? DEFAULT_AI_CONFIGURATION,
   })
 }
-
 
 function getManualEvaluations(
   battle: BattleState,

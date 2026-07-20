@@ -2,45 +2,32 @@
 
 ## 目的
 
-`docs/14_VERTICAL_SLICE.md`の合格条件を自動検証・実装証拠・本番スモークへ対応付け、すべて満たした場合だけ`v0.1.0`を公開する。
+`docs/14_VERTICAL_SLICE.md`の合格条件を検証し、Vercel production確認後に`v0.1.0`を公開する。
 
 ## 実施内容
 
-- [x] T047実行時カタログがT046調整済みマスターを参照しているか確認する
-- [x] 調整前マスター参照を`VERTICAL_SLICE_T046_BALANCED_CATALOG`へ修正する
-- [x] 実行版とコンテンツ版をrelease candidateとして明示する
-- [x] `docs/14`合格条件をチェックリスト化し、根拠と判定を記録する
-- [x] 低レア開花研究を研究画面から実行できるようにする
-- [x] T046 51戦ベンチ、開花研究、release metadataの回帰テストを追加する
-- [x] 未解決の支援・回復技統合をリリースブロッカーとして特定する
-- [x] Vercel PR previewがReadyになることを確認する
-- [ ] 味方対象・自身対象の支援技を戦闘ランナーへ統合する
-- [ ] 実回復量と過剰回復率をベンチマークへ追加する
-- [ ] Vercel productionで主要導線をスモーク確認する
-- [ ] 判定をGOへ変更する
-- [ ] versionを`0.1.0`へ確定する
-- [ ] `v0.1.0`タグとGitHub Releaseを作成する
+- [x] T046調整済みカタログを実行時へ接続
+- [x] `docs/14`合格条件を根拠つきで判定
+- [x] 低レア開花研究をUIへ接続
+- [x] 味方・自身対象の回復技をAUTO／手動へ統合
+- [x] 実回復量と過剰回復率をイベントログ・ベンチへ追加
+- [x] 回復クールダウンを設定し51戦タイムアウト0を確認
+- [x] content、tests、headless、AI／balance benchmark、lint、buildを成功
+- [x] 一時パッチWorkflow・診断トリガーを削除し、標準CIだけのclean headへ戻す
+- [ ] Vercel productionで主要導線をスモーク確認
+- [ ] versionを`0.1.0`へ確定
+- [ ] `v0.1.0`タグとGitHub Releaseを作成
 
 ## 現在の判定
 
-**NO-GO**
+**CODE GO / EXTERNAL DEPLOYMENT PENDING**
 
-理由:
+コード側のrelease blockerは解消した。Vercel無料枠の日次デプロイ上限により最終production確認だけが実行不能であるため、現在は`0.1.0-rc.2`として保持し、最終タグは作成しない。
 
-1. 現行戦闘ランナーは`SINGLE_ENEMY`技だけを候補・実解決し、回復・障壁・浄化・時間短縮などを実行しない
-2. そのため「回復無限がない」「過剰回復が少ない」を検証できない
+## 最終統合条件
 
-Vercel PR previewはReadyであり、デプロイ基盤自体はリリース阻害事項ではない。production昇格はコード側のNO-GO解除後に行う。
+マージ対象headには製品コード、テスト、ベンチマーク、文書だけを含める。標準CIでcontent validation、全テスト、headless、AI／balance benchmark、lint、buildが成功したclean headだけを`main`へ統合する。
 
-## 今回の成果
+## 次の操作
 
-- release candidate `0.1.0-rc.1`
-- T046調整済みカタログをブラウザ実行時へ反映
-- 開花研究UIを接続
-- Vercel PR previewを生成
-- `docs/19_V0_1_RELEASE_READINESS.md`へ全判定とブロッカーを記録
-- リリース未達の状態で誤って`v0.1.0`タグを作らない運用を確定
-
-## 次の実装境界
-
-最優先は支援・回復技の戦闘ランナー統合。完了後にT048の残チェックを再実行し、Vercel production確認とタグ作成へ進む。
+Vercel上限解除後にproductionスモークを実施し、成功した場合のみ残る3項目を完了させる。

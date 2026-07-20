@@ -47,6 +47,6 @@
 - [x] T045 — [研究網スライス・地域A/B制作](T045_RESEARCH_REGIONS_A_B.md)
 - [x] T046 — [バランスシミュレーション・調整・導入](T046_BALANCE_SIMULATION_ONBOARDING.md)
 - [x] T047 — [通し結合・堅牢化](T047_FULL_LOOP_HARDENING.md)
-- [ ] T048 — [合格条件検証・v0.1リリース](T048_V0_1_RELEASE.md) — release candidate `0.1.0-rc.1`; support resolution and Vercel production verification remain
+- [ ] T048 — [合格条件検証・v0.1リリース](T048_V0_1_RELEASE.md) — code GO at `0.1.0-rc.2`; Vercel production smoke and final tag remain
 
-T001～T047 complete. T048 is in progress with a documented NO-GO release gate.
+T001～T047 complete. T048 code acceptance is complete; external production verification remains.

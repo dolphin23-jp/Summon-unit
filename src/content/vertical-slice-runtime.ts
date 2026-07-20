@@ -10,8 +10,8 @@ import {
 } from './vertical-slice-t046-balanced-master'
 import { VERTICAL_SLICE_ONBOARDING_CUES } from './vertical-slice-t046'
 
-export const VERTICAL_SLICE_RELEASE_VERSION = '0.1.0-rc.1'
-export const VERTICAL_SLICE_RELEASE_CONTENT_VERSION = 'slice-v0.1.0-rc.1'
+export const VERTICAL_SLICE_RELEASE_VERSION = '0.1.0-rc.2'
+export const VERTICAL_SLICE_RELEASE_CONTENT_VERSION = 'slice-v0.1.0-rc.2'
 export const VERTICAL_SLICE_RUNTIME_CATALOG = VERTICAL_SLICE_T046_BALANCED_CATALOG
 export const VERTICAL_SLICE_RUNTIME_INITIAL_PLAYER_DATA: PlayerData = createPlayerData(
   {

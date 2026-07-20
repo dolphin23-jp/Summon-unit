@@ -11,8 +11,10 @@ describe('T046 vertical slice balance benchmark', () => {
       stages: 17,
       battles: 51,
     })
-    expect(REPORT.capabilities.healingResolutionAvailable).toBe(false)
-    expect(REPORT.capabilities.overhealRateBasisPoints).toBeNull()
+    expect(REPORT.capabilities.healingResolutionAvailable).toBe(true)
+    expect(REPORT.capabilities.totalModifiedHealing).toBeGreaterThan(0)
+    expect(REPORT.capabilities.totalAppliedHealing).toBeGreaterThan(0)
+    expect(REPORT.capabilities.overhealRateBasisPoints).toBeLessThanOrEqual(3500)
     expect(REPORT.stages).toHaveLength(17)
     expect(REPORT.stages.every((stage) => stage.samples === 3)).toBe(true)
     expect(REPORT.skills.length).toBeGreaterThan(0)
@@ -21,7 +23,11 @@ describe('T046 vertical slice balance benchmark', () => {
   })
 
   it('removes action-limit timeouts and keeps every introductory stage at two wins or better', () => {
-    expect(REPORT.overall.timeoutRateBasisPoints).toBe(0)
+    const timeoutStages = REPORT.stages.filter((stage) => stage.timeoutRateBasisPoints > 0)
+    expect(
+      REPORT.overall.timeoutRateBasisPoints,
+      `timeout stages: ${JSON.stringify(timeoutStages)}`,
+    ).toBe(0)
     for (const stage of REPORT.stages.filter((candidate) => candidate.band === 'INTRO')) {
       expect(stage.allyVictories).toBeGreaterThanOrEqual(2)
     }
