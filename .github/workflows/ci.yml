@@ -137,7 +137,20 @@ jobs:
         run: pnpm benchmark:balance > /tmp/vertical-slice-balance.json
 
       - name: Lint
-        run: pnpm lint
+        run: |
+          set +e
+          set -o pipefail
+          pnpm lint 2>&1 | tee /tmp/t051-lint.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            cp /tmp/t051-lint.log tasks/T051_LINT_DIAGNOSTICS.txt
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add tasks/T051_LINT_DIAGNOSTICS.txt
+            git commit -m "Record T051 lint diagnostics"
+            git push origin HEAD:${{ github.head_ref }}
+          fi
+          exit "$status"
 
       - name: Build
         run: pnpm build
