@@ -369,9 +369,6 @@ export function assertValidBattleEvent(event: BattleEvent): void {
       assertNonEmptyId(event.payload.actorBattleUnitId, 'actorBattleUnitId')
       assertNonEmptyId(event.payload.targetBattleUnitId, 'targetBattleUnitId')
       assertNonEmptyId(event.payload.skillId, 'skillId')
-      if (event.payload.actorBattleUnitId === event.payload.targetBattleUnitId) {
-        throw new Error('skill actor and target must differ')
-      }
       return
     case 'guard_shared': {
       const payload = event.payload

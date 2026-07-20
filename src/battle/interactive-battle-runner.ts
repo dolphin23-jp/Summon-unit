@@ -1,5 +1,11 @@
-import type { AiActionEvaluation } from '../ai/action-evaluation'
-import { evaluateStandardAiActions } from '../ai/standard-scorers'
+import type {
+  AiActionEvaluation,
+  AiEvaluationInput,
+} from '../ai/action-evaluation'
+import {
+  evaluateStandardAiActions,
+  type AiCandidateSupportProjection,
+} from '../ai/standard-scorers'
 import {
   evaluateConfiguredAiDecision,
   type AiConfiguredDecisionResult,
@@ -62,6 +68,7 @@ import {
   getGuardShareForProtectedUnit,
   type GuardShareState,
 } from './guard-share'
+import { resolveUnitHealing } from './healing'
 import { performNormalMovement } from './normal-movement'
 import { getSkillReachTargetCandidates } from './reach-and-area'
 import { getModifiedBattleStatValue } from './stat-modifiers'
@@ -656,7 +663,7 @@ function executeSkillDecision(
   const targetBattleUnitId =
     preview.reach.actualTargetBattleUnitId ?? preview.targetResults[0]?.battleUnitId
   if (targetBattleUnitId === null || targetBattleUnitId === undefined) {
-    throw new Error('damage skill requires at least one resolved target')
+    throw new Error('skill requires at least one resolved target')
   }
   const effectiveSpeed = getModifiedBattleStatValue(
     actorSpecies.stats.speed,
@@ -681,59 +688,80 @@ function executeSkillDecision(
     },
   })
 
-  for (const predicted of preview.targetResults) {
-    if (nextBattle.outcome !== 'ONGOING') {
-      break
+  if (skill.healingPower !== undefined) {
+    for (const predicted of preview.targetResults) {
+      const target = getRequiredUnit(nextBattle, predicted.battleUnitId)
+      if (target.defeated) continue
+      const targetSpecies = getRequiredSpecies(context.speciesById, target.speciesId)
+      const healing = resolveUnitHealing(target, targetSpecies, skill.healingPower)
+      nextBattle = replaceLivingUnit(nextBattle, healing.after)
+      nextLog = appendBattleEvent(nextLog, {
+        kind: 'healing_applied',
+        virtualTime: currentTime,
+        payload: {
+          sourceBattleUnitId: actor.battleUnitId,
+          targetBattleUnitId: target.battleUnitId,
+          skillId: skill.id,
+          baseHealing: healing.baseHealing,
+          modifiedHealing: healing.modifiedHealing,
+          appliedHealing: healing.appliedHealing,
+          overheal: healing.overheal,
+          hpBefore: healing.before.hp,
+          hpAfter: healing.after.hp,
+        },
+      })
     }
-    const target = getRequiredUnit(nextBattle, predicted.battleUnitId)
-    if (target.defeated || predicted.calculatedDamage === 0) {
-      continue
-    }
-    const targetSpecies = getRequiredSpecies(context.speciesById, target.speciesId)
-    const mitigation = resolveBarrierGuardDamage({
-      finalDamage: predicted.calculatedDamage,
-      target,
-      targetSpecies,
-      guard: getLivingGuard(nextBattle, target, context),
-    })
-    nextBattle = applyRecipientResolution(
-      nextBattle,
-      mitigation.target,
-      actor.battleUnitId,
-      currentTime,
-    )
-    if (mitigation.guardShare !== null && nextBattle.outcome === 'ONGOING') {
+  } else {
+    for (const predicted of preview.targetResults) {
+      if (nextBattle.outcome !== 'ONGOING') break
+      const target = getRequiredUnit(nextBattle, predicted.battleUnitId)
+      if (target.defeated || predicted.calculatedDamage === 0) continue
+      const targetSpecies = getRequiredSpecies(context.speciesById, target.speciesId)
+      const mitigation = resolveBarrierGuardDamage({
+        finalDamage: predicted.calculatedDamage,
+        target,
+        targetSpecies,
+        guard: getLivingGuard(nextBattle, target, context),
+      })
       nextBattle = applyRecipientResolution(
         nextBattle,
-        mitigation.guardShare.guard,
+        mitigation.target,
         actor.battleUnitId,
         currentTime,
       )
-      nextLog = recordGuardShared(nextLog, {
-        virtualTime: currentTime,
-        sourceBattleUnitId: actor.battleUnitId,
-        skillId: skill.id,
-        guardShare: mitigation.guardShare.guardShare,
-        finalDamage: mitigation.finalDamage,
-        retainedDamage: mitigation.guardShare.retainedDamage,
-        redirectedDamage: mitigation.guardShare.redirectedDamage,
-      })
-    }
-    nextLog = recordRecipientResolution(
-      nextLog,
-      mitigation.target,
-      actor.battleUnitId,
-      skill.id,
-      currentTime,
-    )
-    if (mitigation.guardShare !== null) {
+      if (mitigation.guardShare !== null && nextBattle.outcome === 'ONGOING') {
+        nextBattle = applyRecipientResolution(
+          nextBattle,
+          mitigation.guardShare.guard,
+          actor.battleUnitId,
+          currentTime,
+        )
+        nextLog = recordGuardShared(nextLog, {
+          virtualTime: currentTime,
+          sourceBattleUnitId: actor.battleUnitId,
+          skillId: skill.id,
+          guardShare: mitigation.guardShare.guardShare,
+          finalDamage: mitigation.finalDamage,
+          retainedDamage: mitigation.guardShare.retainedDamage,
+          redirectedDamage: mitigation.guardShare.redirectedDamage,
+        })
+      }
       nextLog = recordRecipientResolution(
         nextLog,
-        mitigation.guardShare.guard,
+        mitigation.target,
         actor.battleUnitId,
         skill.id,
         currentTime,
       )
+      if (mitigation.guardShare !== null) {
+        nextLog = recordRecipientResolution(
+          nextLog,
+          mitigation.guardShare.guard,
+          actor.battleUnitId,
+          skill.id,
+          currentTime,
+        )
+      }
     }
   }
 
@@ -953,19 +981,26 @@ function getUsableSkills(
   const usable = getRequiredSkillIds(context, actor.battleUnitId)
     .map((skillId) => getRequiredSkill(context.skillById, skillId))
     .filter((skill) => {
-      if (skill.targetType !== 'SINGLE_ENEMY') {
+      if (skill.targetType !== 'SINGLE_ENEMY' && skill.healingPower === undefined) {
         return false
       }
       return getSkillReachTargetCandidates(battle, actor.battleUnitId, skill).some(
-        (target) =>
-          canUseSkillWithUsageState({
-            usageBook,
-            skill,
-            actor,
-            actorSpecies,
-            target,
-            targetSpecies: getRequiredSpecies(context.speciesById, target.speciesId),
-          }),
+        (target) => {
+          const targetSpecies = getRequiredSpecies(context.speciesById, target.speciesId)
+          if (
+            !canUseSkillWithUsageState({
+              usageBook,
+              skill,
+              actor,
+              actorSpecies,
+              target,
+              targetSpecies,
+            })
+          ) {
+            return false
+          }
+          return skill.healingPower === undefined || target.hp < targetSpecies.stats.hp
+        },
       )
     })
   return Object.freeze(usable)
@@ -1050,6 +1085,61 @@ function createSummary(
   })
 }
 
+function createRunnerEvaluationInput(
+  battle: BattleState,
+  actor: BattleUnitState,
+  actorSpecies: MonsterSpecies,
+  context: HeadlessBattleContext,
+): AiEvaluationInput {
+  return Object.freeze({
+    battle,
+    actorBattleUnitId: actor.battleUnitId,
+    speciesById: context.speciesById,
+    availableSkills: getUsableSkills(battle, actor, actorSpecies, context),
+  })
+}
+
+function createHealingSupportProjections(
+  input: AiEvaluationInput,
+  currentTime: BattleTime,
+  recentActorPositionIds: readonly string[] | undefined,
+  context: HeadlessBattleContext,
+): readonly AiCandidateSupportProjection[] {
+  const preliminary = evaluateStandardAiActions({
+    input,
+    currentTime,
+    recentActorPositionIds,
+  })
+  return Object.freeze(
+    preliminary.flatMap((evaluation) => {
+      if (evaluation.preview.kind !== 'USE_SKILL') return []
+      const skill = getRequiredSkill(
+        context.skillById,
+        evaluation.preview.candidate.skillId,
+      )
+      if (skill.healingPower === undefined) return []
+      const targets = evaluation.preview.targetResults.map((predicted) => {
+        const target = getRequiredUnit(input.battle, predicted.battleUnitId)
+        const species = getRequiredSpecies(context.speciesById, target.speciesId)
+        const healing = resolveUnitHealing(target, species, skill.healingPower)
+        return Object.freeze({
+          battleUnitId: target.battleUnitId,
+          rawHealing: healing.modifiedHealing,
+          appliedHealing: healing.appliedHealing,
+          preventedDamage: 0,
+          usefulActionCount: healing.appliedHealing > 0 ? 1 : 0,
+        })
+      })
+      return [
+        Object.freeze({
+          candidateId: evaluation.preview.candidate.candidateId,
+          targets: Object.freeze(targets),
+        }),
+      ]
+    }),
+  )
+}
+
 function getConfiguredDecision(
   battle: BattleState,
   actor: BattleUnitState,
@@ -1057,19 +1147,21 @@ function getConfiguredDecision(
   currentTime: BattleTime,
   context: HeadlessBattleContext,
 ): AiConfiguredDecisionResult {
+  const input = createRunnerEvaluationInput(battle, actor, actorSpecies, context)
+  const recentActorPositionIds = context.recentPositionIds.get(actor.battleUnitId)
   return evaluateConfiguredAiDecision({
-    input: Object.freeze({
-      battle,
-      actorBattleUnitId: actor.battleUnitId,
-      speciesById: context.speciesById,
-      availableSkills: getUsableSkills(battle, actor, actorSpecies, context),
-    }),
+    input,
     currentTime,
-    recentActorPositionIds: context.recentPositionIds.get(actor.battleUnitId),
+    recentActorPositionIds,
+    supportProjections: createHealingSupportProjections(
+      input,
+      currentTime,
+      recentActorPositionIds,
+      context,
+    ),
     configuration: context.aiConfigurations[actor.battleUnitId] ?? DEFAULT_AI_CONFIGURATION,
   })
 }
-
 
 function getManualEvaluations(
   battle: BattleState,
@@ -1078,16 +1170,19 @@ function getManualEvaluations(
   currentTime: BattleTime,
   context: HeadlessBattleContext,
 ): readonly AiActionEvaluation[] {
+  const input = createRunnerEvaluationInput(battle, actor, actorSpecies, context)
+  const recentActorPositionIds = context.recentPositionIds.get(actor.battleUnitId)
   return Object.freeze(
     evaluateStandardAiActions({
-      input: Object.freeze({
-        battle,
-        actorBattleUnitId: actor.battleUnitId,
-        speciesById: context.speciesById,
-        availableSkills: getUsableSkills(battle, actor, actorSpecies, context),
-      }),
+      input,
       currentTime,
-      recentActorPositionIds: context.recentPositionIds.get(actor.battleUnitId),
+      recentActorPositionIds,
+      supportProjections: createHealingSupportProjections(
+        input,
+        currentTime,
+        recentActorPositionIds,
+        context,
+      ),
     }).filter(
       (evaluation) =>
         evaluation.preview.kind === 'MOVE' || evaluation.preview.targetResults.length > 0,
