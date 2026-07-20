@@ -54,8 +54,17 @@ jobs:
       - name: Lint
         run: pnpm lint
 
-      - name: Build
-        run: pnpm build
+      - name: Capture build result
+        id: build
+        shell: bash
+        run: |
+          set +e
+          set -o pipefail
+          pnpm build 2>&1 | tee t050-build.log
+          code=${PIPESTATUS[0]}
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          if [ "$code" -eq 0 ]; then rm -f t050-build.log; fi
+          exit 0
 
       - name: Commit materialized T050
         shell: bash
@@ -69,6 +78,10 @@ jobs:
           fi
           git commit -m "T050: materialize UX guidance and confirmations"
           git push origin HEAD:agent/t050-ux-guidance-confirmation
+
+      - name: Fail on build regression
+        if: steps.build.outputs.code != '0'
+        run: exit 1
 
   verify:
     runs-on: ubuntu-latest
