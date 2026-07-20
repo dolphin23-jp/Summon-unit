@@ -7,20 +7,21 @@ import {
 import { unlockBloomSkill } from '../progression/bloom-research'
 import { createPlayerData } from '../progression/player-data'
 
+const RELEASE_BALANCE_REPORT = runVerticalSliceT046BalanceBenchmark()
+
 describe('T048 release readiness', () => {
   it('keeps the balanced benchmark deterministic and free from timeouts or warnings', () => {
-    const report = runVerticalSliceT046BalanceBenchmark()
-    expect(report.deterministic).toBe(true)
-    expect(report.sampleMatrix).toEqual({
+    expect(RELEASE_BALANCE_REPORT.deterministic).toBe(true)
+    expect(RELEASE_BALANCE_REPORT.sampleMatrix).toEqual({
       profiles: 9,
       profilesPerStage: 3,
       stages: 17,
       battles: 51,
     })
-    expect(report.overall.timeoutRateBasisPoints).toBe(0)
-    expect(report.warnings).toEqual([])
-    expect(report.overall.allyVictories).toBe(45)
-    expect(report.overall.allyDefeats).toBe(6)
+    expect(RELEASE_BALANCE_REPORT.overall.timeoutRateBasisPoints).toBe(0)
+    expect(RELEASE_BALANCE_REPORT.warnings).toEqual([])
+    expect(RELEASE_BALANCE_REPORT.overall.allyVictories).toBe(45)
+    expect(RELEASE_BALANCE_REPORT.overall.allyDefeats).toBe(6)
   })
 
   it('allows an unlocked R1 species to complete bloom research once analysis is sufficient', () => {
@@ -60,8 +61,7 @@ describe('T048 release readiness', () => {
   })
 
   it('records support resolution as unavailable until the runner accepts ally-target skills', () => {
-    const report = runVerticalSliceT046BalanceBenchmark()
-    expect(report.capabilities).toEqual({
+    expect(RELEASE_BALANCE_REPORT.capabilities).toEqual({
       healingResolutionAvailable: false,
       overhealRateBasisPoints: null,
       note: 'The current runner executes SINGLE_ENEMY skills only; healing and overheal are explicitly unavailable.',
