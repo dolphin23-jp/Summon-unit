@@ -1,0 +1,8 @@
+
+> summon-unit@0.1.0-rc.2 validate:content /home/runner/work/Summon-unit/Summon-unit
+> tsc -p tsconfig.headless.json && node -e "require('fs').writeFileSync('.headless-dist/package.json', '{\"type\":\"commonjs\"}')" && node .headless-dist/scripts/validate-content.js && node -e "require('fs').rmSync('.headless-dist', { recursive: true, force: true })"
+
+src/demo/region-ui-demo.ts(27,14): error TS2322: Type 'readonly (Readonly<{ regionId: "region.demo-forest"; name: "翠風の観測林"; summary: "遮蔽、射線、優先撃破を学ぶ導入地域です。"; order: 1; requirement: Readonly<{ type: "ALWAYS"; }>; hideUntilUnlocked: false; }> | Readonly<...>)[]' is not assignable to type 'readonly RegionDefinition[]'.
+  Type 'Readonly<{ regionId: "region.demo-forest"; name: "翠風の観測林"; summary: "遮蔽、射線、優先撃破を学ぶ導入地域です。"; order: 1; requirement: Readonly<{ type: "ALWAYS"; }>; hideUntilUnlocked: false; }> | Readonly<...>' is not assignable to type 'RegionDefinition'.
+    Property 'themeColor' is missing in type 'Readonly<{ regionId: "region.demo-forest"; name: "翠風の観測林"; summary: "遮蔽、射線、優先撃破を学ぶ導入地域です。"; order: 1; requirement: Readonly<{ type: "ALWAYS"; }>; hideUntilUnlocked: false; }>' but required in type 'RegionDefinition'.
+ ELIFECYCLE  Command failed with exit code 2.
