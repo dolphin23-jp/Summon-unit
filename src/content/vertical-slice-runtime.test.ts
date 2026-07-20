@@ -3,15 +3,19 @@ import { createStageBattleDefinition } from '../progression/stage-battle'
 import { summonUnit } from '../progression/unit-economy'
 import { createNextSummonInstanceId } from '../ui/SummonScreen'
 import {
+  VERTICAL_SLICE_RELEASE_CONTENT_VERSION,
+  VERTICAL_SLICE_RELEASE_VERSION,
   VERTICAL_SLICE_RUNTIME_CATALOG,
   VERTICAL_SLICE_RUNTIME_FIRST_STAGE_ID,
   VERTICAL_SLICE_RUNTIME_INITIAL_PLAYER_DATA,
   VERTICAL_SLICE_RUNTIME_VALIDATION,
 } from './vertical-slice-runtime'
 
-describe('T047 vertical-slice runtime integration', () => {
-  it('connects the complete T046 catalog and an immediately playable first formation', () => {
+describe('T048 v0.1 vertical-slice runtime integration', () => {
+  it('connects the balanced release catalog and an immediately playable first formation', () => {
     expect(VERTICAL_SLICE_RUNTIME_VALIDATION).toEqual({
+      releaseVersion: '0.1.0',
+      contentVersion: 'slice-v0.1.0',
       stages: 17,
       initialUnits: 5,
       initialFormationMembers: 3,
@@ -19,7 +23,15 @@ describe('T047 vertical-slice runtime integration', () => {
       onboardingCues: 3,
       firstBattleAllies: 3,
       firstBattleEnemies: 1,
+      tunedWyvernAttack: 65,
+      tunedWyvernInnatePower: 1300,
     })
+    expect(VERTICAL_SLICE_RUNTIME_INITIAL_PLAYER_DATA.gameVersion).toBe(
+      VERTICAL_SLICE_RELEASE_VERSION,
+    )
+    expect(VERTICAL_SLICE_RUNTIME_INITIAL_PLAYER_DATA.contentVersion).toBe(
+      VERTICAL_SLICE_RELEASE_CONTENT_VERSION,
+    )
   })
 
   it('creates byte-identical first-stage definitions across repeated builds', () => {
