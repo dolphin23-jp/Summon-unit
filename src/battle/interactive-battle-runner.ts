@@ -1117,11 +1117,12 @@ function createHealingSupportProjections(
         context.skillById,
         evaluation.preview.candidate.skillId,
       )
-      if (skill.healingPower === undefined) return []
+      const healingPower = skill.healingPower
+      if (healingPower === undefined) return []
       const targets = evaluation.preview.targetResults.map((predicted) => {
         const target = getRequiredUnit(input.battle, predicted.battleUnitId)
         const species = getRequiredSpecies(context.speciesById, target.speciesId)
-        const healing = resolveUnitHealing(target, species, skill.healingPower)
+        const healing = resolveUnitHealing(target, species, healingPower)
         return Object.freeze({
           battleUnitId: target.battleUnitId,
           rawHealing: healing.modifiedHealing,
