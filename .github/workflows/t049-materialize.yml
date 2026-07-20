@@ -29,7 +29,7 @@ jobs:
       - name: Materialize T049 changes
         run: python3 scripts/t049_materialize.py
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --no-frozen-lockfile
       - name: Format changed files
         shell: bash
         run: |
