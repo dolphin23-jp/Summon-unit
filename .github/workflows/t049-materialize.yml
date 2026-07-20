@@ -1,19 +1,16 @@
-name: T049 Materialize
+name: T049 Finalize
 
 on:
   push:
     branches:
       - agent/t049-display-name-masters
-  pull_request:
-    branches:
-      - main
 
 permissions:
   contents: write
 
 jobs:
-  materialize:
-    if: github.actor != 'github-actions[bot]' && (github.event_name == 'push' || github.head_ref == 'agent/t049-display-name-masters')
+  finalize:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -26,46 +23,115 @@ jobs:
       - uses: pnpm/action-setup@v4
         with:
           version: 10.13.1
-      - name: Clear old diagnostics
-        run: rm -f t049-test-results.json
-      - name: Materialize T049 changes
-        run: python3 scripts/t049_materialize.py
+      - name: Apply T049 review fixes
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace(path: str, old: str, new: str) -> None:
+              target = Path(path)
+              text = target.read_text(encoding='utf-8')
+              if old not in text:
+                  raise SystemExit(f'missing expected fragment in {path}: {old[:80]}')
+              target.write_text(text.replace(old, new), encoding='utf-8')
+
+          display = Path('src/content/display-masters.ts')
+          text = display.read_text(encoding='utf-8')
+          text = text.replace('"catalyst.slice.primal-core": "特殊触媒"', '"catalyst.slice.primal-core": "原初核触媒"')
+          text = text.replace('"catalyst.slice.wyvern-heart": "特殊触媒"', '"catalyst.slice.wyvern-heart": "災炎心核"')
+          text = text.replace(
+              'const REWARD_NAMES: Readonly<Record<string, string>> = Object.freeze({\n})',
+              '''const REWARD_NAMES: Readonly<Record<string, string>> = Object.freeze({
+            "regional.slice-a.earth-60": "土触媒補給",
+            "regional.slice-a.venom-90": "毒触媒補給",
+            "regional.slice-a.wind-30": "風触媒補給",
+            "regional.slice-b.fire-30": "火触媒補給",
+            "regional.slice-b.machine-60": "機核触媒補給",
+            "regional.slice-b.primal-90": "原初核触媒補給",
+          })''',
+          )
+          display.write_text(text, encoding='utf-8')
+
+          research = Path('src/ui/ResearchScreen.tsx')
+          text = research.read_text(encoding='utf-8')
+          text = text.replace(
+              "import { resolveCatalystName, resolveDisplayName } from '../content/display-masters'",
+              "import { formatUnitDisplayName, resolveDisplayName } from '../content/display-masters'",
+          )
+          text = text.replace('<label key={resolveCatalystName(catalystId)}>', '<label key={catalystId}>')
+          text = text.replace(
+              "{instance.nickname ?? displayName(instance.speciesId)}{' '}\n              <small>{instance.instanceId}</small>",
+              '{instance.nickname ?? formatUnitDisplayName(instance.speciesId, instance.instanceId)}',
+          )
+          research.write_text(text, encoding='utf-8')
+
+          collection = Path('src/ui/CollectionScreen.tsx')
+          text = collection.read_text(encoding='utf-8')
+          text = text.replace(
+              "import { formatUnitDisplayName, resolveDisplayName } from '../content/display-masters'",
+              "import { formatUnitDisplayName, resolveDisplayName, resolveSkillDescription } from '../content/display-masters'",
+          )
+          text = text.replace(
+              '<h3>{displayName(skill.id)}</h3>\n                      <p>',
+              '<h3>{displayName(skill.id)}</h3>\n                      <p>{resolveSkillDescription(skill.id)}</p>\n                      <p>',
+          )
+          collection.write_text(text, encoding='utf-8')
+
+          tests = Path('src/content/display-masters.test.ts')
+          text = tests.read_text(encoding='utf-8')
+          text = text.replace(
+              '  resolveSkillDescription,',
+              '  resolveRewardName,\n  resolveSkillDescription,',
+          )
+          text = text.replace(
+              "    expect(resolveCatalystName('catalyst.slice.wind')).toBe('風触媒')",
+              "    expect(resolveCatalystName('catalyst.slice.wind')).toBe('風触媒')\n    expect(resolveRewardName('regional.slice-a.wind-30')).toBe('風触媒補給')",
+          )
+          tests.write_text(text, encoding='utf-8')
+
+          lock = Path('pnpm-lock.yaml')
+          if lock.exists():
+              lock.unlink()
+          diagnostic = Path('t049-test-results.json')
+          if diagnostic.exists():
+              diagnostic.unlink()
+          PY
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
+      - name: Remove generated lockfile
+        run: rm -f pnpm-lock.yaml
       - name: Format changed files
         shell: bash
         run: |
           git diff --name-only --diff-filter=ACM -z | xargs -0 -r pnpm exec prettier --write --ignore-unknown
-      - name: Validate content
-        run: pnpm validate:content
-      - name: Run tests with diagnostics
-        id: tests
+      - name: Audit player-facing raw IDs
         shell: bash
         run: |
-          set +e
-          pnpm test -- --reporter=json --outputFile=/tmp/t049-test-results.json
-          code=$?
-          echo "code=$code" >> "$GITHUB_OUTPUT"
-          if [ "$code" -ne 0 ]; then
-            cp /tmp/t049-test-results.json t049-test-results.json
-          fi
-          exit 0
-      - name: Commit materialized changes and diagnostics
+          {
+            echo '# JSX references to internal identity fields'
+            grep -RInE '\{[^}]*\.(battleUnitId|speciesId|catalystId|stageId|regionId|instanceId)[^}]*\}' src/ui || true
+            echo
+            echo '# Local ID-derived display helpers'
+            grep -RInE 'function (displayName|shortName)\(|split\([^)]*[.]' src/ui || true
+          } > t049-ui-id-audit.txt
+      - name: Validate content
+        run: pnpm validate:content
+      - name: Test
+        run: pnpm test
+      - name: Lint
+        run: pnpm lint
+      - name: Build
+        run: pnpm build
+      - name: Commit finalized implementation and audit
         shell: bash
         run: |
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add -A
           if git diff --cached --quiet; then
-            echo "No materialized changes"
+            echo "No finalized changes"
             exit 0
           fi
-          git commit -m "T049: materialize display name masters"
+          git commit -m "T049: finalize display name coverage"
           git push origin HEAD:agent/t049-display-name-masters
-      - name: Fail on test regression
-        if: steps.tests.outputs.code != '0'
-        run: exit 1
-      - name: Lint
-        run: pnpm lint
-      - name: Build
-        run: pnpm build
