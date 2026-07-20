@@ -1,3 +1,4 @@
+import { resolveStageName } from '../content/display-masters'
 import { useState } from 'react'
 import { SAVE_SLOT_IDS, type SaveSlotId, type SaveSlotSummary } from '../save/save-model'
 import { ConfirmDialog } from './ConfirmDialog'
@@ -259,7 +260,11 @@ export function SaveSlotScreen({
                     </div>
                     <div>
                       <dt>中断戦闘</dt>
-                      <dd>{summary.resumableBattleStageId ?? 'なし'}</dd>
+                      <dd>
+                        {summary.resumableBattleStageId === null
+                          ? 'なし'
+                          : resolveStageName(summary.resumableBattleStageId)}
+                      </dd>
                     </div>
                   </dl>
                   {summary.recoveredFromBackup && (

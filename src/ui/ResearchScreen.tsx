@@ -83,8 +83,10 @@ function TrialResearchForm({
   const [catalystIds, setCatalystIds] = useState<readonly string[]>(
     definition.candidateRange.catalystIds.slice(0, definition.candidateRange.minimumCatalystCount),
   )
+  const [confirmOpen, setConfirmOpen] = useState(false)
 
   const submit = () => {
+    setConfirmOpen(false)
     try {
       const result = performFacilityTrialResearch(
         playerData,
@@ -174,10 +176,24 @@ function TrialResearchForm({
       <button
         type="button"
         className="collection-button collection-button--primary"
-        onClick={submit}
+        onClick={() => setConfirmOpen(true)}
       >
         この条件で試験
       </button>
+      <ConfirmDialog
+        open={confirmOpen}
+        title="この条件で試験研究を行いますか？"
+        description="素材個体と触媒は消費しませんが、研究データを消費して適合結果を記録します。"
+        details={[
+          `消費: 研究データ ${definition.trialResearchDataCost}`,
+          `研究方式: ${METHOD_LABELS[method]}`,
+          `素材候補: ${materialSpeciesIds.map(resolveDisplayName).join(' / ') || 'なし'}`,
+          `触媒候補: ${catalystIds.map(resolveDisplayName).join(' / ') || 'なし'}`,
+        ]}
+        confirmLabel="研究データを消費して試験"
+        onCancel={() => setConfirmOpen(false)}
+        onConfirm={submit}
+      />
     </section>
   )
 }
