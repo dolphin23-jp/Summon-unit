@@ -1,8 +1,8 @@
 name: T048 add healing model
 
 on:
-  push:
-    branches: [agent/t048-support-release]
+  pull_request:
+    branches: [main]
     paths:
       - .github/workflows/t048-support-model.yml
 
