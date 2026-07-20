@@ -67,8 +67,8 @@ export function BattleUnitCard({ unit }: { readonly unit: BattleScreenUnitView }
         <strong>{unitName}</strong>
         <span>
           HP {unit.hp}/{unit.maxHp}
-          {unit.barrierTotal > 0 ? `　◇${unit.barrierTotal}` : ''}
-          {unit.nextActionDelta === null ? '' : `　次+${unit.nextActionDelta}t`}
+          {unit.barrierTotal > 0 ? ` / ◇${unit.barrierTotal}` : ''}
+          {unit.nextActionDelta === null ? '' : ` / 次+${unit.nextActionDelta}t`}
         </span>
       </div>
     </article>
