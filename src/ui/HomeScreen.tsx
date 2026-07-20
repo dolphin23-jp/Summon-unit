@@ -1,4 +1,5 @@
 import type { PlayerData } from '../progression/player-data'
+import { FIRST_EXPEDITION_STEPS, shouldShowFirstExpeditionGuide } from './ux-guidance'
 
 export interface HomeScreenProps {
   readonly playerData: PlayerData
@@ -9,6 +10,7 @@ export interface HomeScreenProps {
   readonly onOpenResearch: () => void
   readonly onOpenSummon: () => void
   readonly onOpenSave: () => void
+  readonly onOpenHelp: () => void
 }
 
 export function HomeScreen({
@@ -20,11 +22,18 @@ export function HomeScreen({
   onOpenResearch,
   onOpenSummon,
   onOpenSave,
+  onOpenHelp,
 }: HomeScreenProps) {
   const completedStages = playerData.stageProgress?.completedStageIds.length ?? 0
   const unlockedBlueprints = playerData.collection.speciesStates.filter(
     (state) => state.blueprintUnlocked,
   ).length
+  const showFirstGuide = shouldShowFirstExpeditionGuide(completedStages)
+  const openDestination = (destination: (typeof FIRST_EXPEDITION_STEPS)[number]['destination']) => {
+    if (destination === 'COLLECTION') onOpenCollection()
+    if (destination === 'REGION') onOpenRegion()
+    if (destination === 'RESEARCH') onOpenResearch()
+  }
 
   return (
     <main className="collection-app">
@@ -34,13 +43,18 @@ export function HomeScreen({
           <h1>観測拠点</h1>
           <p>編成、出撃、研究、召喚、セーブを一つの循環として進めます。</p>
         </div>
-        <button
-          type="button"
-          className="collection-button collection-button--primary"
-          onClick={onOpenRegion}
-        >
-          地域観測へ出る
-        </button>
+        <div className="home-header-actions">
+          <button type="button" className="collection-button" onClick={onOpenHelp}>
+            遊び方・用語
+          </button>
+          <button
+            type="button"
+            className="collection-button collection-button--primary"
+            onClick={onOpenRegion}
+          >
+            地域観測へ出る
+          </button>
+        </div>
       </header>
 
       {notice !== null && (
@@ -53,6 +67,37 @@ export function HomeScreen({
         <p className="collection-notice" role="status">
           永続化を利用できません。このセッション中はプレイできますが、再読込後の進行は保証されません。
         </p>
+      )}
+
+      {showFirstGuide && (
+        <section className="collection-panel first-expedition-guide" aria-labelledby="first-guide-title">
+          <div className="collection-section-heading">
+            <div>
+              <p className="panel-heading__kicker">FIRST EXPEDITION</p>
+              <h2 id="first-guide-title">最初の3手</h2>
+            </div>
+            <span>初回クリアまで表示</span>
+          </div>
+          <p>この順番で進めれば、戦闘・解析・研究の基本ループを一度体験できます。</p>
+          <ol className="guidance-step-list">
+            {FIRST_EXPEDITION_STEPS.map((step) => (
+              <li key={step.order}>
+                <span className="guidance-step-list__number">{step.order}</span>
+                <div>
+                  <strong>{step.title}</strong>
+                  <p>{step.detail}</p>
+                </div>
+                <button
+                  type="button"
+                  className={`collection-button${step.order === 1 ? ' collection-button--primary' : ''}`}
+                  onClick={() => openDestination(step.destination)}
+                >
+                  開く
+                </button>
+              </li>
+            ))}
+          </ol>
+        </section>
       )}
 
       <section className="collection-panel" aria-labelledby="home-progress-title">
@@ -80,18 +125,11 @@ export function HomeScreen({
           </div>
         </div>
         <nav className="region-global-actions" aria-label="拠点メニュー">
-          <button type="button" className="collection-button" onClick={onOpenCollection}>
-            編成・図鑑
-          </button>
-          <button type="button" className="collection-button" onClick={onOpenResearch}>
-            研究網・施設
-          </button>
-          <button type="button" className="collection-button" onClick={onOpenSummon}>
-            召喚
-          </button>
-          <button type="button" className="collection-button" onClick={onOpenSave}>
-            セーブスロット
-          </button>
+          <button type="button" className="collection-button" onClick={onOpenCollection}>編成・図鑑</button>
+          <button type="button" className="collection-button" onClick={onOpenResearch}>研究網・施設</button>
+          <button type="button" className="collection-button" onClick={onOpenSummon}>召喚</button>
+          <button type="button" className="collection-button" onClick={onOpenSave}>セーブスロット</button>
+          <button type="button" className="collection-button" onClick={onOpenHelp}>遊び方・用語</button>
         </nav>
       </section>
     </main>
