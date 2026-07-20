@@ -15,7 +15,7 @@ describe('T048 v0.1 release-candidate runtime integration', () => {
   it('connects the balanced release catalog and an immediately playable first formation', () => {
     expect(VERTICAL_SLICE_RUNTIME_VALIDATION).toEqual({
       releaseVersion: '0.1.0-rc.2',
-      contentVersion: 'slice-v0.1.0-rc.2-t049',
+      contentVersion: 'slice-v0.1.0-rc.2-t052',
       stages: 17,
       initialUnits: 5,
       initialFormationMembers: 3,
