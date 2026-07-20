@@ -469,7 +469,22 @@ function getSupportMetrics(
   supportByCandidateId: ReadonlyMap<string, AiCandidateSupportProjection>,
 ): CandidateSupportMetrics {
   const projection = supportByCandidateId.get(preview.candidate.candidateId)
-  if (projection === undefined) {
+  const targets =
+    projection?.targets ??
+    (preview.kind === 'USE_SKILL'
+      ? preview.targetResults
+          .filter((target) => target.rawHealing > 0)
+          .map((target) =>
+            Object.freeze({
+              battleUnitId: target.battleUnitId,
+              rawHealing: target.rawHealing,
+              appliedHealing: target.appliedHealing,
+              preventedDamage: 0,
+              usefulActionCount: target.appliedHealing > 0 ? 1 : 0,
+            }),
+          )
+      : [])
+  if (targets.length === 0) {
     return Object.freeze({
       rawHealing: 0,
       appliedHealing: 0,
@@ -481,7 +496,7 @@ function getSupportMetrics(
   }
 
   let rescueCount = 0
-  for (const target of projection.targets) {
+  for (const target of targets) {
     const unit = getRequiredUnit(context.input.battle, target.battleUnitId)
     const incomingDamage = getThreatDamageBeforeNextTurn(context, unit)
     const effectiveHpBefore = unit.hp + getCurrentBarrierCapacity(unit)
@@ -495,24 +510,24 @@ function getSupportMetrics(
     }
   }
 
-  const actorProjection = projection.targets.find(
+  const actorProjection = targets.find(
     (target) => target.battleUnitId === context.input.actorBattleUnitId,
   )
   return Object.freeze({
     rawHealing: safeAdd(
-      projection.targets.map((target) => target.rawHealing),
+      targets.map((target) => target.rawHealing),
       'raw healing',
     ),
     appliedHealing: safeAdd(
-      projection.targets.map((target) => target.appliedHealing),
+      targets.map((target) => target.appliedHealing),
       'applied healing',
     ),
     preventedDamage: safeAdd(
-      projection.targets.map((target) => target.preventedDamage),
+      targets.map((target) => target.preventedDamage),
       'prevented damage',
     ),
     usefulActionCount: safeAdd(
-      projection.targets.map((target) => target.usefulActionCount),
+      targets.map((target) => target.usefulActionCount),
       'useful support action count',
     ),
     rescueCount,
