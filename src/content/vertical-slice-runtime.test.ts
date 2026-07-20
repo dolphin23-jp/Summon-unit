@@ -15,7 +15,7 @@ describe('T047 vertical-slice runtime integration', () => {
       stages: 17,
       initialUnits: 5,
       initialFormationMembers: 3,
-      unlockedInitialStages: 2,
+      unlockedInitialStages: 1,
       onboardingCues: 3,
       firstBattleAllies: 3,
       firstBattleEnemies: 1,
