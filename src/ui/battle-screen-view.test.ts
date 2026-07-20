@@ -144,7 +144,9 @@ describe('battle screen view', () => {
 describe('relative battle timeline labels', () => {
   it('orders same-time events deterministically and exposes player-facing relative labels', () => {
     const runner = createInteractiveBattleRunner(STANDARD_HEADLESS_BATTLE)
-    const view = createBattleScreenView(STANDARD_HEADLESS_BATTLE, runner.getSnapshot())
+    const snapshot = runner.getSnapshot()
+    const view = createBattleScreenView(STANDARD_HEADLESS_BATTLE, snapshot)
+    const repeated = createBattleScreenView(STANDARD_HEADLESS_BATTLE, snapshot)
     const sameTime = view.timeline.filter((entry, index, entries) =>
       entries.some((other, otherIndex) => otherIndex !== index && other.time === entry.time),
     )
@@ -153,8 +155,9 @@ describe('relative battle timeline labels', () => {
       view.timeline.map((_, index) => index + 1),
     )
     expect(view.timeline.every((entry) => entry.relativeLabel.length > 0)).toBe(true)
-    expect([...sameTime].map((entry) => entry.id)).toEqual(
-      [...sameTime].map((entry) => entry.id).sort((left, right) => left.localeCompare(right, 'en')),
+    expect(sameTime.length).toBeGreaterThan(1)
+    expect(view.timeline.map((entry) => `${entry.time}:${entry.id}`)).toEqual(
+      repeated.timeline.map((entry) => `${entry.time}:${entry.id}`),
     )
     expect(
       view.cells
