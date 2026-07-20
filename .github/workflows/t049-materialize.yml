@@ -1,4 +1,4 @@
-name: T049 Finalize
+name: T049 Build Diagnostic
 
 on:
   push:
@@ -9,9 +9,10 @@ permissions:
   contents: write
 
 jobs:
-  finalize:
+  diagnose:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
@@ -20,118 +21,31 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10.13.1
-      - name: Apply T049 review fixes
-        shell: bash
+      - name: Enable pnpm
         run: |
-          python3 - <<'PY'
-          from pathlib import Path
-
-          def replace(path: str, old: str, new: str) -> None:
-              target = Path(path)
-              text = target.read_text(encoding='utf-8')
-              if old not in text:
-                  raise SystemExit(f'missing expected fragment in {path}: {old[:80]}')
-              target.write_text(text.replace(old, new), encoding='utf-8')
-
-          display = Path('src/content/display-masters.ts')
-          text = display.read_text(encoding='utf-8')
-          text = text.replace('"catalyst.slice.primal-core": "特殊触媒"', '"catalyst.slice.primal-core": "原初核触媒"')
-          text = text.replace('"catalyst.slice.wyvern-heart": "特殊触媒"', '"catalyst.slice.wyvern-heart": "災炎心核"')
-          text = text.replace(
-              'const REWARD_NAMES: Readonly<Record<string, string>> = Object.freeze({\n})',
-              '''const REWARD_NAMES: Readonly<Record<string, string>> = Object.freeze({
-            "regional.slice-a.earth-60": "土触媒補給",
-            "regional.slice-a.venom-90": "毒触媒補給",
-            "regional.slice-a.wind-30": "風触媒補給",
-            "regional.slice-b.fire-30": "火触媒補給",
-            "regional.slice-b.machine-60": "機核触媒補給",
-            "regional.slice-b.primal-90": "原初核触媒補給",
-          })''',
-          )
-          display.write_text(text, encoding='utf-8')
-
-          research = Path('src/ui/ResearchScreen.tsx')
-          text = research.read_text(encoding='utf-8')
-          text = text.replace(
-              "import { resolveCatalystName, resolveDisplayName } from '../content/display-masters'",
-              "import { formatUnitDisplayName, resolveDisplayName } from '../content/display-masters'",
-          )
-          text = text.replace('<label key={resolveCatalystName(catalystId)}>', '<label key={catalystId}>')
-          text = text.replace(
-              "{instance.nickname ?? displayName(instance.speciesId)}{' '}\n              <small>{instance.instanceId}</small>",
-              '{instance.nickname ?? formatUnitDisplayName(instance.speciesId, instance.instanceId)}',
-          )
-          research.write_text(text, encoding='utf-8')
-
-          collection = Path('src/ui/CollectionScreen.tsx')
-          text = collection.read_text(encoding='utf-8')
-          text = text.replace(
-              "import { formatUnitDisplayName, resolveDisplayName } from '../content/display-masters'",
-              "import { formatUnitDisplayName, resolveDisplayName, resolveSkillDescription } from '../content/display-masters'",
-          )
-          text = text.replace(
-              '<h3>{displayName(skill.id)}</h3>\n                      <p>',
-              '<h3>{displayName(skill.id)}</h3>\n                      <p>{resolveSkillDescription(skill.id)}</p>\n                      <p>',
-          )
-          collection.write_text(text, encoding='utf-8')
-
-          tests = Path('src/content/display-masters.test.ts')
-          text = tests.read_text(encoding='utf-8')
-          text = text.replace(
-              '  resolveSkillDescription,',
-              '  resolveRewardName,\n  resolveSkillDescription,',
-          )
-          text = text.replace(
-              "    expect(resolveCatalystName('catalyst.slice.wind')).toBe('風触媒')",
-              "    expect(resolveCatalystName('catalyst.slice.wind')).toBe('風触媒')\n    expect(resolveRewardName('regional.slice-a.wind-30')).toBe('風触媒補給')",
-          )
-          tests.write_text(text, encoding='utf-8')
-
-          lock = Path('pnpm-lock.yaml')
-          if lock.exists():
-              lock.unlink()
-          diagnostic = Path('t049-test-results.json')
-          if diagnostic.exists():
-              diagnostic.unlink()
-          PY
+          corepack enable
+          corepack prepare pnpm@10.13.1 --activate
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
-      - name: Remove generated lockfile
-        run: rm -f pnpm-lock.yaml
-      - name: Format changed files
+      - name: Capture build result
+        id: build
         shell: bash
         run: |
-          git diff --name-only --diff-filter=ACM -z | xargs -0 -r pnpm exec prettier --write --ignore-unknown
-      - name: Audit player-facing raw IDs
-        shell: bash
-        run: |
-          {
-            echo '# JSX references to internal identity fields'
-            grep -RInE '\{[^}]*\.(battleUnitId|speciesId|catalystId|stageId|regionId|instanceId)[^}]*\}' src/ui || true
-            echo
-            echo '# Local ID-derived display helpers'
-            grep -RInE 'function (displayName|shortName)\(|split\([^)]*[.]' src/ui || true
-          } > t049-ui-id-audit.txt
-      - name: Validate content
-        run: pnpm validate:content
-      - name: Test
-        run: pnpm test
-      - name: Lint
-        run: pnpm lint
-      - name: Build
-        run: pnpm build
-      - name: Commit finalized implementation and audit
+          set +e
+          set -o pipefail
+          pnpm build 2>&1 | tee t049-build.log
+          code=${PIPESTATUS[0]}
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Commit diagnostic
+        if: steps.build.outputs.code != '0'
         shell: bash
         run: |
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add -A
-          if git diff --cached --quiet; then
-            echo "No finalized changes"
-            exit 0
-          fi
-          git commit -m "T049: finalize display name coverage"
+          git add t049-build.log
+          git commit -m "chore: capture T049 build diagnostic"
           git push origin HEAD:agent/t049-display-name-masters
+      - name: Fail when build fails
+        if: steps.build.outputs.code != '0'
+        run: exit 1
