@@ -3,6 +3,8 @@ import { useMemo, useState } from 'react'
 import { unlockBloomSkill } from '../progression/bloom-research'
 import type { PlayerData } from '../progression/player-data'
 import type { T037ProgressionCatalog } from '../progression/research-facility'
+import type { BloomResearchDefinition } from '../progression/t036-progression-model'
+import { ConfirmDialog } from './ConfirmDialog'
 import { ResearchScreen } from './ResearchScreen'
 
 export interface T048ResearchScreenProps {
@@ -19,6 +21,7 @@ export function T048ResearchScreen({
   onOpenCollection,
 }: T048ResearchScreenProps) {
   const [notice, setNotice] = useState<string | null>(null)
+  const [pendingDefinition, setPendingDefinition] = useState<BloomResearchDefinition | null>(null)
   const definitions = useMemo(
     () =>
       [...catalog.bloomResearchDefinitions].sort((left, right) => {
@@ -34,6 +37,19 @@ export function T048ResearchScreen({
       }),
     [catalog],
   )
+
+  const unlock = (definition: BloomResearchDefinition) => {
+    setPendingDefinition(null)
+    try {
+      const result = unlockBloomSkill(playerData, definition.speciesId, definition.skillId, catalog)
+      onPlayerDataChange(result.playerData)
+      setNotice(
+        `${resolveDisplayName(result.speciesId)}の開花技${resolveDisplayName(result.skillId)}を解放しました。`,
+      )
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : '開花研究に失敗しました。')
+    }
+  }
 
   return (
     <>
@@ -81,23 +97,6 @@ export function T048ResearchScreen({
                 currencyReady &&
                 researchDataReady
 
-              const unlock = () => {
-                try {
-                  const result = unlockBloomSkill(
-                    playerData,
-                    definition.speciesId,
-                    definition.skillId,
-                    catalog,
-                  )
-                  onPlayerDataChange(result.playerData)
-                  setNotice(
-                    `${resolveDisplayName(result.speciesId)}の開花技${resolveDisplayName(result.skillId)}を解放しました。`,
-                  )
-                } catch (error) {
-                  setNotice(error instanceof Error ? error.message : '開花研究に失敗しました。')
-                }
-              }
-
               let status = '開花研究可能'
               if (!blueprintUnlocked) status = '設計図未解放'
               else if (alreadyUnlocked) status = '開花技解放済み'
@@ -133,7 +132,7 @@ export function T048ResearchScreen({
                     type="button"
                     className="collection-button collection-button--primary"
                     disabled={!canUnlock}
-                    onClick={unlock}
+                    onClick={() => setPendingDefinition(definition)}
                   >
                     {status}
                   </button>
@@ -143,6 +142,25 @@ export function T048ResearchScreen({
           </div>
         </section>
       </main>
+      <ConfirmDialog
+        open={pendingDefinition !== null}
+        title={`${pendingDefinition === null ? '' : resolveDisplayName(pendingDefinition.skillId)}を開花解放しますか？`}
+        description="同種すべての個体へ開花技を永久解放し、基本通貨と研究データを消費します。"
+        details={
+          pendingDefinition === null
+            ? []
+            : [
+                `対象種: ${resolveDisplayName(pendingDefinition.speciesId)}`,
+                `基本通貨 ${pendingDefinition.currencyCost}`,
+                `研究データ ${pendingDefinition.researchDataCost}`,
+              ]
+        }
+        confirmLabel="開花技を解放"
+        onCancel={() => setPendingDefinition(null)}
+        onConfirm={() => {
+          if (pendingDefinition !== null) unlock(pendingDefinition)
+        }}
+      />
     </>
   )
 }

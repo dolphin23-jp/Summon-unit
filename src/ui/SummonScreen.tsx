@@ -4,6 +4,8 @@ import type { SpeciesId } from '../content/monster-species'
 import type { PlayerData } from '../progression/player-data'
 import type { T036ProgressionCatalog } from '../progression/t036-progression-model'
 import { calculateSummonCurrencyCost, summonUnit } from '../progression/unit-economy'
+import { ConfirmDialog } from './ConfirmDialog'
+import { UxHelpButton } from './UxHelpDialog'
 
 function instanceSlug(speciesId: SpeciesId): string {
   return speciesId.split('.').at(-1) ?? speciesId
@@ -51,6 +53,7 @@ export function SummonScreen({
     unlockedSpecies[0]?.id ?? null,
   )
   const [notice, setNotice] = useState<string | null>(null)
+  const [confirmOpen, setConfirmOpen] = useState(false)
   const selectedSpecies =
     unlockedSpecies.find((species) => species.id === selectedSpeciesId) ??
     unlockedSpecies[0] ??
@@ -60,6 +63,7 @@ export function SummonScreen({
   const canAfford = summonCost !== null && playerData.economy.currency >= summonCost
 
   const summon = () => {
+    setConfirmOpen(false)
     if (selectedSpecies === null) {
       setNotice('召喚可能な設計図がありません。')
       return
@@ -85,6 +89,7 @@ export function SummonScreen({
           <p>研究で永久解放した設計図から、抽選や待機なしで個体を召喚します。</p>
         </div>
         <nav className="region-global-actions" aria-label="召喚画面の移動">
+          <UxHelpButton context="SUMMON" />
           <button type="button" className="collection-button" onClick={onOpenHome}>
             ホーム
           </button>
@@ -150,20 +155,34 @@ export function SummonScreen({
             </div>
             <strong>R{selectedSpecies.rarity}</strong>
           </div>
-          <p>
-            基本通貨を{summonCost}消費し、condition 100%の新しい個体を追加します。
-            個体IDは既存データと衝突しない固定規則で発行します。
-          </p>
+          <p>基本通貨を{summonCost}消費し、condition 100%の新しい個体を追加します。</p>
           <button
             type="button"
             className="collection-button collection-button--primary"
             disabled={!canAfford}
-            onClick={summon}
+            onClick={() => setConfirmOpen(true)}
           >
             {canAfford ? `基本通貨 ${summonCost} で召喚` : '基本通貨が不足しています'}
           </button>
         </section>
       )}
+
+      <ConfirmDialog
+        open={confirmOpen && selectedSpecies !== null && summonCost !== null}
+        title={`${selectedSpecies === null ? '' : resolveDisplayName(selectedSpecies.id)}を召喚しますか？`}
+        description="設計図は失われませんが、基本通貨を消費して新しい個体を追加します。"
+        details={
+          summonCost === null
+            ? []
+            : [
+                `消費: 基本通貨 ${summonCost}`,
+                `実行後: 基本通貨 ${playerData.economy.currency - summonCost}`,
+              ]
+        }
+        confirmLabel="召喚する"
+        onCancel={() => setConfirmOpen(false)}
+        onConfirm={summon}
+      />
     </main>
   )
 }

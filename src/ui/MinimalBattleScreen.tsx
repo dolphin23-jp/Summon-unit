@@ -13,10 +13,7 @@ import {
 import { STANDARD_INTERACTIVE_BATTLE } from '../demo/standard-headless-battle'
 import type { StageBattleSettlement } from '../progression/stage-reward'
 import { BattleDecisionPanel } from './BattleDecisionPanel'
-import {
-  BattleResultScreen,
-  type BattleResultNavigationAction,
-} from './BattleResultScreen'
+import { BattleResultScreen, type BattleResultNavigationAction } from './BattleResultScreen'
 import { BattleTimelinePanel } from './BattleTimelinePanel'
 import { BattleUnitCard } from './BattleUnitCard'
 import {
@@ -28,7 +25,9 @@ import {
 import { createBattleResultView } from './battle-result-view'
 import { createBattleScreenView } from './battle-screen-view'
 import { getManualActionKey, ManualActionPanel } from './ManualActionPanel'
+import { ConfirmDialog } from './ConfirmDialog'
 import { MobileDisclosure } from './MobileDisclosure'
+import { UxHelpButton } from './UxHelpDialog'
 
 const STEP_MS = 420
 
@@ -123,10 +122,7 @@ export interface MinimalBattleScreenProps {
   readonly allowFastMode?: boolean
   readonly initialStableSnapshot?: InteractiveBattleStableSnapshot
   readonly initialAttempt?: number
-  readonly onStableSnapshot?: (
-    snapshot: InteractiveBattleStableSnapshot,
-    attempt: number,
-  ) => void
+  readonly onStableSnapshot?: (snapshot: InteractiveBattleStableSnapshot, attempt: number) => void
   readonly onOpenFormation?: () => void
   readonly onOpenResearch?: () => void
   readonly onNextStage?: () => void
@@ -149,9 +145,7 @@ export function MinimalBattleScreen({
   settleResult,
   onSettlement,
 }: MinimalBattleScreenProps) {
-  const [runner, setRunner] = useState(() =>
-    createRunner(definition, initialStableSnapshot),
-  )
+  const [runner, setRunner] = useState(() => createRunner(definition, initialStableSnapshot))
   const [snapshot, setSnapshot] = useState(() => runner.getSnapshot())
   const [autoRequested, setAutoRequested] = useState(false)
   const [speed, setSpeed] = useState<BattleSpeed>(1)
@@ -162,6 +156,7 @@ export function MinimalBattleScreen({
   const [navigationNotice, setNavigationNotice] = useState<string | null>(null)
   const [settlement, setSettlement] = useState<StageBattleSettlement | null>(null)
   const [attempt, setAttempt] = useState(initialAttempt)
+  const [pendingBattleAction, setPendingBattleAction] = useState<'RESET' | 'FORMATION' | null>(null)
   const stableSnapshotCallbackRef = useRef(onStableSnapshot)
 
   useEffect(() => {
@@ -226,10 +221,7 @@ export function MinimalBattleScreen({
     [definition, previewOption, snapshot],
   )
   const resultView = useMemo(
-    () =>
-      isTerminal
-        ? createBattleResultView(definition, runner.getResult(), settlement)
-        : null,
+    () => (isTerminal ? createBattleResultView(definition, runner.getResult(), settlement) : null),
     [definition, isTerminal, runner, settlement, snapshot.totalActions],
   )
 
@@ -317,9 +309,18 @@ export function MinimalBattleScreen({
           </p>
         </div>
         <div className="battle-metrics" aria-label="現在の状態">
-          <div><span>仮想時刻</span><strong>{snapshot.currentVirtualTime}</strong></div>
-          <div><span>行動</span><strong>{snapshot.totalActions}</strong></div>
-          <div><span>結果</span><strong>{outcomeLabel(snapshot.battle.outcome)}</strong></div>
+          <div>
+            <span>仮想時刻</span>
+            <strong>{snapshot.currentVirtualTime}</strong>
+          </div>
+          <div>
+            <span>行動</span>
+            <strong>{snapshot.totalActions}</strong>
+          </div>
+          <div>
+            <span>結果</span>
+            <strong>{outcomeLabel(snapshot.battle.outcome)}</strong>
+          </div>
         </div>
       </header>
 
@@ -383,15 +384,51 @@ export function MinimalBattleScreen({
             </button>
           ))}
         </div>
-        <button type="button" className="control-button" onClick={reset}>
+        <UxHelpButton context="BATTLE" buttonClassName="control-button" />
+        <button
+          type="button"
+          className="control-button"
+          onClick={() => setPendingBattleAction('RESET')}
+        >
           リセット
         </button>
         {onOpenFormation !== undefined && (
-          <button type="button" className="control-button" onClick={onOpenFormation}>
+          <button
+            type="button"
+            className="control-button"
+            onClick={() => (isTerminal ? onOpenFormation() : setPendingBattleAction('FORMATION'))}
+          >
             編成へ戻る
           </button>
         )}
       </nav>
+
+      <ConfirmDialog
+        open={pendingBattleAction !== null}
+        title={
+          pendingBattleAction === 'FORMATION'
+            ? '戦闘を中断して編成へ戻りますか？'
+            : 'この戦闘を最初からやり直しますか？'
+        }
+        description={
+          pendingBattleAction === 'FORMATION'
+            ? '現在の戦闘スナップショットを破棄して、編成画面へ移動します。'
+            : '現在の試行内容を破棄し、同じステージを初期状態から開始します。'
+        }
+        details={[
+          `現在の行動数: ${snapshot.totalActions}`,
+          `現在の状態: ${statusLabel(snapshot, autoRequested, speed)}`,
+        ]}
+        confirmLabel={pendingBattleAction === 'FORMATION' ? '中断して編成へ' : '最初から再開'}
+        tone="danger"
+        onCancel={() => setPendingBattleAction(null)}
+        onConfirm={() => {
+          const action = pendingBattleAction
+          setPendingBattleAction(null)
+          if (action === 'RESET') reset()
+          else if (action === 'FORMATION') onOpenFormation?.()
+        }}
+      />
 
       {resultView !== null && (
         <BattleResultScreen
@@ -420,9 +457,15 @@ export function MinimalBattleScreen({
               <h2 id="board-title">6×3 盤面</h2>
             </div>
             <div className="side-legend" aria-label="陣営と警告の凡例">
-              <span><b aria-hidden="true">A</b> 味方</span>
-              <span><b aria-hidden="true">E</b> 相手</span>
-              <span><i aria-hidden="true">!</i> 予兆</span>
+              <span>
+                <b aria-hidden="true">A</b> 味方
+              </span>
+              <span>
+                <b aria-hidden="true">E</b> 相手
+              </span>
+              <span>
+                <i aria-hidden="true">!</i> 予兆
+              </span>
             </div>
           </div>
 
@@ -442,7 +485,9 @@ export function MinimalBattleScreen({
                 >
                   <span className="board-cell__coordinate">{coordinate}</span>
                   {cell.telegraphCount > 0 && (
-                    <span className="telegraph-marker" aria-hidden="true">! {cell.telegraphCount}</span>
+                    <span className="telegraph-marker" aria-hidden="true">
+                      ! {cell.telegraphCount}
+                    </span>
                   )}
                   {cell.unit === null ? (
                     <span className="board-cell__empty">空き</span>
