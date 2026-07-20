@@ -31,7 +31,7 @@ describe('stage battle access', () => {
         'formation.main',
         T039_PLAYER_CATALOG,
       ),
-    ).toThrow('stage.demo-forest-boss')
+    ).toThrow('不明なステージ')
   })
 })
 

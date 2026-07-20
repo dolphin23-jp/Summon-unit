@@ -547,7 +547,7 @@ export function CollectionScreen({
                       key={`${row}:${column}`}
                       type="button"
                       className={`formation-cell${member !== undefined ? ' formation-cell--occupied' : ''}${member?.instanceId === selectedInstanceId ? ' formation-cell--selected' : ''}`}
-                      aria-label={`${['前列', '中列', '後列'][row]} ${['A', 'B', 'C'][column]}${instance === null ? ' 空き' : ` ${instance.nickname ?? instance.instanceId}`}`}
+                      aria-label={`${['前列', '中列', '後列'][row]} ${['A', 'B', 'C'][column]}${instance === null ? ' 空き' : ` ${instance.nickname ?? formatUnitDisplayName(instance.speciesId, instance.instanceId)}`}`}
                       onClick={() => {
                         if (selectedInstanceId === null) {
                           if (member !== undefined) setSelectedInstanceId(member.instanceId)
