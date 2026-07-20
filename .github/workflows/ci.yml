@@ -31,7 +31,19 @@ jobs:
         run: pnpm install --no-frozen-lockfile
 
       - name: Content validation
-        run: pnpm validate:content
+        id: content
+        run: |
+          set -o pipefail
+          pnpm validate:content 2>&1 | tee /tmp/content-validation.log
+
+      - name: Upload content validation diagnostics
+        if: failure() && steps.content.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: content-validation-diagnostics
+          path: /tmp/content-validation.log
+          if-no-files-found: error
+          retention-days: 3
 
       - name: Test
         id: test
