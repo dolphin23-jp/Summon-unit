@@ -9,7 +9,10 @@ const positions = Object.freeze({
 })
 
 function event<T extends BattleEvent>(value: T): T {
-  return Object.freeze({ ...value, payload: Object.freeze({ ...value.payload }) }) as T
+  return Object.freeze({
+    ...value,
+    payload: Object.freeze({ ...value.payload }),
+  }) as unknown as T
 }
 
 const skillId = STANDARD_HEADLESS_BATTLE.skills[0]?.id ?? 'skill.demo'
