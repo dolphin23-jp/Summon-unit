@@ -1,15 +1,20 @@
-import {
-  T039_GENERIC_SKILL_COSTS,
-  T039_PLAYER_CATALOG,
-} from '../demo/region-ui-demo'
 import { validateContentCatalog } from './content-validation'
 import { VERTICAL_SLICE_CONTENT_VALIDATION } from './vertical-slice-content'
 import { VERTICAL_SLICE_T046_BALANCED_VALIDATION } from './vertical-slice-t046-balanced-master'
+import {
+  VERTICAL_SLICE_RUNTIME_CATALOG,
+  VERTICAL_SLICE_RUNTIME_GENERIC_SKILL_COSTS,
+  VERTICAL_SLICE_RUNTIME_VALIDATION,
+} from './vertical-slice-runtime'
 import { VERTICAL_SLICE_WORLD_VALIDATION } from './vertical-slice-world'
 
-export const ACTIVE_CONTENT_VALIDATION = validateContentCatalog(T039_PLAYER_CATALOG, {
-  genericSkillCosts: T039_GENERIC_SKILL_COSTS,
-})
+export const ACTIVE_CONTENT_VALIDATION = validateContentCatalog(
+  VERTICAL_SLICE_RUNTIME_CATALOG,
+  { genericSkillCosts: VERTICAL_SLICE_RUNTIME_GENERIC_SKILL_COSTS },
+)
+
+export const ACTIVE_RUNTIME_INTEGRATION_VALIDATION =
+  VERTICAL_SLICE_RUNTIME_VALIDATION
 
 export const AUTHORED_VERTICAL_SLICE_CONTENT_VALIDATION =
   VERTICAL_SLICE_CONTENT_VALIDATION
