@@ -224,6 +224,15 @@ export function MinimalBattleScreen({
     () => (isTerminal ? createBattleResultView(definition, runner.getResult(), settlement) : null),
     [definition, isTerminal, runner, settlement, snapshot.totalActions],
   )
+  const speciesIdByBattleUnitId = useMemo(
+    () =>
+      Object.freeze(
+        Object.fromEntries(
+          snapshot.battle.units.map((unit) => [unit.battleUnitId, unit.speciesId]),
+        ),
+      ),
+    [snapshot.battle.units],
+  )
 
   const reset = () => {
     setAutoRequested(false)
@@ -489,11 +498,20 @@ export function MinimalBattleScreen({
                       ! {cell.telegraphCount}
                     </span>
                   )}
-                  {cell.unit === null ? (
-                    <span className="board-cell__empty">空き</span>
-                  ) : (
-                    <BattleUnitCard unit={cell.unit} />
+                  {isSelected && (
+                    <span className="board-cell__state-marker" aria-hidden="true">
+                      ◎
+                    </span>
                   )}
+                  {!isSelected && isAffected && (
+                    <span
+                      className="board-cell__state-marker board-cell__state-marker--affected"
+                      aria-hidden="true"
+                    >
+                      ◇
+                    </span>
+                  )}
+                  {cell.unit !== null && <BattleUnitCard unit={cell.unit} />}
                 </div>
               )
             })}
@@ -506,7 +524,10 @@ export function MinimalBattleScreen({
           defaultOpen={!isTerminal}
           className="battle-disclosure battle-disclosure--timeline"
         >
-          <BattleTimelinePanel entries={view.timeline} />
+          <BattleTimelinePanel
+            entries={view.timeline}
+            speciesIdByBattleUnitId={speciesIdByBattleUnitId}
+          />
         </MobileDisclosure>
 
         <MobileDisclosure
@@ -521,6 +542,7 @@ export function MinimalBattleScreen({
             detailed={detailedLog}
             onDetailedChange={setDetailedLog}
             statusText={statusLabel(snapshot, autoRequested, speed)}
+            speciesIdByBattleUnitId={speciesIdByBattleUnitId}
           />
         </MobileDisclosure>
       </div>

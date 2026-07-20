@@ -172,11 +172,19 @@ function FormationMemberEditor({
   return (
     <section className="member-editor" aria-labelledby="member-editor-title">
       <div className="collection-section-heading">
-        <div>
-          <p className="panel-heading__kicker">MEMBER SETTINGS</p>
-          <h2 id="member-editor-title">
-            {instance.nickname ?? formatUnitDisplayName(species.id, instance.instanceId)}
-          </h2>
+        <div className="member-editor__identity">
+          <MonsterIcon
+            species={species}
+            label={resolveDisplayName(species.id)}
+            size="sm"
+            variant="frameless"
+          />
+          <div>
+            <p className="panel-heading__kicker">MEMBER SETTINGS</p>
+            <h2 id="member-editor-title">
+              {instance.nickname ?? formatUnitDisplayName(species.id, instance.instanceId)}
+            </h2>
+          </div>
         </div>
         <span>状態 {basisPointsLabel(instance.conditionBasisPoints)}</span>
       </div>

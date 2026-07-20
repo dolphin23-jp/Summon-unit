@@ -1,4 +1,5 @@
 import type { BattleTimelineEntryView } from './battle-screen-view'
+import { MonsterIcon } from './MonsterIcon'
 
 function kindLabel(entry: BattleTimelineEntryView): string {
   if (entry.provisional) {
@@ -20,8 +21,10 @@ function kindLabel(entry: BattleTimelineEntryView): string {
 
 export function BattleTimelinePanel({
   entries,
+  speciesIdByBattleUnitId,
 }: {
   readonly entries: readonly BattleTimelineEntryView[]
+  readonly speciesIdByBattleUnitId: Readonly<Record<string, string>>
 }) {
   return (
     <aside className="timeline-panel" aria-labelledby="timeline-title">
@@ -36,30 +39,43 @@ export function BattleTimelinePanel({
         <p className="panel-empty">予定されたイベントはありません。</p>
       ) : (
         <ol className="timeline-list">
-          {entries.map((entry, index) => (
-            <li
-              key={entry.id}
-              className={`${entry.reservation ? 'timeline-entry timeline-entry--reservation' : 'timeline-entry'}${entry.provisional ? ' timeline-entry--provisional' : ''}`}
-            >
-              <span className="timeline-entry__rank">{index + 1}</span>
-              <div className="timeline-entry__body">
-                <div className="timeline-entry__headline">
-                  <span className="timeline-entry__kind">{kindLabel(entry)}</span>
-                  <strong>{entry.label}</strong>
+          {entries.map((entry, index) => {
+            const actorSpeciesId =
+              entry.actorBattleUnitId === null
+                ? null
+                : (speciesIdByBattleUnitId[entry.actorBattleUnitId] ?? null)
+            return (
+              <li
+                key={entry.id}
+                className={`${entry.reservation ? 'timeline-entry timeline-entry--reservation' : 'timeline-entry'}${entry.provisional ? ' timeline-entry--provisional' : ''}`}
+              >
+                <span className="timeline-entry__rank">{index + 1}</span>
+                {actorSpeciesId === null ? (
+                  <span className="monster-mini-placeholder" aria-hidden="true">
+                    •
+                  </span>
+                ) : (
+                  <MonsterIcon speciesId={actorSpeciesId} size="sm" variant="frameless" />
+                )}
+                <div className="timeline-entry__body">
+                  <div className="timeline-entry__headline">
+                    <span className="timeline-entry__kind">{kindLabel(entry)}</span>
+                    <strong>{entry.label}</strong>
+                  </div>
+                  {entry.detail !== null && <small>{entry.detail}</small>}
                 </div>
-                {entry.detail !== null && <small>{entry.detail}</small>}
-              </div>
-              <div className="timeline-entry__time">
-                <strong>+{entry.delta}</strong>
-                <small>t={entry.time}</small>
-              </div>
-              {entry.provisional && entry.positionId !== null && (
-                <span className="timeline-entry__ghost-position" aria-label="仮位置">
-                  {entry.positionId}
-                </span>
-              )}
-            </li>
-          ))}
+                <div className="timeline-entry__time">
+                  <strong>+{entry.delta}</strong>
+                  <small>t={entry.time}</small>
+                </div>
+                {entry.provisional && entry.positionId !== null && (
+                  <span className="timeline-entry__ghost-position" aria-label="仮位置">
+                    {entry.positionId}
+                  </span>
+                )}
+              </li>
+            )
+          })}
         </ol>
       )}
     </aside>
