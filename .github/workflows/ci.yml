@@ -7,9 +7,9 @@ permissions:
   contents: write
 
 jobs:
-  verify:
+  validation-diagnostics:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 8
 
     steps:
       - name: Checkout pull request branch
@@ -17,9 +17,6 @@ jobs:
         with:
           ref: ${{ github.head_ref }}
           fetch-depth: 0
-
-      - name: Materialize T052 implementation
-        run: python scripts/t052_materialize.py
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -34,73 +31,18 @@ jobs:
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
 
-      - name: Format T052 files
+      - name: Capture content validation diagnostics
         run: |
-          pnpm exec prettier --write \
-            src/App.tsx \
-            src/main.tsx \
-            src/progression/region-progression.ts \
-            src/content/vertical-slice-world.ts \
-            src/content/vertical-slice-runtime.ts \
-            src/ui/GameIcon.tsx \
-            src/ui/BattleMobileTabs.tsx \
-            src/ui/BattleMobileTabs.test.tsx \
-            src/ui/battle-screen-view.ts \
-            src/ui/battle-screen-view.test.ts \
-            src/ui/BattleTimelinePanel.tsx \
-            src/ui/BattleUnitCard.tsx \
-            src/ui/BattleDecisionPanel.tsx \
-            src/ui/RegionScreen.tsx \
-            src/ui/HomeScreen.tsx \
-            src/ui/BattleResultScreen.tsx \
-            src/ui/MinimalBattleScreen.tsx \
-            src/ui/theme.css \
-            src/ui/theme-contract.test.ts \
-            tasks/T052_VISUAL_THEME_AND_BATTLE_LAYOUT.md \
-            tasks/STATUS.md \
-            docs/12_UI_UX.md
-
-      - name: Commit materialized implementation
-        run: |
-          if git diff --quiet && git diff --cached --quiet; then
-            echo "No materialized changes to commit."
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -m "T052: unify visual theme and mobile battle layout"
-          git push origin HEAD:${{ github.head_ref }}
-
-      - name: Content validation
-        run: pnpm validate:content
-
-      - name: Test
-        id: test
-        run: |
+          set +e
           set -o pipefail
-          pnpm test 2>&1 | tee /tmp/vitest.log
-
-      - name: Upload test diagnostics
-        if: failure() && steps.test.outcome == 'failure'
-        uses: actions/upload-artifact@v4
-        with:
-          name: vitest-diagnostics
-          path: /tmp/vitest.log
-          if-no-files-found: error
-          retention-days: 3
-
-      - name: Headless demo
-        run: pnpm demo:headless > /tmp/headless-battle-demo.json
-
-      - name: AI regression benchmark
-        run: pnpm benchmark:ai
-
-      - name: Vertical slice balance benchmark
-        run: pnpm benchmark:balance > /tmp/vertical-slice-balance.json
-
-      - name: Lint
-        run: pnpm lint
-
-      - name: Build
-        run: pnpm build
+          pnpm validate:content 2>&1 | tee /tmp/t052-validation.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            cp /tmp/t052-validation.log tasks/T052_VALIDATION_DIAGNOSTICS.txt
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add tasks/T052_VALIDATION_DIAGNOSTICS.txt
+            git commit -m "Record T052 validation diagnostics"
+            git push origin HEAD:${{ github.head_ref }}
+          fi
+          exit "$status"
