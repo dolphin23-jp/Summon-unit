@@ -1,0 +1,7 @@
+
+> summon-unit@0.1.0-rc.2 build /home/runner/work/Summon-unit/Summon-unit
+> tsc -b && vite build
+
+src/ui/fx/fx-mapper.test.ts(12,10): error TS2352: Conversion of type 'Readonly<{ [idx: string]: string | number | bigint | boolean | symbol | object | null | undefined; }>' to type 'T' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  'T' could be instantiated with an arbitrary type which could be unrelated to 'Readonly<{ [idx: string]: string | number | bigint | boolean | symbol | object | null | undefined; }>'.
+ ELIFECYCLE  Command failed with exit code 2.
