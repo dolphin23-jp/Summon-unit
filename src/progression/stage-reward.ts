@@ -1,3 +1,4 @@
+import { resolveStageName } from '../content/display-masters'
 import type { HeadlessBattleRunResult } from '../battle/headless-battle-runner'
 import type { SpeciesId } from '../content/monster-species'
 import { applyPlayerProgressionTransaction, type AppliedAnalysisGain } from './analysis'
@@ -225,21 +226,23 @@ function applyBattleConditionChanges(
   }
 
   const changes: StageConditionChange[] = []
-  const unitInstances: PlayerUnitInstance[] = playerData.collection.unitInstances.map((instance) => {
-    const projected = resultByInstanceId.get(instance.instanceId)
-    if (projected === undefined) return instance
-    const afterBasisPoints = Math.min(instance.conditionBasisPoints, projected)
-    if (afterBasisPoints !== instance.conditionBasisPoints) {
-      changes.push(
-        Object.freeze({
-          instanceId: instance.instanceId,
-          beforeBasisPoints: instance.conditionBasisPoints,
-          afterBasisPoints,
-        }),
-      )
-    }
-    return Object.freeze({ ...instance, conditionBasisPoints: afterBasisPoints })
-  })
+  const unitInstances: PlayerUnitInstance[] = playerData.collection.unitInstances.map(
+    (instance) => {
+      const projected = resultByInstanceId.get(instance.instanceId)
+      if (projected === undefined) return instance
+      const afterBasisPoints = Math.min(instance.conditionBasisPoints, projected)
+      if (afterBasisPoints !== instance.conditionBasisPoints) {
+        changes.push(
+          Object.freeze({
+            instanceId: instance.instanceId,
+            beforeBasisPoints: instance.conditionBasisPoints,
+            afterBasisPoints,
+          }),
+        )
+      }
+      return Object.freeze({ ...instance, conditionBasisPoints: afterBasisPoints })
+    },
+  )
   const next = normalizeStagePlayerData(
     {
       ...playerData,
@@ -294,12 +297,7 @@ export function settleStageBattle(
 ): StageBattleSettlement {
   assertNonEmptyString(input.settlementId, 'settlementId')
   assertNonEmptyString(input.stageId, 'stageId')
-  assertSafeIntegerInRange(
-    input.bonusRollBasisPoints,
-    0,
-    9_999,
-    'bonusRollBasisPoints',
-  )
+  assertSafeIntegerInRange(input.bonusRollBasisPoints, 0, 9_999, 'bonusRollBasisPoints')
   const stages = normalizeStageDefinitions(catalog.stages ?? [], catalog)
   const stage = getStageDefinition(catalog, input.stageId)
   let normalized = normalizeStagePlayerData(playerData, catalog)
@@ -397,11 +395,7 @@ export function settleStageBattle(
   const completedProgressIds = stages
     .filter((candidate) => completedStageIds.includes(candidate.stageId))
     .map((candidate) => candidate.completionProgressId)
-  const research = applyResearchHintTriggers(
-    progressed,
-    { completedProgressIds },
-    catalog,
-  )
+  const research = applyResearchHintTriggers(progressed, { completedProgressIds }, catalog)
   progressed = normalizeStagePlayerData(
     {
       ...research.playerData,
@@ -413,7 +407,7 @@ export function settleStageBattle(
 
   const notifications: string[] = []
   if (victory) {
-    notifications.push(`${stage.stageId} をクリアしました。`)
+    notifications.push(`${resolveStageName(stage.stageId)} をクリアしました。`)
     if (randomSelection.rewardId !== null) {
       notifications.push(`追加報酬 ${randomSelection.rewardId} を獲得しました。`)
     }
@@ -421,7 +415,9 @@ export function settleStageBattle(
       notifications.push(`地域ポイント報酬 ${rewardId} を獲得しました。`)
     }
     for (const change of research.changes) {
-      notifications.push(`研究ノード ${change.nodeId} の開示段階が ${change.afterStage} になりました。`)
+      notifications.push(
+        `研究ノード ${change.nodeId} の開示段階が ${change.afterStage} になりました。`,
+      )
     }
   } else {
     notifications.push('勝利報酬はありません。戦闘記録と個体コンディションのみ反映しました。')

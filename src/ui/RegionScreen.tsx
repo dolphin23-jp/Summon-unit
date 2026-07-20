@@ -1,3 +1,4 @@
+import { resolveDisplayName } from '../content/display-masters'
 import { useMemo, useState } from 'react'
 import type { PlayerData } from '../progression/player-data'
 import type { ProgressionNotification } from '../progression/progression-notifications'
@@ -21,14 +22,6 @@ const STAGE_KIND_LABELS: Readonly<Record<StageKind, string>> = Object.freeze({
   BOSS: '地域ボス',
   HIDDEN: '隠し戦闘',
 })
-
-function displayName(id: string): string {
-  const tail = id.split('.').at(-1) ?? id
-  return tail
-    .split('-')
-    .map((part) => `${part.slice(0, 1).toUpperCase()}${part.slice(1)}`)
-    .join(' ')
-}
 
 function regionalRewardsForStages(
   stages: readonly StageDefinition[],
@@ -83,10 +76,7 @@ export interface RegionScreenProps {
   readonly notifications: readonly ProgressionNotification[]
   readonly onSelectStage: (stageId: string) => void
   readonly onStartBattle: (stageId: string, formationId: string) => void
-  readonly onInstantSimulate: (
-    stageId: string,
-    formationId: string,
-  ) => InstantStageSimulationResult
+  readonly onInstantSimulate: (stageId: string, formationId: string) => InstantStageSimulationResult
   readonly onOpenCollection: () => void
   readonly onOpenResearch: () => void
   readonly onDismissNotification: (notificationId: string) => void
@@ -110,7 +100,8 @@ export function RegionScreen({
   const selectedStage = progression.stages.find((stage) => stage.stageId === selectedStageId)
   const initialRegionId =
     selectedStage?.regionId ??
-    progression.regions.find((region) => getRegionAccessState(playerData, region).visible)?.regionId ??
+    progression.regions.find((region) => getRegionAccessState(playerData, region).visible)
+      ?.regionId ??
     null
   const [selectedRegionId, setSelectedRegionId] = useState<string | null>(initialRegionId)
   const [notice, setNotice] = useState<string | null>(null)
@@ -118,12 +109,16 @@ export function RegionScreen({
     (region) => getRegionAccessState(playerData, region).visible,
   )
   const selectedRegion =
-    visibleRegions.find((region) => region.regionId === selectedRegionId) ?? visibleRegions[0] ?? null
+    visibleRegions.find((region) => region.regionId === selectedRegionId) ??
+    visibleRegions[0] ??
+    null
   const regionStages =
     selectedRegion === null
       ? []
       : progression.stages.filter((stage) => stage.regionId === selectedRegion.regionId)
-  const visibleStages = regionStages.filter((stage) => getStageAccessState(playerData, stage).visible)
+  const visibleStages = regionStages.filter(
+    (stage) => getStageAccessState(playerData, stage).visible,
+  )
   const undiscoveredCount = regionStages.length - visibleStages.length
   const completedStageIds = new Set(playerData.stageProgress?.completedStageIds ?? [])
   const activeFormationId = playerData.formations.activeFormationId
@@ -133,9 +128,9 @@ export function RegionScreen({
   const regionalState =
     selectedRegion === null
       ? null
-      : playerData.stageProgress?.regionalPoints.find(
+      : (playerData.stageProgress?.regionalPoints.find(
           (state) => state.regionId === selectedRegion.regionId,
-        ) ?? null
+        ) ?? null)
   const regionalRewards = regionalRewardsForStages(regionStages)
 
   const simulate = (stageId: string) => {
@@ -177,9 +172,18 @@ export function RegionScreen({
       </header>
 
       <section className="region-resource-bar" aria-label="現在の資源と編成">
-        <div><span>基本通貨</span><strong>{playerData.economy.currency}</strong></div>
-        <div><span>研究データ</span><strong>{playerData.economy.researchData}</strong></div>
-        <div><span>触媒種</span><strong>{playerData.economy.catalysts.length}</strong></div>
+        <div>
+          <span>基本通貨</span>
+          <strong>{playerData.economy.currency}</strong>
+        </div>
+        <div>
+          <span>研究データ</span>
+          <strong>{playerData.economy.researchData}</strong>
+        </div>
+        <div>
+          <span>触媒種</span>
+          <strong>{playerData.economy.catalysts.length}</strong>
+        </div>
         <div>
           <span>出撃編成</span>
           <strong>{activeFormation?.name ?? '未設定'}</strong>
@@ -205,7 +209,10 @@ export function RegionScreen({
             {notifications.map((notification) => {
               const actionLabel = notificationActionLabel(notification)
               return (
-                <article key={notification.id} className={`progress-notification progress-notification--${notification.kind.toLowerCase()}`}>
+                <article
+                  key={notification.id}
+                  className={`progress-notification progress-notification--${notification.kind.toLowerCase()}`}
+                >
                   <div>
                     <strong>{notification.title}</strong>
                     <p>{notification.detail}</p>
@@ -235,7 +242,11 @@ export function RegionScreen({
         </section>
       )}
 
-      {notice !== null && <p className="collection-notice region-notice" role="status">{notice}</p>}
+      {notice !== null && (
+        <p className="collection-notice region-notice" role="status">
+          {notice}
+        </p>
+      )}
 
       <div className="region-layout">
         <aside className="region-selector collection-panel" aria-labelledby="region-list-title">
@@ -295,7 +306,8 @@ export function RegionScreen({
                 <h3 id="regional-reward-title">地域ポイント天井</h3>
                 <div className="regional-reward-list">
                   {regionalRewards.map((reward) => {
-                    const claimed = regionalState?.claimedRewardIds.includes(reward.rewardId) ?? false
+                    const claimed =
+                      regionalState?.claimedRewardIds.includes(reward.rewardId) ?? false
                     const reached = (regionalState?.points ?? 0) >= reward.requiredPoints
                     return (
                       <div
@@ -303,8 +315,10 @@ export function RegionScreen({
                         className={`regional-reward${claimed ? ' is-claimed' : reached ? ' is-reached' : ''}`}
                       >
                         <span>{reward.requiredPoints}P</span>
-                        <strong>{displayName(reward.rewardId)}</strong>
-                        <small>{claimed ? '受取済み' : reached ? '次回精算で受取' : '未到達'}</small>
+                        <strong>{resolveDisplayName(reward.rewardId)}</strong>
+                        <small>
+                          {claimed ? '受取済み' : reached ? '次回精算で受取' : '未到達'}
+                        </small>
                       </div>
                     )
                   })}
@@ -328,23 +342,39 @@ export function RegionScreen({
                         onClick={() => onSelectStage(stage.stageId)}
                       >
                         <span className="stage-card__kind">{STAGE_KIND_LABELS[stage.kind]}</span>
-                        <strong>{displayName(stage.stageId)}</strong>
+                        <strong>{resolveDisplayName(stage.stageId)}</strong>
                         <small>{completed ? 'CLEAR' : access.unlocked ? 'OPEN' : 'LOCKED'}</small>
                       </button>
                       <div className="stage-card__body">
                         <h3>{stage.theme}</h3>
                         {stage.secondaryTheme !== null && <p>{stage.secondaryTheme}</p>}
                         <dl>
-                          <div><dt>敵数</dt><dd>{stage.enemyFormation.units.length}</dd></div>
-                          <div><dt>確定通貨</dt><dd>{stage.rewards.guaranteed.currency}</dd></div>
-                          <div><dt>研究データ</dt><dd>{stage.rewards.guaranteed.researchData}</dd></div>
-                          <div><dt>地域P</dt><dd>{stage.rewards.regionalPointGain}</dd></div>
+                          <div>
+                            <dt>敵数</dt>
+                            <dd>{stage.enemyFormation.units.length}</dd>
+                          </div>
+                          <div>
+                            <dt>確定通貨</dt>
+                            <dd>{stage.rewards.guaranteed.currency}</dd>
+                          </div>
+                          <div>
+                            <dt>研究データ</dt>
+                            <dd>{stage.rewards.guaranteed.researchData}</dd>
+                          </div>
+                          <div>
+                            <dt>地域P</dt>
+                            <dd>{stage.rewards.regionalPointGain}</dd>
+                          </div>
                         </dl>
                         {!access.unlocked && (
-                          <p className="stage-card__lock" role="status">{access.reason}</p>
+                          <p className="stage-card__lock" role="status">
+                            {access.reason}
+                          </p>
                         )}
                         {completed && (
-                          <p className="stage-card__fast">クリア済み: ×8戦闘と即時シミュレーションを利用可能</p>
+                          <p className="stage-card__fast">
+                            クリア済み: ×8戦闘と即時シミュレーションを利用可能
+                          </p>
                         )}
                       </div>
                       <div className="stage-card__actions">
@@ -379,7 +409,8 @@ export function RegionScreen({
 
               {undiscoveredCount > 0 && (
                 <p className="region-secret-summary">
-                  未発見のステージが{undiscoveredCount}件あります。地域進行を進めて兆候を探してください。
+                  未発見のステージが{undiscoveredCount}
+                  件あります。地域進行を進めて兆候を探してください。
                 </p>
               )}
             </>

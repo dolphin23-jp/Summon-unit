@@ -1,3 +1,4 @@
+import { DISPLAY_MASTER_VALIDATION } from '../src/content/display-masters'
 import {
   ACTIVE_CONTENT_VALIDATION,
   AUTHORED_VERTICAL_SLICE_CONTENT_VALIDATION,
@@ -12,6 +13,7 @@ console.log(
       verticalSlice: AUTHORED_VERTICAL_SLICE_CONTENT_VALIDATION,
       verticalSliceWorld: AUTHORED_VERTICAL_SLICE_WORLD_VALIDATION,
       verticalSliceBalanced: BALANCED_VERTICAL_SLICE_CONTENT_VALIDATION,
+      displayMasters: DISPLAY_MASTER_VALIDATION,
     },
     null,
     2,

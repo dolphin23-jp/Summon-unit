@@ -1,3 +1,8 @@
+import {
+  formatUnitDisplayName,
+  resolveDisplayName,
+  resolveSkillDescription,
+} from '../content/display-masters'
 import { useMemo, useState } from 'react'
 import {
   AI_INDIVIDUAL_STRATEGIES,
@@ -61,17 +66,6 @@ const TAB_LABELS: Readonly<Record<CollectionTab, string>> = Object.freeze({
   ENCYCLOPEDIA: '図鑑',
 })
 
-function shortId(id: string): string {
-  return id.split('.').at(-1) ?? id
-}
-
-function displayName(id: string): string {
-  return shortId(id)
-    .split('-')
-    .map((part) => `${part.slice(0, 1).toUpperCase()}${part.slice(1)}`)
-    .join(' ')
-}
-
 function basisPointsLabel(value: number): string {
   return `${Math.floor(value / 100)}.${String(value % 100).padStart(2, '0')}%`
 }
@@ -123,8 +117,10 @@ function RosterCard({
     >
       <MonsterIcon species={species} />
       <span className="roster-card__body">
-        <strong>{instance.nickname ?? displayName(species.id)}</strong>
-        <small>{instance.instanceId}</small>
+        <strong>
+          {instance.nickname ?? formatUnitDisplayName(species.id, instance.instanceId)}
+        </strong>
+        <small>{resolveDisplayName(species.id)}</small>
         <span>
           {member === null
             ? '未配置'
@@ -176,7 +172,9 @@ function FormationMemberEditor({
       <div className="collection-section-heading">
         <div>
           <p className="panel-heading__kicker">MEMBER SETTINGS</p>
-          <h2 id="member-editor-title">{instance.nickname ?? displayName(species.id)}</h2>
+          <h2 id="member-editor-title">
+            {instance.nickname ?? formatUnitDisplayName(species.id, instance.instanceId)}
+          </h2>
         </div>
         <span>状態 {basisPointsLabel(instance.conditionBasisPoints)}</span>
       </div>
@@ -185,11 +183,15 @@ function FormationMemberEditor({
           汎用技
           <select
             value={member.loadout.genericSkillId ?? ''}
-            onChange={(event) => changeLoadout(event.target.value || null, member.loadout.bloomSkillId)}
+            onChange={(event) =>
+              changeLoadout(event.target.value || null, member.loadout.bloomSkillId)
+            }
           >
             <option value="">装備なし</option>
             {instance.learnedGenericSkillIds.map((skillId) => (
-              <option key={skillId} value={skillId}>{displayName(skillId)}</option>
+              <option key={skillId} value={skillId}>
+                {resolveDisplayName(skillId)}
+              </option>
             ))}
           </select>
         </label>
@@ -197,11 +199,15 @@ function FormationMemberEditor({
           開花技
           <select
             value={member.loadout.bloomSkillId ?? ''}
-            onChange={(event) => changeLoadout(member.loadout.genericSkillId, event.target.value || null)}
+            onChange={(event) =>
+              changeLoadout(member.loadout.genericSkillId, event.target.value || null)
+            }
           >
             <option value="">装備なし</option>
             {speciesState.bloomSkillIds.map((skillId) => (
-              <option key={skillId} value={skillId}>{displayName(skillId)}</option>
+              <option key={skillId} value={skillId}>
+                {resolveDisplayName(skillId)}
+              </option>
             ))}
           </select>
         </label>
@@ -223,7 +229,9 @@ function FormationMemberEditor({
             }
           >
             {AI_INDIVIDUAL_STRATEGIES.map((strategy) => (
-              <option key={strategy} value={strategy}>{INDIVIDUAL_LABELS[strategy]}</option>
+              <option key={strategy} value={strategy}>
+                {INDIVIDUAL_LABELS[strategy]}
+              </option>
             ))}
           </select>
         </label>
@@ -245,7 +253,9 @@ function FormationMemberEditor({
             }
           >
             {AI_TEAM_STRATEGIES.map((strategy) => (
-              <option key={strategy} value={strategy}>{TEAM_LABELS[strategy]}</option>
+              <option key={strategy} value={strategy}>
+                {TEAM_LABELS[strategy]}
+              </option>
             ))}
           </select>
         </label>
@@ -258,7 +268,7 @@ function FormationMemberEditor({
             'STANDARD'
           return (
             <label key={skillId}>
-              <span>{displayName(skillId)}</span>
+              <span>{resolveDisplayName(skillId)}</span>
               <select
                 value={current}
                 onChange={(event) =>
@@ -275,7 +285,9 @@ function FormationMemberEditor({
                 }
               >
                 {AI_SKILL_POLICIES.map((policy) => (
-                  <option key={policy} value={policy}>{POLICY_LABELS[policy]}</option>
+                  <option key={policy} value={policy}>
+                    {POLICY_LABELS[policy]}
+                  </option>
                 ))}
               </select>
             </label>
@@ -305,13 +317,7 @@ function FormationMemberEditor({
           className="collection-button"
           onClick={() =>
             onChange(
-              moveFormationMemberPriority(
-                playerData,
-                formationId,
-                instance.instanceId,
-                1,
-                catalog,
-              ),
+              moveFormationMemberPriority(playerData, formationId, instance.instanceId, 1, catalog),
             )
           }
         >
@@ -362,9 +368,9 @@ export function CollectionScreen({
   const activeFormation =
     activeFormationId === null
       ? null
-      : playerData.formations.formations.find(
+      : (playerData.formations.formations.find(
           (formation) => formation.formationId === activeFormationId,
-        ) ?? null
+        ) ?? null)
   const selectedInstance =
     playerData.collection.unitInstances.find(
       (instance) => instance.instanceId === selectedInstanceId,
@@ -393,7 +399,9 @@ export function CollectionScreen({
     if (activeFormation === null) return
     let index = playerData.formations.formations.length + 1
     let formationId = `formation.preset-${index}`
-    while (playerData.formations.formations.some((formation) => formation.formationId === formationId)) {
+    while (
+      playerData.formations.formations.some((formation) => formation.formationId === formationId)
+    ) {
       index += 1
       formationId = `formation.preset-${index}`
     }
@@ -426,7 +434,7 @@ export function CollectionScreen({
         catalog,
       )
       onPlayerDataChange(result.playerData)
-      setNotice(`${displayName(skill.id)}を基本通貨${result.spentCurrency}で習得しました。`)
+      setNotice(`${resolveDisplayName(skill.id)}を基本通貨${result.spentCurrency}で習得しました。`)
     } catch (error) {
       setNotice(error instanceof Error ? error.message : '習得に失敗しました。')
     }
@@ -438,7 +446,7 @@ export function CollectionScreen({
   const selectedSpecies =
     selectedSpeciesState === null
       ? null
-      : catalog.species.find((species) => species.id === selectedSpeciesState.speciesId) ?? null
+      : (catalog.species.find((species) => species.id === selectedSpeciesState.speciesId) ?? null)
 
   return (
     <main className="collection-app">
@@ -449,9 +457,18 @@ export function CollectionScreen({
           <p>所持個体、編成、技習得、図鑑、正式な経済状態を同じPlayerDataから編集します。</p>
         </div>
         <dl className="collection-header__metrics">
-          <div><dt>基本通貨</dt><dd>{playerData.economy.currency}</dd></div>
-          <div><dt>研究データ</dt><dd>{playerData.economy.researchData}</dd></div>
-          <div><dt>触媒</dt><dd>{catalystTotal}</dd></div>
+          <div>
+            <dt>基本通貨</dt>
+            <dd>{playerData.economy.currency}</dd>
+          </div>
+          <div>
+            <dt>研究データ</dt>
+            <dd>{playerData.economy.researchData}</dd>
+          </div>
+          <div>
+            <dt>触媒</dt>
+            <dd>{catalystTotal}</dd>
+          </div>
         </dl>
       </header>
 
@@ -468,11 +485,18 @@ export function CollectionScreen({
           </button>
         ))}
       </nav>
-      {notice !== null && <p className="collection-notice" role="status">{notice}</p>}
+      {notice !== null && (
+        <p className="collection-notice" role="status">
+          {notice}
+        </p>
+      )}
 
       {tab === 'FORMATION' && activeFormation !== null && activeFormationId !== null && (
         <div className="formation-layout">
-          <section className="collection-panel formation-board-panel" aria-labelledby="formation-title">
+          <section
+            className="collection-panel formation-board-panel"
+            aria-labelledby="formation-title"
+          >
             <div className="collection-section-heading">
               <div>
                 <p className="panel-heading__kicker">FORMATION PRESET</p>
@@ -502,7 +526,9 @@ export function CollectionScreen({
                 </button>
               </div>
             </div>
-            <p className="formation-help">個体を選択してマスを押すと配置・移動します。占有マスでは既存個体と交代します。</p>
+            <p className="formation-help">
+              個体を選択してマスを押すと配置・移動します。占有マスでは既存個体と交代します。
+            </p>
             <div className="formation-board" aria-label="味方3×3編成盤面">
               {LOCAL_ROWS.flatMap((row) =>
                 COLUMNS.map((column) => {
@@ -513,15 +539,15 @@ export function CollectionScreen({
                   const instance =
                     member === undefined
                       ? null
-                      : playerData.collection.unitInstances.find(
+                      : (playerData.collection.unitInstances.find(
                           (candidate) => candidate.instanceId === member.instanceId,
-                        ) ?? null
+                        ) ?? null)
                   return (
                     <button
                       key={`${row}:${column}`}
                       type="button"
                       className={`formation-cell${member !== undefined ? ' formation-cell--occupied' : ''}${member?.instanceId === selectedInstanceId ? ' formation-cell--selected' : ''}`}
-                      aria-label={`${['前列', '中列', '後列'][row]} ${['A', 'B', 'C'][column]}${instance === null ? ' 空き' : ` ${instance.nickname ?? instance.instanceId}`}`}
+                      aria-label={`${['前列', '中列', '後列'][row]} ${['A', 'B', 'C'][column]}${instance === null ? ' 空き' : ` ${instance.nickname ?? formatUnitDisplayName(instance.speciesId, instance.instanceId)}`}`}
                       onClick={() => {
                         if (selectedInstanceId === null) {
                           if (member !== undefined) setSelectedInstanceId(member.instanceId)
@@ -540,8 +566,14 @@ export function CollectionScreen({
                         )
                       }}
                     >
-                      <span>{['前列', '中列', '後列'][row]} {['A', 'B', 'C'][column]}</span>
-                      <strong>{instance === null ? '空き' : instance.nickname ?? displayName(instance.speciesId)}</strong>
+                      <span>
+                        {['前列', '中列', '後列'][row]} {['A', 'B', 'C'][column]}
+                      </span>
+                      <strong>
+                        {instance === null
+                          ? '空き'
+                          : (instance.nickname ?? resolveDisplayName(instance.speciesId))}
+                      </strong>
                       {member !== undefined && <small>優先 {member.tiePriority}</small>}
                     </button>
                   )
@@ -563,7 +595,10 @@ export function CollectionScreen({
 
           <aside className="collection-panel roster-panel" aria-labelledby="roster-title">
             <div className="collection-section-heading">
-              <div><p className="panel-heading__kicker">OWNED UNITS</p><h2 id="roster-title">所持個体</h2></div>
+              <div>
+                <p className="panel-heading__kicker">OWNED UNITS</p>
+                <h2 id="roster-title">所持個体</h2>
+              </div>
             </div>
             <div className="roster-list">
               {playerData.collection.unitInstances.map((instance) => (
@@ -571,7 +606,11 @@ export function CollectionScreen({
                   key={instance.instanceId}
                   instance={instance}
                   species={speciesForInstance(instance, catalog)}
-                  member={activeFormation.members.find((member) => member.instanceId === instance.instanceId) ?? null}
+                  member={
+                    activeFormation.members.find(
+                      (member) => member.instanceId === instance.instanceId,
+                    ) ?? null
+                  }
                   selected={selectedInstanceId === instance.instanceId}
                   onSelect={() => setSelectedInstanceId(instance.instanceId)}
                 />
@@ -599,7 +638,10 @@ export function CollectionScreen({
         <div className="learning-layout">
           <aside className="collection-panel roster-panel">
             <div className="collection-section-heading">
-              <div><p className="panel-heading__kicker">LEARNING TARGET</p><h2>習得する個体</h2></div>
+              <div>
+                <p className="panel-heading__kicker">LEARNING TARGET</p>
+                <h2>習得する個体</h2>
+              </div>
             </div>
             <div className="roster-list">
               {playerData.collection.unitInstances.map((instance) => (
@@ -616,10 +658,15 @@ export function CollectionScreen({
           </aside>
           <section className="collection-panel learning-panel" aria-labelledby="learning-title">
             <div className="collection-section-heading">
-              <div><p className="panel-heading__kicker">GENERIC SKILL TRAINING</p><h2 id="learning-title">汎用技習得</h2></div>
+              <div>
+                <p className="panel-heading__kicker">GENERIC SKILL TRAINING</p>
+                <h2 id="learning-title">汎用技習得</h2>
+              </div>
               <strong className="learning-currency">基本通貨 {playerData.economy.currency}</strong>
             </div>
-            <p className="formation-help">習得費は共通の基本通貨から原子的に差し引かれ、習得済み技と同時にPlayerDataへ保存されます。</p>
+            <p className="formation-help">
+              習得費は共通の基本通貨から原子的に差し引かれ、習得済み技と同時にPlayerDataへ保存されます。
+            </p>
             <div className="skill-learning-grid">
               {genericSkills.map((skill) => {
                 const learned = selectedInstance?.learnedGenericSkillIds.includes(skill.id) ?? false
@@ -629,14 +676,19 @@ export function CollectionScreen({
                   <article key={skill.id} className="skill-learning-card">
                     <div>
                       <span className="skill-slot-badge">GENERIC</span>
-                      <h3>{displayName(skill.id)}</h3>
-                      <p>コスト {skill.actionCost} / 威力 {skill.damageMultiplierPermille}</p>
+                      <h3>{resolveDisplayName(skill.id)}</h3>
+                      <p>{resolveSkillDescription(skill.id)}</p>
+                      <p>
+                        コスト {skill.actionCost} / 威力 {skill.damageMultiplierPermille}
+                      </p>
                     </div>
                     <strong>{learned ? '習得済み' : `習得費 ${cost ?? '—'}`}</strong>
                     <button
                       type="button"
                       className="collection-button"
-                      disabled={selectedInstance === null || learned || cost === undefined || insufficient}
+                      disabled={
+                        selectedInstance === null || learned || cost === undefined || insufficient
+                      }
                       onClick={() => learnSkill(skill)}
                     >
                       {learned ? '習得済み' : insufficient ? '通貨不足' : 'この個体が習得'}
@@ -651,14 +703,22 @@ export function CollectionScreen({
 
       {tab === 'ENCYCLOPEDIA' && (
         <div className="encyclopedia-layout">
-          <section className="collection-panel encyclopedia-grid-panel" aria-labelledby="encyclopedia-title">
+          <section
+            className="collection-panel encyclopedia-grid-panel"
+            aria-labelledby="encyclopedia-title"
+          >
             <div className="collection-section-heading">
-              <div><p className="panel-heading__kicker">SPECIES ENCYCLOPEDIA</p><h2 id="encyclopedia-title">図鑑</h2></div>
+              <div>
+                <p className="panel-heading__kicker">SPECIES ENCYCLOPEDIA</p>
+                <h2 id="encyclopedia-title">図鑑</h2>
+              </div>
               <span>解析度は5種類の増加源で0～10000</span>
             </div>
             <div className="encyclopedia-grid">
               {playerData.collection.speciesStates.map((state) => {
-                const species = catalog.species.find((candidate) => candidate.id === state.speciesId)
+                const species = catalog.species.find(
+                  (candidate) => candidate.id === state.speciesId,
+                )
                 if (species === undefined) return null
                 const stage = encyclopediaStage(state.encyclopediaStageId)
                 return (
@@ -670,7 +730,7 @@ export function CollectionScreen({
                     onClick={() => setSelectedSpeciesId(state.speciesId)}
                   >
                     <MonsterIcon species={species} concealed={stage < 2} />
-                    <strong>{stage < 2 ? '???' : displayName(species.id)}</strong>
+                    <strong>{stage < 2 ? '???' : resolveDisplayName(species.id)}</strong>
                     <span>開示 {stage}/5</span>
                     <small>解析 {basisPointsLabel(state.analysisBasisPoints)}</small>
                   </button>
@@ -680,7 +740,10 @@ export function CollectionScreen({
           </section>
 
           {selectedSpecies !== null && selectedSpeciesState !== null && (
-            <aside className="collection-panel species-detail" aria-labelledby="species-detail-title">
+            <aside
+              className="collection-panel species-detail"
+              aria-labelledby="species-detail-title"
+            >
               <MonsterIcon
                 species={selectedSpecies}
                 concealed={encyclopediaStage(selectedSpeciesState.encyclopediaStageId) < 2}
@@ -690,41 +753,85 @@ export function CollectionScreen({
                 <h2 id="species-detail-title">
                   {encyclopediaStage(selectedSpeciesState.encyclopediaStageId) < 2
                     ? '未解析種'
-                    : displayName(selectedSpecies.id)}
+                    : resolveDisplayName(selectedSpecies.id)}
                 </h2>
               </div>
               <dl className="species-detail__facts">
-                <div><dt>開示段階</dt><dd>{encyclopediaStage(selectedSpeciesState.encyclopediaStageId)}/5</dd></div>
-                <div><dt>解析度</dt><dd>{basisPointsLabel(selectedSpeciesState.analysisBasisPoints)}</dd></div>
-                <div><dt>設計図</dt><dd>{selectedSpeciesState.blueprintUnlocked ? '解放済み' : '未解放'}</dd></div>
-                <div><dt>所持数</dt><dd>{playerData.collection.unitInstances.filter((instance) => instance.speciesId === selectedSpecies.id).length}</dd></div>
+                <div>
+                  <dt>開示段階</dt>
+                  <dd>{encyclopediaStage(selectedSpeciesState.encyclopediaStageId)}/5</dd>
+                </div>
+                <div>
+                  <dt>解析度</dt>
+                  <dd>{basisPointsLabel(selectedSpeciesState.analysisBasisPoints)}</dd>
+                </div>
+                <div>
+                  <dt>設計図</dt>
+                  <dd>{selectedSpeciesState.blueprintUnlocked ? '解放済み' : '未解放'}</dd>
+                </div>
+                <div>
+                  <dt>所持数</dt>
+                  <dd>
+                    {
+                      playerData.collection.unitInstances.filter(
+                        (instance) => instance.speciesId === selectedSpecies.id,
+                      ).length
+                    }
+                  </dd>
+                </div>
                 {encyclopediaStage(selectedSpeciesState.encyclopediaStageId) >= 2 && (
                   <>
-                    <div><dt>属性</dt><dd>{displayName(selectedSpecies.attributeId)}</dd></div>
-                    <div><dt>レア度</dt><dd>R{selectedSpecies.rarity}</dd></div>
+                    <div>
+                      <dt>属性</dt>
+                      <dd>{resolveDisplayName(selectedSpecies.attributeId)}</dd>
+                    </div>
+                    <div>
+                      <dt>レア度</dt>
+                      <dd>R{selectedSpecies.rarity}</dd>
+                    </div>
                   </>
                 )}
                 {encyclopediaStage(selectedSpeciesState.encyclopediaStageId) >= 3 && (
                   <>
-                    <div><dt>HP</dt><dd>{selectedSpecies.stats.hp}</dd></div>
-                    <div><dt>Attack</dt><dd>{selectedSpecies.stats.attack}</dd></div>
-                    <div><dt>Defense</dt><dd>{selectedSpecies.stats.defense}</dd></div>
-                    <div><dt>Speed</dt><dd>{selectedSpecies.stats.speed}</dd></div>
+                    <div>
+                      <dt>HP</dt>
+                      <dd>{selectedSpecies.stats.hp}</dd>
+                    </div>
+                    <div>
+                      <dt>Attack</dt>
+                      <dd>{selectedSpecies.stats.attack}</dd>
+                    </div>
+                    <div>
+                      <dt>Defense</dt>
+                      <dd>{selectedSpecies.stats.defense}</dd>
+                    </div>
+                    <div>
+                      <dt>Speed</dt>
+                      <dd>{selectedSpecies.stats.speed}</dd>
+                    </div>
                   </>
                 )}
               </dl>
               {encyclopediaStage(selectedSpeciesState.encyclopediaStageId) >= 4 && (
                 <section className="species-detail__skills">
                   <h3>技情報</h3>
-                  <p>固有: {displayName(selectedSpecies.innateSkillId)}</p>
-                  <p>開花: {selectedSpeciesState.bloomSkillIds.length === 0 ? '未解放' : selectedSpeciesState.bloomSkillIds.map(displayName).join(' / ')}</p>
+                  <p>固有: {resolveDisplayName(selectedSpecies.innateSkillId)}</p>
+                  <p>
+                    開花:{' '}
+                    {selectedSpeciesState.bloomSkillIds.length === 0
+                      ? '未解放'
+                      : selectedSpeciesState.bloomSkillIds.map(resolveDisplayName).join(' / ')}
+                  </p>
                 </section>
               )}
               {encyclopediaStage(selectedSpeciesState.encyclopediaStageId) >= 5 && (
                 <section className="species-detail__statistics">
                   <h3>観測統計</h3>
                   {Object.entries(selectedSpeciesState.statistics).map(([key, value]) => (
-                    <p key={key}><span>{displayName(key)}</span><strong>{value}</strong></p>
+                    <p key={key}>
+                      <span>{resolveDisplayName(key)}</span>
+                      <strong>{value}</strong>
+                    </p>
                   ))}
                 </section>
               )}
