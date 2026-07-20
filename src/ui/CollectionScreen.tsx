@@ -820,7 +820,7 @@ export function CollectionScreen({
                     開花:{' '}
                     {selectedSpeciesState.bloomSkillIds.length === 0
                       ? '未解放'
-                      : selectedSpeciesState.bloomSkillIds.map(displayName).join(' / ')}
+                      : selectedSpeciesState.bloomSkillIds.map(resolveDisplayName).join(' / ')}
                   </p>
                 </section>
               )}

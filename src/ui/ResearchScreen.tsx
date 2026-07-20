@@ -361,7 +361,7 @@ function ResearchNodeDetail({
           </div>
           <div>
             <dt>隣接</dt>
-            <dd>{definition.adjacentNodeIds.map(displayName).join(' / ') || 'なし'}</dd>
+            <dd>{definition.adjacentNodeIds.map(resolveDisplayName).join(' / ') || 'なし'}</dd>
           </div>
         </dl>
       )}

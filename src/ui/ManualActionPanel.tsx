@@ -93,7 +93,7 @@ function ManualActionPreviewPanel({
         </div>
         <div>
           <dt>移動後</dt>
-          <dd>{preview.toPositionId}</dd>
+          <dd>{positionLabel(preview.toPositionId)}</dd>
         </div>
       </dl>
 
