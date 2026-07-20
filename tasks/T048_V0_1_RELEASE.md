@@ -13,6 +13,7 @@
 - [x] 実回復量と過剰回復率をイベントログ・ベンチへ追加
 - [x] 回復クールダウンを設定し51戦タイムアウト0を確認
 - [x] content、tests、headless、AI／balance benchmark、lint、buildを成功
+- [x] 一時パッチWorkflow・診断トリガーを削除し、標準CIだけのclean headへ戻す
 - [ ] Vercel productionで主要導線をスモーク確認
 - [ ] versionを`0.1.0`へ確定
 - [ ] `v0.1.0`タグとGitHub Releaseを作成
@@ -22,6 +23,10 @@
 **CODE GO / EXTERNAL DEPLOYMENT PENDING**
 
 コード側のrelease blockerは解消した。Vercel無料枠の日次デプロイ上限により最終production確認だけが実行不能であるため、現在は`0.1.0-rc.2`として保持し、最終タグは作成しない。
+
+## 最終統合条件
+
+マージ対象headには製品コード、テスト、ベンチマーク、文書だけを含める。標準CIでcontent validation、全テスト、headless、AI／balance benchmark、lint、buildが成功したclean headだけを`main`へ統合する。
 
 ## 次の操作
 
