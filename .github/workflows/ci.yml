@@ -2,94 +2,13 @@ name: CI
 
 on:
   push:
-    branches: [main, agent/t050-ux-guidance-confirmation]
+    branches: [main]
   pull_request:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  materialize-t050:
-    if: github.actor != 'github-actions[bot]' && (github.ref == 'refs/heads/agent/t050-ux-guidance-confirmation' || github.head_ref == 'agent/t050-ux-guidance-confirmation')
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          ref: agent/t050-ux-guidance-confirmation
-          fetch-depth: 0
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - name: Enable pnpm
-        run: |
-          corepack enable
-          corepack prepare pnpm@10.13.1 --activate
-
-      - name: Materialize or repair T050
-        shell: bash
-        run: |
-          if [ -f src/ux/ux-guidance.ts ]; then
-            python3 scripts/t050_fix.py
-          else
-            python3 scripts/t050_materialize.py
-            python3 scripts/t050_fix.py
-          fi
-
-      - name: Install dependencies
-        run: pnpm install --no-frozen-lockfile
-
-      - name: Remove generated lockfile
-        run: rm -f pnpm-lock.yaml
-
-      - name: Format changed files
-        shell: bash
-        run: |
-          git diff --name-only --diff-filter=ACM -z | xargs -0 -r pnpm exec prettier --write --ignore-unknown
-
-      - name: Content validation
-        run: pnpm validate:content
-
-      - name: Test
-        run: pnpm test
-
-      - name: Lint
-        run: pnpm lint
-
-      - name: Capture build result
-        id: build
-        shell: bash
-        run: |
-          set +e
-          set -o pipefail
-          pnpm build 2>&1 | tee t050-build.log
-          code=${PIPESTATUS[0]}
-          echo "code=$code" >> "$GITHUB_OUTPUT"
-          if [ "$code" -eq 0 ]; then rm -f t050-build.log; fi
-          exit 0
-
-      - name: Commit materialized T050
-        shell: bash
-        run: |
-          git config user.name github-actions[bot]
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add -A
-          if git diff --cached --quiet; then
-            echo "No T050 changes to commit"
-            exit 0
-          fi
-          git commit -m "T050: materialize UX guidance and confirmations"
-          git push origin HEAD:agent/t050-ux-guidance-confirmation
-
-      - name: Fail on build regression
-        if: steps.build.outputs.code != '0'
-        run: exit 1
-
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 10
