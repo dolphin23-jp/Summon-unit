@@ -1,22 +1,21 @@
 name: CI
 
 on:
+  push:
+    branches: [main]
   pull_request:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  lint-diagnostics:
+  verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 10
 
     steps:
-      - name: Checkout pull request branch
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.head_ref }}
-          fetch-depth: 0
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -31,18 +30,35 @@ jobs:
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
 
-      - name: Capture lint diagnostics
+      - name: Content validation
+        run: pnpm validate:content
+
+      - name: Test
+        id: test
         run: |
-          set +e
           set -o pipefail
-          pnpm lint 2>&1 | tee /tmp/t051-lint.log
-          status=${PIPESTATUS[0]}
-          if [ "$status" -ne 0 ]; then
-            cp /tmp/t051-lint.log tasks/T051_LINT_DIAGNOSTICS.txt
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add tasks/T051_LINT_DIAGNOSTICS.txt
-            git commit -m "Record T051 lint diagnostics"
-            git push origin HEAD:${{ github.head_ref }}
-          fi
-          exit "$status"
+          pnpm test 2>&1 | tee /tmp/vitest.log
+
+      - name: Upload test diagnostics
+        if: failure() && steps.test.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: vitest-diagnostics
+          path: /tmp/vitest.log
+          if-no-files-found: error
+          retention-days: 3
+
+      - name: Headless demo
+        run: pnpm demo:headless > /tmp/headless-battle-demo.json
+
+      - name: AI regression benchmark
+        run: pnpm benchmark:ai
+
+      - name: Vertical slice balance benchmark
+        run: pnpm benchmark:balance > /tmp/vertical-slice-balance.json
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Build
+        run: pnpm build
