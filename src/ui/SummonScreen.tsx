@@ -1,3 +1,4 @@
+import { resolveDisplayName } from '../content/display-masters'
 import { useMemo, useState } from 'react'
 import type { SpeciesId } from '../content/monster-species'
 import type { PlayerData } from '../progression/player-data'
@@ -5,21 +6,14 @@ import type { T036ProgressionCatalog } from '../progression/t036-progression-mod
 import { calculateSummonCurrencyCost, summonUnit } from '../progression/unit-economy'
 
 function displayName(id: string): string {
-  const tail = id.split('.').at(-1) ?? id
-  return tail
-    .split('-')
-    .map((part) => `${part.slice(0, 1).toUpperCase()}${part.slice(1)}`)
-    .join(' ')
+  return resolveDisplayName(id)
 }
 
 function instanceSlug(speciesId: SpeciesId): string {
   return speciesId.split('.').at(-1) ?? speciesId
 }
 
-export function createNextSummonInstanceId(
-  playerData: PlayerData,
-  speciesId: SpeciesId,
-): string {
+export function createNextSummonInstanceId(playerData: PlayerData, speciesId: SpeciesId): string {
   const existing = new Set(
     playerData.collection.unitInstances.map((instance) => instance.instanceId),
   )
@@ -54,10 +48,7 @@ export function SummonScreen({
         .filter((state) => state.blueprintUnlocked)
         .map((state) => catalog.species.find((species) => species.id === state.speciesId))
         .filter((species): species is NonNullable<typeof species> => species !== undefined)
-        .sort(
-          (left, right) =>
-            left.rarity - right.rarity || left.id.localeCompare(right.id, 'en'),
-        ),
+        .sort((left, right) => left.rarity - right.rarity || left.id.localeCompare(right.id, 'en')),
     [catalog.species, playerData.collection.speciesStates],
   )
   const [selectedSpeciesId, setSelectedSpeciesId] = useState<SpeciesId | null>(
@@ -79,11 +70,7 @@ export function SummonScreen({
     }
     try {
       const instanceId = createNextSummonInstanceId(playerData, selectedSpecies.id)
-      const result = summonUnit(
-        playerData,
-        { instanceId, speciesId: selectedSpecies.id },
-        catalog,
-      )
+      const result = summonUnit(playerData, { instanceId, speciesId: selectedSpecies.id }, catalog)
       onPlayerDataChange(result.playerData)
       setNotice(
         `${displayName(result.speciesId)}を召喚しました。基本通貨を${result.currencySpent}消費しました。`,
@@ -148,7 +135,9 @@ export function SummonScreen({
                 >
                   <span className="research-node__stage">R{species.rarity}</span>
                   <strong>{displayName(species.id)}</strong>
-                  <small>所持 {owned} / 通貨 {cost}</small>
+                  <small>
+                    所持 {owned} / 通貨 {cost}
+                  </small>
                 </button>
               )
             })}

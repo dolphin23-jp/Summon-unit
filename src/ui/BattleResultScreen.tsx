@@ -1,10 +1,11 @@
+import {
+  formatUnitDisplayName,
+  resolveCatalystName,
+  resolveSpeciesName,
+} from '../content/display-masters'
 import type { BattleResultView } from './battle-result-view'
 
-export type BattleResultNavigationAction =
-  | 'RETRY'
-  | 'FORMATION'
-  | 'RESEARCH'
-  | 'NEXT_STAGE'
+export type BattleResultNavigationAction = 'RETRY' | 'FORMATION' | 'RESEARCH' | 'NEXT_STAGE'
 
 function sideLabel(side: 'ALLY' | 'ENEMY'): string {
   return side === 'ALLY' ? '味方' : '相手'
@@ -26,16 +27,27 @@ export function BattleResultScreen({
       aria-live="polite"
     >
       <header className="result-screen__header">
-        <span className="result-screen__mark" aria-hidden="true">{view.mark}</span>
+        <span className="result-screen__mark" aria-hidden="true">
+          {view.mark}
+        </span>
         <div>
           <p className="panel-heading__kicker">BATTLE RESULT</p>
           <h2 id="battle-result-title">{view.title}</h2>
           <p>{view.summary}</p>
         </div>
         <dl className="result-screen__meta">
-          <div><dt>終了</dt><dd>{view.terminationLabel}</dd></div>
-          <div><dt>仮想時刻</dt><dd>t={view.finalVirtualTime}</dd></div>
-          <div><dt>総行動</dt><dd>{view.totalActions}</dd></div>
+          <div>
+            <dt>終了</dt>
+            <dd>{view.terminationLabel}</dd>
+          </div>
+          <div>
+            <dt>仮想時刻</dt>
+            <dd>t={view.finalVirtualTime}</dd>
+          </div>
+          <div>
+            <dt>総行動</dt>
+            <dd>{view.totalActions}</dd>
+          </div>
         </dl>
       </header>
 
@@ -43,14 +55,38 @@ export function BattleResultScreen({
         <section className="result-card" aria-labelledby="result-reward-title">
           <h3 id="result-reward-title">報酬・修復費</h3>
           <dl className="result-reward-list">
-            <div><dt><span aria-hidden="true">C</span> 基本通貨</dt><dd>+{view.rewards.currency}</dd></div>
-            <div><dt><span aria-hidden="true">R</span> 研究データ</dt><dd>+{view.rewards.researchData}</dd></div>
-            <div><dt><span aria-hidden="true">K</span> 触媒</dt><dd>+{view.rewards.catalyst}</dd></div>
-            <div><dt><span aria-hidden="true">−</span> 修復費目安</dt><dd>{view.repairCost}</dd></div>
+            <div>
+              <dt>
+                <span aria-hidden="true">C</span> 基本通貨
+              </dt>
+              <dd>+{view.rewards.currency}</dd>
+            </div>
+            <div>
+              <dt>
+                <span aria-hidden="true">R</span> 研究データ
+              </dt>
+              <dd>+{view.rewards.researchData}</dd>
+            </div>
+            <div>
+              <dt>
+                <span aria-hidden="true">K</span> 触媒
+              </dt>
+              <dd>+{view.rewards.catalyst}</dd>
+            </div>
+            <div>
+              <dt>
+                <span aria-hidden="true">−</span> 修復費目安
+              </dt>
+              <dd>{view.repairCost}</dd>
+            </div>
             {view.regionalPoints !== null && (
               <div>
-                <dt><span aria-hidden="true">P</span> 地域ポイント</dt>
-                <dd>{view.regionalPoints.before} → {view.regionalPoints.after}</dd>
+                <dt>
+                  <span aria-hidden="true">P</span> 地域ポイント
+                </dt>
+                <dd>
+                  {view.regionalPoints.before} → {view.regionalPoints.after}
+                </dd>
               </div>
             )}
           </dl>
@@ -58,7 +94,7 @@ export function BattleResultScreen({
             <ul className="result-analysis-list" aria-label="獲得触媒内訳">
               {view.rewards.catalysts.map((catalyst) => (
                 <li key={catalyst.catalystId}>
-                  <span>{catalyst.catalystId}</span>
+                  <span>{resolveCatalystName(catalyst.catalystId)}</span>
                   <strong>+{catalyst.amount}</strong>
                 </li>
               ))}
@@ -79,7 +115,7 @@ export function BattleResultScreen({
             <ul className="result-analysis-list">
               {view.analysisChanges.map((change) => (
                 <li key={change.speciesId}>
-                  <span>{change.speciesId}</span>
+                  <span>{resolveSpeciesName(change.speciesId)}</span>
                   <strong>+{change.change}</strong>
                 </li>
               ))}
@@ -91,7 +127,10 @@ export function BattleResultScreen({
           <h3 id="result-notification-title">進行・研究通知</h3>
           <ul className="result-notification-list">
             {view.notifications.map((notification) => (
-              <li key={notification}><span aria-hidden="true">!</span>{notification}</li>
+              <li key={notification}>
+                <span aria-hidden="true">!</span>
+                {notification}
+              </li>
             ))}
           </ul>
         </section>
@@ -124,10 +163,19 @@ export function BattleResultScreen({
             <tbody>
               {view.unitStats.map((unit) => (
                 <tr key={unit.battleUnitId}>
-                  <td><span className={`result-side result-side--${unit.side.toLowerCase()}`}>{unit.side === 'ALLY' ? 'A' : 'E'} {sideLabel(unit.side)}</span></td>
-                  <th scope="row"><strong>{unit.battleUnitId}</strong><small>{unit.speciesId}</small></th>
+                  <td>
+                    <span className={`result-side result-side--${unit.side.toLowerCase()}`}>
+                      {unit.side === 'ALLY' ? 'A' : 'E'} {sideLabel(unit.side)}
+                    </span>
+                  </td>
+                  <th scope="row">
+                    <strong>{formatUnitDisplayName(unit.speciesId, unit.battleUnitId)}</strong>
+                    <small>{resolveSpeciesName(unit.speciesId)}</small>
+                  </th>
                   <td>{unit.defeated ? '戦闘不能' : '生存'}</td>
-                  <td>{unit.hp}/{unit.maxHp}</td>
+                  <td>
+                    {unit.hp}/{unit.maxHp}
+                  </td>
                   <td>{unit.actionCount}</td>
                   <td>{unit.skillUseCount}</td>
                   <td>{unit.damageDealt}</td>
@@ -143,13 +191,27 @@ export function BattleResultScreen({
 
       <footer className="result-screen__footer">
         <div className="result-actions" aria-label="戦闘終了後の移動先">
-          <button type="button" className="control-button control-button--primary" onClick={() => onNavigate('RETRY')}>再戦</button>
-          <button type="button" className="control-button" onClick={() => onNavigate('FORMATION')}>編成</button>
-          <button type="button" className="control-button" onClick={() => onNavigate('RESEARCH')}>研究</button>
-          <button type="button" className="control-button" onClick={() => onNavigate('NEXT_STAGE')}>次ステージ</button>
+          <button
+            type="button"
+            className="control-button control-button--primary"
+            onClick={() => onNavigate('RETRY')}
+          >
+            再戦
+          </button>
+          <button type="button" className="control-button" onClick={() => onNavigate('FORMATION')}>
+            編成
+          </button>
+          <button type="button" className="control-button" onClick={() => onNavigate('RESEARCH')}>
+            研究
+          </button>
+          <button type="button" className="control-button" onClick={() => onNavigate('NEXT_STAGE')}>
+            次ステージ
+          </button>
         </div>
         {navigationNotice !== null && (
-          <p className="result-navigation-notice" role="status">{navigationNotice}</p>
+          <p className="result-navigation-notice" role="status">
+            {navigationNotice}
+          </p>
         )}
       </footer>
     </section>

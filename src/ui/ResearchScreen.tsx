@@ -1,3 +1,4 @@
+import { resolveCatalystName, resolveDisplayName } from '../content/display-masters'
 import { useMemo, useState } from 'react'
 import type { MonsterSpecies } from '../content/monster-species'
 import type { PlayerData } from '../progression/player-data'
@@ -35,10 +36,7 @@ function shortId(id: string): string {
 }
 
 function displayName(id: string): string {
-  return shortId(id)
-    .split('-')
-    .map((part) => `${part.slice(0, 1).toUpperCase()}${part.slice(1)}`)
-    .join(' ')
+  return resolveDisplayName(id)
 }
 
 function speciesForNode(
@@ -46,7 +44,8 @@ function speciesForNode(
   catalog: T037ProgressionCatalog,
 ): MonsterSpecies {
   const species = catalog.species.find((candidate) => candidate.id === definition.targetSpeciesId)
-  if (species === undefined) throw new Error(`unknown research target species: ${definition.targetSpeciesId}`)
+  if (species === undefined)
+    throw new Error(`unknown research target species: ${definition.targetSpeciesId}`)
   return species
 }
 
@@ -88,10 +87,7 @@ function TrialResearchForm({
     ),
   )
   const [catalystIds, setCatalystIds] = useState<readonly string[]>(
-    definition.candidateRange.catalystIds.slice(
-      0,
-      definition.candidateRange.minimumCatalystCount,
-    ),
+    definition.candidateRange.catalystIds.slice(0, definition.candidateRange.minimumCatalystCount),
   )
 
   const submit = () => {
@@ -112,7 +108,9 @@ function TrialResearchForm({
         onNotice('試験研究が完全一致しました。正確なレシピを開示しました。')
         return
       }
-      const matchedMaterials = result.evaluation.materialSpecies.filter((entry) => entry.matched).length
+      const matchedMaterials = result.evaluation.materialSpecies.filter(
+        (entry) => entry.matched,
+      ).length
       const matchedCatalysts = result.evaluation.catalysts.filter((entry) => entry.matched).length
       onNotice(
         `試験結果: 方式${result.evaluation.methodMatched ? '適合' : '不適合'} / 素材${matchedMaterials}/${result.evaluation.materialSpecies.length} / 触媒${matchedCatalysts}/${result.evaluation.catalysts.length}`,
@@ -134,16 +132,22 @@ function TrialResearchForm({
       <p>触媒と個体は消費せず、選択要素ごとの適合結果を返します。</p>
       <label className="research-method-select">
         研究方式
-        <select value={method} onChange={(event) => setMethod(event.target.value as ResearchMethod)}>
+        <select
+          value={method}
+          onChange={(event) => setMethod(event.target.value as ResearchMethod)}
+        >
           {definition.candidateRange.methods.map((candidate) => (
-            <option key={candidate} value={candidate}>{METHOD_LABELS[candidate]}</option>
+            <option key={candidate} value={candidate}>
+              {METHOD_LABELS[candidate]}
+            </option>
           ))}
         </select>
       </label>
       <div className="research-choice-columns">
         <fieldset>
           <legend>
-            素材種 {definition.candidateRange.minimumMaterialCount}～{definition.candidateRange.maximumMaterialCount}
+            素材種 {definition.candidateRange.minimumMaterialCount}～
+            {definition.candidateRange.maximumMaterialCount}
           </legend>
           {definition.candidateRange.materialSpeciesIds.map((speciesId) => (
             <label key={speciesId}>
@@ -158,10 +162,11 @@ function TrialResearchForm({
         </fieldset>
         <fieldset>
           <legend>
-            触媒 {definition.candidateRange.minimumCatalystCount}～{definition.candidateRange.maximumCatalystCount}
+            触媒 {definition.candidateRange.minimumCatalystCount}～
+            {definition.candidateRange.maximumCatalystCount}
           </legend>
           {definition.candidateRange.catalystIds.map((catalystId) => (
-            <label key={catalystId}>
+            <label key={resolveCatalystName(catalystId)}>
               <input
                 type="checkbox"
                 checked={catalystIds.includes(catalystId)}
@@ -172,7 +177,11 @@ function TrialResearchForm({
           ))}
         </fieldset>
       </div>
-      <button type="button" className="collection-button collection-button--primary" onClick={submit}>
+      <button
+        type="button"
+        className="collection-button collection-button--primary"
+        onClick={submit}
+      >
         この条件で試験
       </button>
     </section>
@@ -238,33 +247,57 @@ function FinalResearchForm({
         <strong>成功率 100%</strong>
       </div>
       <dl className="research-requirements">
-        <div><dt>研究データ</dt><dd>{finalDefinition.researchDataCost}</dd></div>
+        <div>
+          <dt>研究データ</dt>
+          <dd>{finalDefinition.researchDataCost}</dd>
+        </div>
         <div>
           <dt>触媒</dt>
-          <dd>{finalDefinition.catalysts.length === 0 ? 'なし' : finalDefinition.catalysts.map((entry) => `${displayName(entry.catalystId)} ×${entry.amount}`).join(' / ')}</dd>
+          <dd>
+            {finalDefinition.catalysts.length === 0
+              ? 'なし'
+              : finalDefinition.catalysts
+                  .map((entry) => `${displayName(entry.catalystId)} ×${entry.amount}`)
+                  .join(' / ')}
+          </dd>
         </div>
         <div>
           <dt>標本</dt>
-          <dd>{finalDefinition.specimenRequirements.length === 0 ? 'なし' : finalDefinition.specimenRequirements.map((entry) => `${displayName(entry.speciesId)} ×${entry.amount}`).join(' / ')}</dd>
+          <dd>
+            {finalDefinition.specimenRequirements.length === 0
+              ? 'なし'
+              : finalDefinition.specimenRequirements
+                  .map((entry) => `${displayName(entry.speciesId)} ×${entry.amount}`)
+                  .join(' / ')}
+          </dd>
         </div>
       </dl>
       {finalDefinition.specimenRequirements.length > 0 && (
         <fieldset className="research-specimens">
           <legend>消費する標本個体</legend>
-          {eligibleSpecimens.length === 0 && <p>使用可能な標本がありません。locked・編成中個体は表示されません。</p>}
+          {eligibleSpecimens.length === 0 && (
+            <p>使用可能な標本がありません。locked・編成中個体は表示されません。</p>
+          )}
           {eligibleSpecimens.map((instance) => (
             <label key={instance.instanceId}>
               <input
                 type="checkbox"
                 checked={specimenInstanceIds.includes(instance.instanceId)}
-                onChange={() => setSpecimenInstanceIds(toggleId(specimenInstanceIds, instance.instanceId))}
+                onChange={() =>
+                  setSpecimenInstanceIds(toggleId(specimenInstanceIds, instance.instanceId))
+                }
               />
-              {instance.nickname ?? displayName(instance.speciesId)} <small>{instance.instanceId}</small>
+              {instance.nickname ?? displayName(instance.speciesId)}{' '}
+              <small>{instance.instanceId}</small>
             </label>
           ))}
         </fieldset>
       )}
-      <button type="button" className="collection-button collection-button--primary" onClick={submit}>
+      <button
+        type="button"
+        className="collection-button collection-button--primary"
+        onClick={submit}
+      >
         資源を消費して設計図解放
       </button>
     </section>
@@ -296,7 +329,10 @@ function ResearchNodeDetail({
   return (
     <section className="collection-panel research-detail" aria-labelledby="research-detail-title">
       <div className="research-detail__hero">
-        <div className={`research-orb research-orb--stage-${state.disclosureStage}`} aria-hidden="true">
+        <div
+          className={`research-orb research-orb--stage-${state.disclosureStage}`}
+          aria-hidden="true"
+        >
           {state.disclosureStage < 2 ? '?' : shortId(species.id).slice(0, 2).toUpperCase()}
         </div>
         <div>
@@ -304,32 +340,51 @@ function ResearchNodeDetail({
           <h2 id="research-detail-title">
             {state.disclosureStage < 2 ? '未解析ノード' : displayName(species.id)}
           </h2>
-          <p>{STATUS_LABELS[state.status]} / 開示 {state.disclosureStage}/5</p>
+          <p>
+            {STATUS_LABELS[state.status]} / 開示 {state.disclosureStage}/5
+          </p>
         </div>
       </div>
 
       <div className="research-stage-track" aria-label={`開示段階 ${state.disclosureStage}/5`}>
         {[1, 2, 3, 4, 5].map((stage) => (
-          <span key={stage} className={stage <= state.disclosureStage ? 'is-open' : ''}>{stage}</span>
+          <span key={stage} className={stage <= state.disclosureStage ? 'is-open' : ''}>
+            {stage}
+          </span>
         ))}
       </div>
 
       {state.disclosureStage >= 2 && (
         <dl className="research-facts">
-          <div><dt>対象種</dt><dd>{displayName(species.id)}</dd></div>
-          <div><dt>属性</dt><dd>{displayName(species.attributeId)}</dd></div>
-          <div><dt>レア度</dt><dd>R{species.rarity}</dd></div>
-          <div><dt>隣接</dt><dd>{definition.adjacentNodeIds.map(displayName).join(' / ') || 'なし'}</dd></div>
+          <div>
+            <dt>対象種</dt>
+            <dd>{displayName(species.id)}</dd>
+          </div>
+          <div>
+            <dt>属性</dt>
+            <dd>{displayName(species.attributeId)}</dd>
+          </div>
+          <div>
+            <dt>レア度</dt>
+            <dd>R{species.rarity}</dd>
+          </div>
+          <div>
+            <dt>隣接</dt>
+            <dd>{definition.adjacentNodeIds.map(displayName).join(' / ') || 'なし'}</dd>
+          </div>
         </dl>
       )}
 
       {state.disclosureStage === 1 && (
-        <p className="research-rumor">輪郭だけが研究網に浮かんでいます。解析度・触媒・地域進行・隣接研究から情報を集めてください。</p>
+        <p className="research-rumor">
+          輪郭だけが研究網に浮かんでいます。解析度・触媒・地域進行・隣接研究から情報を集めてください。
+        </p>
       )}
 
       {facilityLocked && (
         <p className="research-warning" role="status">
-          この研究にはR{species.rarity}を扱える研究施設が必要です。現在は段階{facility?.stage}・R{facility?.maxResearchableRarity}までです。
+          この研究にはR{species.rarity}を扱える研究施設が必要です。現在は段階{facility?.stage}・R
+          {facility?.maxResearchableRarity}までです。
         </p>
       )}
 
@@ -390,7 +445,8 @@ export function ResearchScreen({
   const selectedDefinition =
     selectedState === null
       ? null
-      : catalog.researchNodes.find((definition) => definition.nodeId === selectedState.nodeId) ?? null
+      : (catalog.researchNodes.find((definition) => definition.nodeId === selectedState.nodeId) ??
+        null)
   const currentFacility = getResearchFacilityStageDefinition(
     playerData.facilities,
     catalog.researchFacilityStages,
@@ -407,7 +463,9 @@ export function ResearchScreen({
     try {
       const result = upgradeResearchFacility(playerData, catalog)
       onPlayerDataChange(result.playerData)
-      setNotice(`研究施設を段階${result.afterStage}へ更新しました。R${result.maxResearchableRarity}まで研究できます。`)
+      setNotice(
+        `研究施設を段階${result.afterStage}へ更新しました。R${result.maxResearchableRarity}まで研究できます。`,
+      )
     } catch (error) {
       setNotice(error instanceof Error ? error.message : '研究施設の更新に失敗しました。')
     }
@@ -421,7 +479,9 @@ export function ResearchScreen({
           <h1>研究網・研究施設</h1>
           <p>ヒントから候補を絞り、試験研究で照合し、確定研究で設計図を永久解放します。</p>
         </div>
-        <button type="button" className="collection-button" onClick={onOpenCollection}>編成・図鑑へ戻る</button>
+        <button type="button" className="collection-button" onClick={onOpenCollection}>
+          編成・図鑑へ戻る
+        </button>
       </header>
 
       <section className="research-facility collection-panel" aria-labelledby="facility-title">
@@ -434,7 +494,10 @@ export function ResearchScreen({
         </div>
         <div className="facility-stage-list">
           {catalog.researchFacilityStages.map((stage) => (
-            <div key={stage.stage} className={stage.stage <= (currentFacility?.stage ?? 0) ? 'is-active' : ''}>
+            <div
+              key={stage.stage}
+              className={stage.stage <= (currentFacility?.stage ?? 0) ? 'is-active' : ''}
+            >
               <span>段階 {stage.stage}</span>
               <strong>R{stage.maxResearchableRarity}</strong>
             </div>
@@ -462,7 +525,11 @@ export function ResearchScreen({
         </div>
       </section>
 
-      {notice !== null && <p className="collection-notice research-notice" role="status">{notice}</p>}
+      {notice !== null && (
+        <p className="collection-notice research-notice" role="status">
+          {notice}
+        </p>
+      )}
 
       <div className="research-layout">
         <section className="collection-panel research-network" aria-labelledby="network-title">
@@ -475,7 +542,9 @@ export function ResearchScreen({
           </div>
           <div className="research-node-grid">
             {visibleStates.map((state) => {
-              const definition = catalog.researchNodes.find((candidate) => candidate.nodeId === state.nodeId)
+              const definition = catalog.researchNodes.find(
+                (candidate) => candidate.nodeId === state.nodeId,
+              )
               if (definition === undefined) return null
               const species = speciesForNode(definition, catalog)
               return (
@@ -489,7 +558,9 @@ export function ResearchScreen({
                   <span className="research-node__stage">{state.disclosureStage}/5</span>
                   <strong>{state.disclosureStage < 2 ? '?' : displayName(species.id)}</strong>
                   <small>{STATUS_LABELS[state.status]}</small>
-                  <span className="research-node__links">↔ {definition.adjacentNodeIds.length}</span>
+                  <span className="research-node__links">
+                    ↔ {definition.adjacentNodeIds.length}
+                  </span>
                 </button>
               )
             })}

@@ -1,3 +1,4 @@
+import { resolveDisplayName } from '../content/display-masters'
 import { useMemo, useState } from 'react'
 import { unlockBloomSkill } from '../progression/bloom-research'
 import type { PlayerData } from '../progression/player-data'
@@ -5,11 +6,7 @@ import type { T037ProgressionCatalog } from '../progression/research-facility'
 import { ResearchScreen } from './ResearchScreen'
 
 function displayName(id: string): string {
-  const tail = id.split('.').at(-1) ?? id
-  return tail
-    .split('-')
-    .map((part) => `${part.slice(0, 1).toUpperCase()}${part.slice(1)}`)
-    .join(' ')
+  return resolveDisplayName(id)
 }
 
 export interface T048ResearchScreenProps {
@@ -113,7 +110,10 @@ export function T048ResearchScreen({
               } else if (!currencyReady || !researchDataReady) status = '研究資源不足'
 
               return (
-                <article key={`${definition.speciesId}:${definition.skillId}`} className="research-node">
+                <article
+                  key={`${definition.speciesId}:${definition.skillId}`}
+                  className="research-node"
+                >
                   <span className="research-node__stage">R{species?.rarity ?? '—'}</span>
                   <strong>{displayName(definition.speciesId)}</strong>
                   <small>{displayName(definition.skillId)}</small>

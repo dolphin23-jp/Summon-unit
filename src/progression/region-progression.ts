@@ -1,3 +1,4 @@
+import { resolveRegionName, resolveStageName } from '../content/display-masters'
 import type { PlayerData, PlayerDataContentCatalog } from './player-data'
 import type { T037ProgressionCatalog } from './research-facility'
 import {
@@ -131,12 +132,7 @@ function normalizeRequirement(
       if (!knownRegionIds.has(requirement.regionId)) {
         throw new Error(`${field} references unknown region: ${requirement.regionId}`)
       }
-      assertSafeIntegerInRange(
-        requirement.points,
-        1,
-        Number.MAX_SAFE_INTEGER,
-        `${field}.points`,
-      )
+      assertSafeIntegerInRange(requirement.points, 1, Number.MAX_SAFE_INTEGER, `${field}.points`)
       return Object.freeze({
         type: 'REGION_POINTS',
         regionId: requirement.regionId,
@@ -194,7 +190,9 @@ export function normalizeRegionProgression(
       ),
     })
   })
-  regions.sort((left, right) => left.order - right.order || compareIds(left.regionId, right.regionId))
+  regions.sort(
+    (left, right) => left.order - right.order || compareIds(left.regionId, right.regionId),
+  )
 
   const regionById = new Map(regions.map((region) => [region.regionId, region]))
   const stageOrdersByRegion = new Map<RegionId, Set<number>>()
@@ -247,7 +245,8 @@ export function normalizeRegionProgression(
 
 export function getRegionPoints(playerData: PlayerData, regionId: RegionId): number {
   return (
-    playerData.stageProgress?.regionalPoints.find((state) => state.regionId === regionId)?.points ?? 0
+    playerData.stageProgress?.regionalPoints.find((state) => state.regionId === regionId)?.points ??
+    0
   )
 }
 
@@ -273,11 +272,11 @@ export function describeProgressRequirement(requirement: ProgressRequirement): s
     case 'ALWAYS':
       return null
     case 'STAGE_COMPLETED':
-      return `${requirement.stageId} のクリアが必要です。`
+      return `${resolveStageName(requirement.stageId)} のクリアが必要です。`
     case 'ALL_STAGES_COMPLETED':
-      return `${requirement.stageIds.join('、')} の全クリアが必要です。`
+      return `${requirement.stageIds.map(resolveStageName).join('、')} の全クリアが必要です。`
     case 'REGION_POINTS':
-      return `${requirement.regionId} の地域ポイント ${requirement.points} が必要です。`
+      return `${resolveRegionName(requirement.regionId)} の地域ポイント ${requirement.points} が必要です。`
   }
 }
 
@@ -336,7 +335,7 @@ export function getNextUnlockedStageId(
   const currentIndex = normalized.stages.findIndex((stage) => stage.stageId === currentStageId)
   if (currentIndex < 0) throw new Error(`current stage does not exist: ${currentStageId}`)
   return (
-    normalized.stages.slice(currentIndex + 1).find((stage) => unlocked.has(stage.stageId))?.stageId ??
-    null
+    normalized.stages.slice(currentIndex + 1).find((stage) => unlocked.has(stage.stageId))
+      ?.stageId ?? null
   )
 }
