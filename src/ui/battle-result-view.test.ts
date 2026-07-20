@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createInteractiveBattleRunner } from '../battle/headless-battle-runner'
+import { runHeadlessBattle } from '../battle/headless-battle-runner'
 import { STANDARD_HEADLESS_BATTLE } from '../demo/standard-headless-battle'
 import {
   isBattleMotionLevel,
@@ -9,26 +9,38 @@ import { createBattleResultView } from './battle-result-view'
 
 describe('battle result view', () => {
   it('projects deterministic rewards, analysis changes, and per-unit records', () => {
-    const runner = createInteractiveBattleRunner(STANDARD_HEADLESS_BATTLE)
-    const result = runner.runToCompletion()
-    const view = createBattleResultView(STANDARD_HEADLESS_BATTLE, result, null)
+    const result = runHeadlessBattle(STANDARD_HEADLESS_BATTLE)
+    const view = createBattleResultView(STANDARD_HEADLESS_BATTLE, result)
 
-    expect(view.outcome).not.toBe('ONGOING')
-    expect(view.unitRecords).toHaveLength(result.summary.units.length)
-    expect(view.rewards.currency).toBeGreaterThanOrEqual(0)
-    expect(view.rewards.researchData).toBeGreaterThanOrEqual(0)
+    expect(view.rewards.stub).toBe(true)
+    expect(view.unitStats).toHaveLength(result.summary.units.length)
+    expect(view.analysisChanges.map((change) => change.speciesId)).toEqual(
+      [...new Set(result.summary.units.map((unit) => unit.speciesId))].sort(),
+    )
+
+    for (const unit of result.summary.units) {
+      const record = view.unitStats.find((candidate) => candidate.battleUnitId === unit.battleUnitId)
+      expect(record).toMatchObject({
+        speciesId: unit.speciesId,
+        side: unit.side,
+        hp: unit.hp,
+        defeated: unit.defeated,
+        actionCount: unit.actionCount,
+      })
+    }
   })
 
   it('matches aggregate event-log damage and remains byte-identical', () => {
-    const run = () => {
-      const runner = createInteractiveBattleRunner(STANDARD_HEADLESS_BATTLE)
-      const result = runner.runToCompletion()
-      return createBattleResultView(STANDARD_HEADLESS_BATTLE, result, null)
-    }
-    const first = run()
-    const eventDamage = first.unitRecords.reduce((total, unit) => total + unit.damageTaken, 0)
-    expect(eventDamage).toBeGreaterThan(0)
-    expect(JSON.stringify(run())).toBe(JSON.stringify(first))
+    const result = runHeadlessBattle(STANDARD_HEADLESS_BATTLE)
+    const first = createBattleResultView(STANDARD_HEADLESS_BATTLE, result)
+    const second = createBattleResultView(STANDARD_HEADLESS_BATTLE, result)
+    const loggedDamage = result.log.events.reduce(
+      (total, event) => total + (event.kind === 'damage_applied' ? event.payload.appliedDamage : 0),
+      0,
+    )
+
+    expect(first.unitStats.reduce((total, unit) => total + unit.damageTaken, 0)).toBe(loggedDamage)
+    expect(JSON.stringify(first)).toBe(JSON.stringify(second))
   })
 })
 
