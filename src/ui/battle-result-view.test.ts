@@ -52,9 +52,10 @@ describe('battle motion preferences', () => {
     expect(isBattleMotionLevel('OFF')).toBe(false)
   })
 
-  it('honors a stored choice and otherwise follows reduced-motion preference', () => {
+  it('honors stored choices unless reduced-motion requires minimal presentation', () => {
     expect(resolveInitialBattleMotionLevel('MINIMAL', false)).toBe('MINIMAL')
-    expect(resolveInitialBattleMotionLevel(null, true)).toBe('REDUCED')
+    expect(resolveInitialBattleMotionLevel(null, true)).toBe('MINIMAL')
+    expect(resolveInitialBattleMotionLevel('STANDARD', true)).toBe('MINIMAL')
     expect(resolveInitialBattleMotionLevel(undefined, false)).toBe('STANDARD')
   })
 })
