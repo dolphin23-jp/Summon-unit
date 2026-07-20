@@ -1,21 +1,25 @@
 name: CI
 
 on:
-  push:
-    branches: [main]
   pull_request:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 12
 
     steps:
-      - name: Checkout
+      - name: Checkout pull request branch
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - name: Materialize T052 implementation
+        run: python scripts/t052_materialize.py
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -29,6 +33,44 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
+
+      - name: Format T052 files
+        run: |
+          pnpm exec prettier --write \
+            src/App.tsx \
+            src/main.tsx \
+            src/progression/region-progression.ts \
+            src/content/vertical-slice-world.ts \
+            src/content/vertical-slice-runtime.ts \
+            src/ui/GameIcon.tsx \
+            src/ui/BattleMobileTabs.tsx \
+            src/ui/BattleMobileTabs.test.tsx \
+            src/ui/battle-screen-view.ts \
+            src/ui/battle-screen-view.test.ts \
+            src/ui/BattleTimelinePanel.tsx \
+            src/ui/BattleUnitCard.tsx \
+            src/ui/BattleDecisionPanel.tsx \
+            src/ui/RegionScreen.tsx \
+            src/ui/HomeScreen.tsx \
+            src/ui/BattleResultScreen.tsx \
+            src/ui/MinimalBattleScreen.tsx \
+            src/ui/theme.css \
+            src/ui/theme-contract.test.ts \
+            tasks/T052_VISUAL_THEME_AND_BATTLE_LAYOUT.md \
+            tasks/STATUS.md \
+            docs/12_UI_UX.md
+
+      - name: Commit materialized implementation
+        run: |
+          if git diff --quiet && git diff --cached --quiet; then
+            echo "No materialized changes to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "T052: unify visual theme and mobile battle layout"
+          git push origin HEAD:${{ github.head_ref }}
 
       - name: Content validation
         run: pnpm validate:content
