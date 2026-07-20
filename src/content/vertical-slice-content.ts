@@ -74,7 +74,7 @@ function defineTrait(
 
 function defineSkill(record: VerticalSliceSkillRecord): VerticalSliceSkillRecord {
   const healingPower = record.effectTags.includes('HEAL')
-    ? Math.max(1, Math.floor(record.definition.actionCost / 2))
+    ? Math.max(1, Math.floor(record.definition.actionCost / 3))
     : undefined
   return Object.freeze({
     ...record,
@@ -84,7 +84,7 @@ function defineSkill(record: VerticalSliceSkillRecord): VerticalSliceSkillRecord
         ? {}
         : {
             healingPower,
-            cooldownActions: record.definition.cooldownActions ?? 2,
+            cooldownActions: record.definition.cooldownActions ?? 3,
           }),
     }),
     effectTags: freezeStrings(record.effectTags),
