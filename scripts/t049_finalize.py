@@ -50,6 +50,7 @@ research = research.replace(
     "{state.disclosureStage < 2 ? '?' : shortId(species.id).slice(0, 2).toUpperCase()}",
     "{state.disclosureStage < 2 ? '?' : resolveDisplayName(species.id).slice(0, 1)}",
 )
+research = research.replace("definition.adjacentNodeIds.map(displayName)", "definition.adjacentNodeIds.map(resolveDisplayName)")
 research = re.sub(r"\nfunction shortId\(id: string\): string \{.*?\n\}\n", "\n", research, count=1, flags=re.DOTALL)
 write(research_path, research)
 
@@ -67,6 +68,7 @@ collection = collection.replace(
     "instance.nickname ?? instance.instanceId",
     "instance.nickname ?? formatUnitDisplayName(instance.speciesId, instance.instanceId)",
 )
+collection = collection.replace("selectedSpeciesState.bloomSkillIds.map(displayName)", "selectedSpeciesState.bloomSkillIds.map(resolveDisplayName)")
 write(collection_path, collection)
 
 manual_path = "src/ui/ManualActionPanel.tsx"
@@ -117,7 +119,7 @@ if "regional.slice-a.wind-30" not in tests:
     )
 write(test_path, tests)
 
-for generated in ("pnpm-lock.yaml", "t049-test-results.json"):
+for generated in ("pnpm-lock.yaml", "t049-test-results.json", "t049-build.log"):
     target = ROOT / generated
     if target.exists():
         target.unlink()
