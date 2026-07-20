@@ -29,6 +29,7 @@ export const T039_REGIONS: readonly RegionDefinition[] = Object.freeze([
     regionId: 'region.demo-forest',
     name: '翠風の観測林',
     summary: '遮蔽、射線、優先撃破を学ぶ導入地域です。',
+    themeColor: '#55b889',
     order: 1,
     requirement: Object.freeze({ type: 'ALWAYS' as const }),
     hideUntilUnlocked: false,
@@ -37,6 +38,7 @@ export const T039_REGIONS: readonly RegionDefinition[] = Object.freeze([
     regionId: 'region.demo-ruins',
     name: '灰燼機構跡',
     summary: '地域ボス撃破後に開く、次地域の先行観測区画です。',
+    themeColor: '#a97962',
     order: 2,
     requirement: Object.freeze({
       type: 'STAGE_COMPLETED' as const,
@@ -76,8 +78,7 @@ export const T039_FOREST_ELITE: StageDefinition = Object.freeze({
         Object.freeze({
           ...unit,
           battleUnitId: `enemy.elite-${index + 1}`,
-          equippedSkillIds:
-            index === 0 ? Object.freeze(['skill.demo-generic-rush']) : undefined,
+          equippedSkillIds: index === 0 ? Object.freeze(['skill.demo-generic-rush']) : undefined,
         }),
       ),
     ),

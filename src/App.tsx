@@ -142,9 +142,7 @@ function App() {
     ),
   )
   const [saveBootState, setSaveBootState] = useState<SaveBootState>('LOADING')
-  const [saveSummaries, setSaveSummaries] = useState<readonly SaveSlotSummary[]>(
-    emptySaveSummaries,
-  )
+  const [saveSummaries, setSaveSummaries] = useState<readonly SaveSlotSummary[]>(emptySaveSummaries)
   const [activeSlotId, setActiveSlotId] = useState<SaveSlotId>(
     DEFAULT_LOCAL_SAVE_SETTINGS.activeSlotId,
   )
@@ -189,10 +187,7 @@ function App() {
         if (cancelled) return
         setPlayerData(result.playerData)
         setNotifications(
-          createCurrentProgressionNotifications(
-            result.playerData,
-            VERTICAL_SLICE_RUNTIME_CATALOG,
-          ),
+          createCurrentProgressionNotifications(result.playerData, VERTICAL_SLICE_RUNTIME_CATALOG),
         )
         setActiveSlotId(result.settings.activeSlotId)
         setAutosaveEnabled(result.settings.autosaveEnabled)
@@ -248,10 +243,7 @@ function App() {
   const refreshSaveSummaries = async (): Promise<void> => {
     if (BROWSER_SAVE_REPOSITORY === null) return
     setSaveSummaries(
-      await listSaveSlotSummaries(
-        BROWSER_SAVE_REPOSITORY,
-        VERTICAL_SLICE_RUNTIME_CATALOG,
-      ),
+      await listSaveSlotSummaries(BROWSER_SAVE_REPOSITORY, VERTICAL_SLICE_RUNTIME_CATALOG),
     )
   }
 
@@ -281,7 +273,9 @@ function App() {
     if (!autosaveEnabled || saveBootState !== 'READY') return
     void enqueueSaveTask(() => persistPlayerData(nextPlayerData, activeSlotId)).catch((error) =>
       setSaveNotice(
-        error instanceof Error ? `自動保存に失敗しました: ${error.message}` : '自動保存に失敗しました。',
+        error instanceof Error
+          ? `自動保存に失敗しました: ${error.message}`
+          : '自動保存に失敗しました。',
       ),
     )
   }
@@ -358,10 +352,7 @@ function App() {
       setPlayerData(loaded.playerData)
       activeBattleRef.current = loaded.activeBattle
       setNotifications(
-        createCurrentProgressionNotifications(
-          loaded.playerData,
-          VERTICAL_SLICE_RUNTIME_CATALOG,
-        ),
+        createCurrentProgressionNotifications(loaded.playerData, VERTICAL_SLICE_RUNTIME_CATALOG),
       )
       setActiveSlotId(slotId)
       const storage = getBrowserLocalSettingsStorage()
@@ -434,7 +425,9 @@ function App() {
     if (enabled) {
       void enqueueSaveTask(() => persistPlayerData(playerData, activeSlotId)).catch((error) =>
         setSaveNotice(
-          error instanceof Error ? `自動保存に失敗しました: ${error.message}` : '自動保存に失敗しました。',
+          error instanceof Error
+            ? `自動保存に失敗しました: ${error.message}`
+            : '自動保存に失敗しました。',
         ),
       )
     }
@@ -455,8 +448,7 @@ function App() {
         stageId,
         definition,
         serial: nextBattleSerial,
-        fastModeAvailable:
-          playerData.stageProgress?.completedStageIds.includes(stageId) ?? false,
+        fastModeAvailable: playerData.stageProgress?.completedStageIds.includes(stageId) ?? false,
         initialAttempt: 0,
       })
       setNextBattleSerial((current) => current + 1)
@@ -466,10 +458,7 @@ function App() {
     }
   }
 
-  const instantSimulate = (
-    stageId: string,
-    formationId: string,
-  ): InstantStageSimulationResult => {
+  const instantSimulate = (stageId: string, formationId: string): InstantStageSimulationResult => {
     const serial = nextBattleSerial
     const result = runInstantStageSimulation(
       playerData,
@@ -493,13 +482,12 @@ function App() {
     setBattleSession(null)
     setScreen(nextScreen)
     if (autosaveEnabled && saveBootState === 'READY') {
-      void enqueueSaveTask(() => persistPlayerData(playerData, activeSlotId, null)).catch(
-        (error) =>
-          setSaveNotice(
-            error instanceof Error
-              ? `戦闘中断データの削除に失敗しました: ${error.message}`
-              : '戦闘中断データの削除に失敗しました。',
-          ),
+      void enqueueSaveTask(() => persistPlayerData(playerData, activeSlotId, null)).catch((error) =>
+        setSaveNotice(
+          error instanceof Error
+            ? `戦闘中断データの削除に失敗しました: ${error.message}`
+            : '戦闘中断データの削除に失敗しました。',
+        ),
       )
     }
   }
@@ -548,10 +536,7 @@ function App() {
       setPlayerData(saved.playerData)
       activeBattleRef.current = saved.activeBattle
       setNotifications(
-        createCurrentProgressionNotifications(
-          saved.playerData,
-          VERTICAL_SLICE_RUNTIME_CATALOG,
-        ),
+        createCurrentProgressionNotifications(saved.playerData, VERTICAL_SLICE_RUNTIME_CATALOG),
       )
       await refreshSaveSummaries()
       if (saved.activeBattle !== null) {
@@ -593,12 +578,21 @@ function App() {
   }
 
   if (battleSession !== null) {
+    const battleStage = VERTICAL_SLICE_RUNTIME_CATALOG.stages.find(
+      (stage) => stage.stageId === battleSession.stageId,
+    )
+    const battleRegion = VERTICAL_SLICE_RUNTIME_CATALOG.regions.find(
+      (region) => region.regionId === battleStage?.regionId,
+    )
     return (
       <MinimalBattleScreen
         definition={battleSession.definition}
         allowFastMode={battleSession.fastModeAvailable}
         initialStableSnapshot={battleSession.initialStableSnapshot}
         initialAttempt={battleSession.initialAttempt}
+        themeColor={battleRegion?.themeColor}
+        regionName={battleRegion?.name}
+        stageName={battleStage?.theme}
         onStableSnapshot={(stableSnapshot, attempt) => {
           const savedBattle = normalizeSavedBattleSession({
             saveVersion: 1,
@@ -626,8 +620,7 @@ function App() {
           settleStageBattle(playerData, result, VERTICAL_SLICE_RUNTIME_CATALOG, {
             settlementId: `${battleSession.stageId}:run-${battleSession.serial}:attempt-${attempt}`,
             stageId: battleSession.stageId,
-            bonusRollBasisPoints:
-              (battleSession.serial * 7919 + attempt * 3571) % 10_000,
+            bonusRollBasisPoints: (battleSession.serial * 7919 + attempt * 3571) % 10_000,
           })
         }
         onSettlement={(settlement) => {
@@ -697,7 +690,11 @@ function App() {
           <button type="button" className="collection-button" onClick={() => setScreen('SUMMON')}>
             召喚
           </button>
-          <button type="button" className="collection-button" onClick={() => openSaveScreen('RESEARCH')}>
+          <button
+            type="button"
+            className="collection-button"
+            onClick={() => openSaveScreen('RESEARCH')}
+          >
             セーブスロット
           </button>
         </nav>
@@ -744,7 +741,11 @@ function App() {
           <button type="button" className="collection-button" onClick={() => setScreen('SUMMON')}>
             召喚
           </button>
-          <button type="button" className="collection-button" onClick={() => openSaveScreen('COLLECTION')}>
+          <button
+            type="button"
+            className="collection-button"
+            onClick={() => openSaveScreen('COLLECTION')}
+          >
             セーブスロット
           </button>
         </nav>
@@ -754,10 +755,7 @@ function App() {
           genericSkillCosts={VERTICAL_SLICE_RUNTIME_GENERIC_SKILL_COSTS}
           onPlayerDataChange={updatePlayerData}
           onStartBattle={(formationId) => {
-            const unlockedStageIds = getUnlockedStageIds(
-              playerData,
-              VERTICAL_SLICE_RUNTIME_CATALOG,
-            )
+            const unlockedStageIds = getUnlockedStageIds(playerData, VERTICAL_SLICE_RUNTIME_CATALOG)
             const stageId =
               selectedStageId !== null && unlockedStageIds.includes(selectedStageId)
                 ? selectedStageId
@@ -808,9 +806,7 @@ function App() {
         onOpenSave={() => openSaveScreen('REGION')}
         onDismissNotification={(notificationId) =>
           setNotifications((current) =>
-            Object.freeze(
-              current.filter((notification) => notification.id !== notificationId),
-            ),
+            Object.freeze(current.filter((notification) => notification.id !== notificationId)),
           )
         }
         onDismissAllNotifications={() => setNotifications(Object.freeze([]))}

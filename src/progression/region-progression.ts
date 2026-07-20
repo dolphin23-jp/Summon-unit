@@ -26,6 +26,7 @@ export interface RegionDefinition {
   readonly regionId: RegionId
   readonly name: string
   readonly summary: string
+  readonly themeColor: string
   readonly order: number
   readonly requirement: ProgressRequirement
   readonly hideUntilUnlocked: boolean
@@ -72,6 +73,12 @@ function compareIds(left: string, right: string): number {
 function assertNonEmptyString(value: string, field: string): void {
   if (value.trim().length === 0) {
     throw new Error(`${field} must be a non-empty string`)
+  }
+}
+
+function assertThemeColor(value: string, field: string): void {
+  if (!/^#[0-9a-f]{6}$/i.test(value)) {
+    throw new Error(`${field} must be a six-digit hexadecimal color`)
   }
 }
 
@@ -175,6 +182,7 @@ export function normalizeRegionProgression(
   const regions = rawRegions.map((region) => {
     assertNonEmptyString(region.name, `region.${region.regionId}.name`)
     assertNonEmptyString(region.summary, `region.${region.regionId}.summary`)
+    assertThemeColor(region.themeColor, `region.${region.regionId}.themeColor`)
     assertSafeIntegerInRange(region.order, 1, Number.MAX_SAFE_INTEGER, 'region.order')
     if (regionOrders.has(region.order)) {
       throw new Error(`region order must be unique: ${region.order}`)

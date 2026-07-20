@@ -2,9 +2,7 @@ import type { BattleTimelineEntryView } from './battle-screen-view'
 import { MonsterIcon } from './MonsterIcon'
 
 function kindLabel(entry: BattleTimelineEntryView): string {
-  if (entry.provisional) {
-    return '仮'
-  }
+  if (entry.provisional) return '仮'
   switch (entry.kind) {
     case 'UNIT_TURN':
       return '行動'
@@ -22,9 +20,13 @@ function kindLabel(entry: BattleTimelineEntryView): string {
 export function BattleTimelinePanel({
   entries,
   speciesIdByBattleUnitId,
+  detailed,
+  onDetailedChange,
 }: {
   readonly entries: readonly BattleTimelineEntryView[]
   readonly speciesIdByBattleUnitId: Readonly<Record<string, string>>
+  readonly detailed: boolean
+  readonly onDetailedChange: (detailed: boolean) => void
 }) {
   return (
     <aside className="timeline-panel" aria-labelledby="timeline-title">
@@ -33,7 +35,14 @@ export function BattleTimelinePanel({
           <p className="panel-heading__kicker">UPCOMING EVENTS</p>
           <h2 id="timeline-title">タイムライン</h2>
         </div>
-        <span className="timeline-count">未来 {entries.length}件</span>
+        <button
+          type="button"
+          className="detail-toggle"
+          aria-pressed={detailed}
+          onClick={() => onDetailedChange(!detailed)}
+        >
+          {detailed ? '相対表示' : '詳細時刻'}
+        </button>
       </div>
       {entries.length === 0 ? (
         <p className="panel-empty">予定されたイベントはありません。</p>
@@ -65,8 +74,12 @@ export function BattleTimelinePanel({
                   {entry.detail !== null && <small>{entry.detail}</small>}
                 </div>
                 <div className="timeline-entry__time">
-                  <strong>+{entry.delta}</strong>
-                  <small>t={entry.time}</small>
+                  <strong>{entry.relativeLabel}</strong>
+                  {detailed && (
+                    <small>
+                      +{entry.delta} / t={entry.time}
+                    </small>
+                  )}
                 </div>
                 {entry.provisional && entry.positionId !== null && (
                   <span className="timeline-entry__ghost-position" aria-label="仮位置">

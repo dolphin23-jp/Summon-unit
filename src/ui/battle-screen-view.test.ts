@@ -67,9 +67,7 @@ describe('battle screen view', () => {
     expect(cell?.unit).toMatchObject({
       attributeLabel: '風',
       nextActionTime: expect.any(Number),
-      effects: [
-        expect.objectContaining({ label: '毒', stacks: 2, durationLabel: '残3回' }),
-      ],
+      effects: [expect.objectContaining({ label: '毒', stacks: 2, durationLabel: '残3回' })],
     })
     expect(view.timeline.some((entry) => entry.kind === 'TELEGRAPH_RESOLVE')).toBe(true)
     expect(view.timeline.length).toBeLessThanOrEqual(12)
@@ -140,5 +138,33 @@ describe('battle screen view', () => {
 
     expect(unit?.effects).toHaveLength(4)
     expect(unit?.hiddenEffectCount).toBe(2)
+  })
+})
+
+describe('relative battle timeline labels', () => {
+  it('orders same-time events deterministically and exposes player-facing relative labels', () => {
+    const runner = createInteractiveBattleRunner(STANDARD_HEADLESS_BATTLE)
+    const snapshot = runner.getSnapshot()
+    const view = createBattleScreenView(STANDARD_HEADLESS_BATTLE, snapshot)
+    const repeated = createBattleScreenView(STANDARD_HEADLESS_BATTLE, snapshot)
+    const sameTime = view.timeline.filter((entry, index, entries) =>
+      entries.some((other, otherIndex) => otherIndex !== index && other.time === entry.time),
+    )
+
+    expect(view.timeline.map((entry) => entry.relativeOrder)).toEqual(
+      view.timeline.map((_, index) => index + 1),
+    )
+    expect(view.timeline.every((entry) => entry.relativeLabel.length > 0)).toBe(true)
+    expect(sameTime.length).toBeGreaterThan(1)
+    expect(view.timeline.map((entry) => `${entry.time}:${entry.id}`)).toEqual(
+      repeated.timeline.map((entry) => `${entry.time}:${entry.id}`),
+    )
+    expect(
+      view.cells
+        .flatMap((cell) => (cell.unit === null ? [] : [cell.unit]))
+        .every(
+          (unit) => unit.nextActionLabel === '予定なし' || unit.nextActionLabel.includes('次'),
+        ),
+    ).toBe(true)
   })
 })

@@ -1,11 +1,7 @@
 import type { AiDecisionReasonLog } from '../ai/configured-decision'
 import type { UnitTurnEventPayload } from '../battle/action-scheduling'
 import { getTotalBarrierCapacity } from '../battle/barrier'
-import {
-  ALL_BOARD_POSITIONS,
-  getBoardPositionId,
-  type BoardPosition,
-} from '../battle/board'
+import { ALL_BOARD_POSITIONS, getBoardPositionId, type BoardPosition } from '../battle/board'
 import type { ActiveEffectState } from '../battle/effect-framework'
 import type {
   HeadlessBattleDefinition,
@@ -41,6 +37,8 @@ export interface BattleScreenUnitView {
   readonly attributeLabel: string
   readonly nextActionTime: number | null
   readonly nextActionDelta: number | null
+  readonly nextActionRank: number | null
+  readonly nextActionLabel: string
   readonly effects: readonly BattleScreenEffectView[]
   readonly hiddenEffectCount: number
   readonly telegraphCount: number
@@ -59,6 +57,8 @@ export interface BattleTimelineEntryView {
   readonly kind: ScheduledEventKind
   readonly time: number
   readonly delta: number
+  readonly relativeOrder: number
+  readonly relativeLabel: string
   readonly label: string
   readonly detail: string | null
   readonly actorBattleUnitId: string | null
@@ -248,6 +248,7 @@ function createUnitView(
   speciesById: Readonly<Record<string, MonsterSpecies>>,
   unit: BattleUnitState,
   telegraphCount: number,
+  nextActionRank: number | null,
 ): BattleScreenUnitView {
   const species = getRequiredSpecies(speciesById, unit.speciesId)
   const definitionUnit = definition.units.find(
@@ -273,6 +274,13 @@ function createUnitView(
     nextActionTime,
     nextActionDelta:
       nextActionTime === null ? null : Math.max(0, nextActionTime - snapshot.currentVirtualTime),
+    nextActionRank,
+    nextActionLabel:
+      nextActionRank === null
+        ? '予定なし'
+        : nextActionRank === 1
+          ? '次に行動'
+          : `次から${nextActionRank}番目`,
     effects,
     hiddenEffectCount: Math.max(0, unit.effects.length - effects.length),
     telegraphCount,
@@ -359,6 +367,8 @@ function createTimelineEntry(
     kind: event.kind,
     time: event.time,
     delta: Math.max(0, event.time - currentVirtualTime),
+    relativeOrder: 0,
+    relativeLabel: '',
     label: presentation.label,
     detail: presentation.detail,
     actorBattleUnitId: presentation.actorBattleUnitId,
@@ -385,9 +395,7 @@ function createProvisionalTimelineEntry(
   }
   const time = option.preview.nextActionTime
   const positionId = option.preview.toPositionId
-  const isKnownUnit = definition.units.some(
-    (unit) => unit.battleUnitId === actor.battleUnitId,
-  )
+  const isKnownUnit = definition.units.some((unit) => unit.battleUnitId === actor.battleUnitId)
   if (!isKnownUnit && actor.sourceInstanceId !== null) {
     return null
   }
@@ -396,6 +404,8 @@ function createProvisionalTimelineEntry(
     kind: 'UNIT_TURN',
     time,
     delta: Math.max(0, time - snapshot.currentVirtualTime),
+    relativeOrder: 0,
+    relativeLabel: '',
     label: `${shortId(actor.battleUnitId)} 次回行動（仮）`,
     detail: `${option.label}後 / ${positionId}`,
     actorBattleUnitId: actor.battleUnitId,
@@ -405,7 +415,7 @@ function createProvisionalTimelineEntry(
   })
 }
 
-function compareTimelineEntries(
+export function compareTimelineEntries(
   left: BattleTimelineEntryView,
   right: BattleTimelineEntryView,
 ): number {
@@ -418,6 +428,27 @@ function compareTimelineEntries(
   return compareIds(left.id, right.id)
 }
 
+export function addRelativeTimelineLabels(
+  entries: readonly BattleTimelineEntryView[],
+): readonly BattleTimelineEntryView[] {
+  return Object.freeze(
+    entries.map((entry, index) => {
+      const actionsBefore = entries
+        .slice(0, index)
+        .filter((candidate) => candidate.kind === 'UNIT_TURN').length
+      const relativeLabel =
+        entry.kind === 'TELEGRAPH_RESOLVE'
+          ? actionsBefore === 0
+            ? '次に予兆着弾'
+            : `あと${actionsBefore}行動で予兆着弾`
+          : index === 0
+            ? '次の予定'
+            : `次から${index + 1}番目`
+      return Object.freeze({ ...entry, relativeOrder: index + 1, relativeLabel })
+    }),
+  )
+}
+
 export function createBattleScreenView(
   definition: HeadlessBattleDefinition,
   snapshot: InteractiveBattleSnapshot,
@@ -425,6 +456,24 @@ export function createBattleScreenView(
 ): BattleScreenView {
   const speciesById = getSpeciesMap(definition)
   const telegraphs = telegraphCountsByPosition(snapshot)
+  const timeline = snapshot.battle.timeline.events.map((event) =>
+    createTimelineEntry(event, snapshot.currentVirtualTime),
+  )
+  const provisional = createProvisionalTimelineEntry(definition, snapshot, previewOption)
+  if (provisional !== null) timeline.push(provisional)
+  timeline.sort(compareTimelineEntries)
+  const relativeTimeline = addRelativeTimelineLabels(timeline)
+
+  const nextActionRankByUnitId = new Map<string, number>()
+  let actionRank = 0
+  for (const entry of relativeTimeline) {
+    if (entry.kind !== 'UNIT_TURN' || entry.actorBattleUnitId === null) continue
+    actionRank += 1
+    if (!nextActionRankByUnitId.has(entry.actorBattleUnitId)) {
+      nextActionRankByUnitId.set(entry.actorBattleUnitId, actionRank)
+    }
+  }
+
   const cells = ALL_BOARD_POSITIONS.map((position) => {
     const positionId = getBoardPositionId(position)
     const telegraphCount = telegraphs.get(positionId) ?? 0
@@ -439,26 +488,20 @@ export function createBattleScreenView(
       unit:
         unit === null
           ? null
-          : createUnitView(definition, snapshot, speciesById, unit, telegraphCount),
+          : createUnitView(
+              definition,
+              snapshot,
+              speciesById,
+              unit,
+              telegraphCount,
+              nextActionRankByUnitId.get(unit.battleUnitId) ?? null,
+            ),
     })
   })
 
-  const timeline = snapshot.battle.timeline.events.map((event) =>
-    createTimelineEntry(event, snapshot.currentVirtualTime),
-  )
-  const provisional = createProvisionalTimelineEntry(
-    definition,
-    snapshot,
-    previewOption,
-  )
-  if (provisional !== null) {
-    timeline.push(provisional)
-  }
-  timeline.sort(compareTimelineEntries)
-
   return Object.freeze({
     cells: Object.freeze(cells),
-    timeline: Object.freeze(timeline.slice(0, BATTLE_TIMELINE_LIMIT)),
+    timeline: Object.freeze(relativeTimeline.slice(0, BATTLE_TIMELINE_LIMIT)),
     lastDecisionLog: snapshot.lastDecisionLog,
   })
 }

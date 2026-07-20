@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import type { BattleOutcome } from '../battle/defeat-and-victory'
 import type { Side } from '../battle/board'
 import {
@@ -26,7 +26,7 @@ import { createBattleResultView } from './battle-result-view'
 import { createBattleScreenView } from './battle-screen-view'
 import { getManualActionKey, ManualActionPanel } from './ManualActionPanel'
 import { ConfirmDialog } from './ConfirmDialog'
-import { MobileDisclosure } from './MobileDisclosure'
+import { BattleMobileTabs, BattleTabPanel, type BattlePanelTab } from './BattleMobileTabs'
 import { UxHelpButton } from './UxHelpDialog'
 
 const STEP_MS = 420
@@ -122,6 +122,9 @@ export interface MinimalBattleScreenProps {
   readonly allowFastMode?: boolean
   readonly initialStableSnapshot?: InteractiveBattleStableSnapshot
   readonly initialAttempt?: number
+  readonly themeColor?: string
+  readonly regionName?: string
+  readonly stageName?: string
   readonly onStableSnapshot?: (snapshot: InteractiveBattleStableSnapshot, attempt: number) => void
   readonly onOpenFormation?: () => void
   readonly onOpenResearch?: () => void
@@ -138,6 +141,9 @@ export function MinimalBattleScreen({
   allowFastMode = false,
   initialStableSnapshot,
   initialAttempt = 0,
+  themeColor = '#55b889',
+  regionName = '観測地域',
+  stageName = '戦術交戦',
   onStableSnapshot,
   onOpenFormation,
   onOpenResearch,
@@ -157,6 +163,7 @@ export function MinimalBattleScreen({
   const [settlement, setSettlement] = useState<StageBattleSettlement | null>(null)
   const [attempt, setAttempt] = useState(initialAttempt)
   const [pendingBattleAction, setPendingBattleAction] = useState<'RESET' | 'FORMATION' | null>(null)
+  const [activePanel, setActivePanel] = useState<BattlePanelTab>('OPERATIONS')
   const stableSnapshotCallbackRef = useRef(onStableSnapshot)
 
   useEffect(() => {
@@ -205,6 +212,10 @@ export function MinimalBattleScreen({
   }, [isPlaying, runner, snapshot.totalActions, speed])
 
   const pending = snapshot.pendingManualAction
+  useEffect(() => {
+    if (pending !== null) setActivePanel('OPERATIONS')
+  }, [pending])
+
   useEffect(() => {
     const initial =
       pending?.options.find((option) => option.recommended) ?? pending?.options[0] ?? null
@@ -308,19 +319,23 @@ export function MinimalBattleScreen({
   }
 
   return (
-    <main className="battle-app" data-motion={motionLevel.toLowerCase()}>
-      <header className="battle-header">
+    <main
+      className="battle-app"
+      data-motion={motionLevel.toLowerCase()}
+      style={{ '--region-accent': themeColor } as CSSProperties}
+    >
+      <header className="battle-header battle-header--compact">
         <div>
-          <p className="eyebrow">TACTICAL BATTLE VIEW</p>
-          <h1>Monster Research Tactics</h1>
+          <p className="eyebrow">{regionName}</p>
+          <h1>{stageName}</h1>
           <p className="battle-header__description">
-            盤面状態、確定前プレビュー、予約イベント、AI判断理由を同じ戦闘状態から表示します。
+            盤面を見ながら、下部タブで操作・予定・判断理由を切り替えます。
           </p>
         </div>
         <div className="battle-metrics" aria-label="現在の状態">
           <div>
-            <span>仮想時刻</span>
-            <strong>{snapshot.currentVirtualTime}</strong>
+            <span>次の予定</span>
+            <strong>{view.timeline[0]?.relativeLabel ?? '予定なし'}</strong>
           </div>
           <div>
             <span>行動</span>
@@ -332,85 +347,6 @@ export function MinimalBattleScreen({
           </div>
         </div>
       </header>
-
-      <nav className="battle-controls" aria-label="戦闘操作">
-        <button
-          type="button"
-          className="control-button control-button--primary"
-          onClick={() => setAutoRequested((current) => !current)}
-          disabled={isTerminal || pending !== null}
-          aria-pressed={isPlaying}
-        >
-          {isTerminal ? '戦闘完了' : isPlaying ? '一時停止' : 'AUTO開始'}
-        </button>
-        <button
-          type="button"
-          className="control-button"
-          onClick={() => runner.step()}
-          disabled={snapshot.status !== 'READY'}
-        >
-          1行動進める
-        </button>
-        <button
-          type="button"
-          className="control-button"
-          onClick={toggleManualInterrupt}
-          disabled={isTerminal}
-          aria-pressed={snapshot.manualAllyActionRequested || pending !== null}
-        >
-          {pending !== null
-            ? 'AI推奨で再開'
-            : snapshot.manualAllyActionRequested
-              ? '手動割込を取消'
-              : '次の味方を手動'}
-        </button>
-        <div className="speed-control" aria-label="AUTO速度">
-          <span>速度</span>
-          {getBattleSpeedOptions(allowFastMode).map((candidate) => (
-            <button
-              key={candidate}
-              type="button"
-              className="control-button control-button--speed"
-              aria-pressed={speed === candidate}
-              onClick={() => setSpeed(candidate)}
-            >
-              ×{candidate}
-            </button>
-          ))}
-          {allowFastMode && <small className="battle-fast-mode-label">クリア済み</small>}
-        </div>
-        <div className="motion-control" role="group" aria-label="演出レベル">
-          <span>演出</span>
-          {BATTLE_MOTION_LEVELS.map((level) => (
-            <button
-              key={level}
-              type="button"
-              className="control-button control-button--motion"
-              aria-pressed={motionLevel === level}
-              onClick={() => changeMotionLevel(level)}
-            >
-              {MOTION_LABELS[level]}
-            </button>
-          ))}
-        </div>
-        <UxHelpButton context="BATTLE" buttonClassName="control-button" />
-        <button
-          type="button"
-          className="control-button"
-          onClick={() => setPendingBattleAction('RESET')}
-        >
-          リセット
-        </button>
-        {onOpenFormation !== undefined && (
-          <button
-            type="button"
-            className="control-button"
-            onClick={() => (isTerminal ? onOpenFormation() : setPendingBattleAction('FORMATION'))}
-          >
-            編成へ戻る
-          </button>
-        )}
-      </nav>
 
       <ConfirmDialog
         open={pendingBattleAction !== null}
@@ -448,19 +384,21 @@ export function MinimalBattleScreen({
       )}
 
       {pending !== null && (
-        <ManualActionPanel
-          pending={pending}
-          selectedActionKey={selectedActionKey}
-          selectedCandidateId={selectedCandidateId}
-          onSelectAction={selectAction}
-          onSelectCandidate={setSelectedCandidateId}
-          onConfirm={confirmManualAction}
-        />
+        <div className="battle-foreground-layer" data-layer="manual-preview">
+          <ManualActionPanel
+            pending={pending}
+            selectedActionKey={selectedActionKey}
+            selectedCandidateId={selectedCandidateId}
+            onSelectAction={selectAction}
+            onSelectCandidate={setSelectedCandidateId}
+            onConfirm={confirmManualAction}
+          />
+        </div>
       )}
 
       <div className={`battle-workspace${isTerminal ? ' battle-workspace--result-detail' : ''}`}>
         <section className="board-panel" aria-labelledby="board-title">
-          <div className="panel-heading">
+          <div className="panel-heading board-panel__heading">
             <div>
               <p className="panel-heading__kicker">BATTLEFIELD</p>
               <h2 id="board-title">6×3 盤面</h2>
@@ -518,33 +456,109 @@ export function MinimalBattleScreen({
           </div>
         </section>
 
-        <MobileDisclosure
-          title="タイムライン"
-          kicker="UPCOMING EVENTS"
-          defaultOpen={!isTerminal}
-          className="battle-disclosure battle-disclosure--timeline"
-        >
-          <BattleTimelinePanel
-            entries={view.timeline}
-            speciesIdByBattleUnitId={speciesIdByBattleUnitId}
-          />
-        </MobileDisclosure>
-
-        <MobileDisclosure
-          title="ログ・行動理由"
-          kicker="EVENTS & AI REASONS"
-          defaultOpen={!isTerminal}
-          className="battle-disclosure battle-disclosure--decision"
-        >
-          <BattleDecisionPanel
-            events={snapshot.log.events}
-            decisionLog={view.lastDecisionLog}
-            detailed={detailedLog}
-            onDetailedChange={setDetailedLog}
-            statusText={statusLabel(snapshot, autoRequested, speed)}
-            speciesIdByBattleUnitId={speciesIdByBattleUnitId}
-          />
-        </MobileDisclosure>
+        <BattleMobileTabs activeTab={activePanel} onChange={setActivePanel} />
+        <div className="battle-lower-deck">
+          <BattleTabPanel tab="OPERATIONS" activeTab={activePanel}>
+            <nav className="battle-controls" aria-label="戦闘操作">
+              <button
+                type="button"
+                className="control-button control-button--primary"
+                onClick={() => setAutoRequested((current) => !current)}
+                disabled={isTerminal || pending !== null}
+                aria-pressed={isPlaying}
+              >
+                {isTerminal ? '戦闘完了' : isPlaying ? '一時停止' : 'AUTO開始'}
+              </button>
+              <button
+                type="button"
+                className="control-button"
+                onClick={() => runner.step()}
+                disabled={snapshot.status !== 'READY'}
+              >
+                1行動進める
+              </button>
+              <button
+                type="button"
+                className="control-button"
+                onClick={toggleManualInterrupt}
+                disabled={isTerminal}
+                aria-pressed={snapshot.manualAllyActionRequested || pending !== null}
+              >
+                {pending !== null
+                  ? 'AI推奨で再開'
+                  : snapshot.manualAllyActionRequested
+                    ? '手動割込を取消'
+                    : '次の味方を手動'}
+              </button>
+              <div className="speed-control" aria-label="AUTO速度">
+                <span>速度</span>
+                {getBattleSpeedOptions(allowFastMode).map((candidate) => (
+                  <button
+                    key={candidate}
+                    type="button"
+                    className="control-button control-button--speed"
+                    aria-pressed={speed === candidate}
+                    onClick={() => setSpeed(candidate)}
+                  >
+                    ×{candidate}
+                  </button>
+                ))}
+                {allowFastMode && <small className="battle-fast-mode-label">クリア済み</small>}
+              </div>
+              <div className="motion-control" role="group" aria-label="演出レベル">
+                <span>演出</span>
+                {BATTLE_MOTION_LEVELS.map((level) => (
+                  <button
+                    key={level}
+                    type="button"
+                    className="control-button control-button--motion"
+                    aria-pressed={motionLevel === level}
+                    onClick={() => changeMotionLevel(level)}
+                  >
+                    {MOTION_LABELS[level]}
+                  </button>
+                ))}
+              </div>
+              <UxHelpButton context="BATTLE" buttonClassName="control-button" />
+              <button
+                type="button"
+                className="control-button"
+                onClick={() => setPendingBattleAction('RESET')}
+              >
+                リセット
+              </button>
+              {onOpenFormation !== undefined && (
+                <button
+                  type="button"
+                  className="control-button"
+                  onClick={() =>
+                    isTerminal ? onOpenFormation() : setPendingBattleAction('FORMATION')
+                  }
+                >
+                  編成へ戻る
+                </button>
+              )}
+            </nav>
+          </BattleTabPanel>
+          <BattleTabPanel tab="TIMELINE" activeTab={activePanel}>
+            <BattleTimelinePanel
+              entries={view.timeline}
+              speciesIdByBattleUnitId={speciesIdByBattleUnitId}
+              detailed={detailedLog}
+              onDetailedChange={setDetailedLog}
+            />
+          </BattleTabPanel>
+          <BattleTabPanel tab="LOG" activeTab={activePanel}>
+            <BattleDecisionPanel
+              events={snapshot.log.events}
+              decisionLog={view.lastDecisionLog}
+              detailed={detailedLog}
+              onDetailedChange={setDetailedLog}
+              statusText={statusLabel(snapshot, autoRequested, speed)}
+              speciesIdByBattleUnitId={speciesIdByBattleUnitId}
+            />
+          </BattleTabPanel>
+        </div>
       </div>
     </main>
   )

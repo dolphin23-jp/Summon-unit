@@ -7,6 +7,7 @@ import {
   loadUxGuidanceState,
 } from '../ux/ux-guidance'
 import { FirstRunGuide } from './FirstRunGuide'
+import { GameIcon } from './GameIcon'
 import { MonsterIcon } from './MonsterIcon'
 import { UxHelpButton } from './UxHelpDialog'
 
@@ -110,27 +111,42 @@ export function HomeScreen({
           </div>
           <strong>{playerData.contentVersion}</strong>
         </div>
-        <div className="region-resource-bar" aria-label="現在の資源と進行">
-          <div>
-            <span>基本通貨</span>
-            <strong>{playerData.economy.currency}</strong>
-          </div>
-          <div>
-            <span>研究データ</span>
-            <strong>{playerData.economy.researchData}</strong>
-          </div>
-          <div>
-            <span>所持個体</span>
-            <strong>{playerData.collection.unitInstances.length}</strong>
-          </div>
-          <div>
-            <span>設計図</span>
-            <strong>{unlockedBlueprints}</strong>
-          </div>
-          <div>
-            <span>クリア</span>
-            <strong>{completedStages}</strong>
-          </div>
+        <div className="home-summary-grid" aria-label="現在の資源と進行">
+          <article className="home-summary-item">
+            <GameIcon name="currency" />
+            <span>
+              <small>基本通貨</small>
+              <strong>{playerData.economy.currency}</strong>
+            </span>
+          </article>
+          <article className="home-summary-item">
+            <GameIcon name="research" />
+            <span>
+              <small>研究データ</small>
+              <strong>{playerData.economy.researchData}</strong>
+            </span>
+          </article>
+          <article className="home-summary-item">
+            <GameIcon name="units" />
+            <span>
+              <small>所持個体</small>
+              <strong>{playerData.collection.unitInstances.length}</strong>
+            </span>
+          </article>
+          <article className="home-summary-item">
+            <GameIcon name="blueprint" />
+            <span>
+              <small>設計図</small>
+              <strong>{unlockedBlueprints}</strong>
+            </span>
+          </article>
+          <article className="home-summary-item">
+            <GameIcon name="stages" />
+            <span>
+              <small>クリア</small>
+              <strong>{completedStages}</strong>
+            </span>
+          </article>
         </div>
       </section>
 

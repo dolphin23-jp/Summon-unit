@@ -1,7 +1,10 @@
 import { resolveDisplayName } from '../content/display-masters'
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type CSSProperties } from 'react'
 import type { PlayerData } from '../progression/player-data'
-import type { ProgressionNotification } from '../progression/progression-notifications'
+import type {
+  ProgressionNotification,
+  ProgressionNotificationKind,
+} from '../progression/progression-notifications'
 import {
   getRegionAccessState,
   getRegionPoints,
@@ -15,6 +18,7 @@ import type {
   StageDefinition,
   StageKind,
 } from '../progression/stage-model'
+import { GameIcon, type GameIconName } from './GameIcon'
 
 const STAGE_KIND_LABELS: Readonly<Record<StageKind, string>> = Object.freeze({
   NORMAL: '通常戦',
@@ -55,6 +59,23 @@ function outcomeLabel(result: InstantStageSimulationResult): string {
       return '引き分け'
     case 'ONGOING':
       return '行動上限'
+  }
+}
+
+function notificationIcon(kind: ProgressionNotificationKind): GameIconName {
+  switch (kind) {
+    case 'REGION_UNLOCKED':
+    case 'STAGE_UNLOCKED':
+    case 'HIDDEN_STAGE_FOUND':
+      return 'discovery'
+    case 'RESEARCH_HINT':
+      return 'research'
+    case 'BLUEPRINT_UNLOCKED':
+      return 'blueprint'
+    case 'BLOOM_AVAILABLE':
+      return 'bloom'
+    case 'REGIONAL_REWARD':
+      return 'region'
   }
 }
 
@@ -153,8 +174,13 @@ export function RegionScreen({
     if (notification.target === 'COLLECTION') onOpenCollection()
   }
 
+  const regionThemeStyle =
+    selectedRegion === null
+      ? undefined
+      : ({ '--region-accent': selectedRegion.themeColor } as CSSProperties)
+
   return (
-    <main className="region-app">
+    <main className="region-app" data-region-id={selectedRegion?.regionId} style={regionThemeStyle}>
       <header className="region-header">
         <div>
           <p className="eyebrow">REGION OPERATIONS</p>
@@ -213,9 +239,10 @@ export function RegionScreen({
                   key={notification.id}
                   className={`progress-notification progress-notification--${notification.kind.toLowerCase()}`}
                 >
-                  <div>
+                  <GameIcon name={notificationIcon(notification.kind)} />
+                  <div className="progress-notification__copy">
                     <strong>{notification.title}</strong>
-                    <p>{notification.detail}</p>
+                    <span>{notification.detail}</span>
                   </div>
                   <div className="progress-notification__actions">
                     {actionLabel !== null && (
@@ -275,6 +302,7 @@ export function RegionScreen({
                   key={region.regionId}
                   type="button"
                   className="region-select-button"
+                  style={{ '--region-button-accent': region.themeColor } as CSSProperties}
                   aria-pressed={selectedRegion?.regionId === region.regionId}
                   onClick={() => setSelectedRegionId(region.regionId)}
                 >

@@ -44,6 +44,8 @@ describe('BattleUnitCard accessibility', () => {
       attributeLabel: '火',
       nextActionTime: 10,
       nextActionDelta: 4,
+      nextActionRank: 1,
+      nextActionLabel: '次の行動',
       effects: [],
       hiddenEffectCount: 0,
       telegraphCount: 0,
