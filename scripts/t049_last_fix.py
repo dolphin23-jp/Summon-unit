@@ -16,8 +16,9 @@ def write(path: str, content: str) -> None:
 for path in ("src/ui/CollectionScreen.tsx", "src/ui/ResearchScreen.tsx"):
     text = read(path)
     text = text.replace("displayName(", "resolveDisplayName(")
-    if "displayName(" in text:
-        raise SystemExit(f"stale displayName call remains in {path}")
+    text = text.replace("map(displayName)", "map(resolveDisplayName)")
+    if "displayName(" in text or "map(displayName)" in text:
+        raise SystemExit(f"stale displayName reference remains in {path}")
     if "resolveDisplayName" not in text:
         raise SystemExit(f"display resolver is not imported in {path}")
     write(path, text)
