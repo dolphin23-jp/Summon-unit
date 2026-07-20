@@ -26,6 +26,8 @@ jobs:
       - uses: pnpm/action-setup@v4
         with:
           version: 10.13.1
+      - name: Clear old diagnostics
+        run: rm -f t049-test-results.json
       - name: Materialize T049 changes
         run: python3 scripts/t049_materialize.py
       - name: Install dependencies
@@ -36,13 +38,19 @@ jobs:
           git diff --name-only --diff-filter=ACM -z | xargs -0 -r pnpm exec prettier --write --ignore-unknown
       - name: Validate content
         run: pnpm validate:content
-      - name: Run tests
-        run: pnpm test
-      - name: Lint
-        run: pnpm lint
-      - name: Build
-        run: pnpm build
-      - name: Commit materialized changes
+      - name: Run tests with diagnostics
+        id: tests
+        shell: bash
+        run: |
+          set +e
+          pnpm test -- --reporter=json --outputFile=/tmp/t049-test-results.json
+          code=$?
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          if [ "$code" -ne 0 ]; then
+            cp /tmp/t049-test-results.json t049-test-results.json
+          fi
+          exit 0
+      - name: Commit materialized changes and diagnostics
         shell: bash
         run: |
           git config user.name github-actions[bot]
@@ -54,3 +62,10 @@ jobs:
           fi
           git commit -m "T049: materialize display name masters"
           git push origin HEAD:agent/t049-display-name-masters
+      - name: Fail on test regression
+        if: steps.tests.outputs.code != '0'
+        run: exit 1
+      - name: Lint
+        run: pnpm lint
+      - name: Build
+        run: pnpm build
