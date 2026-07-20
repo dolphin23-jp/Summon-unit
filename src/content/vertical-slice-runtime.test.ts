@@ -11,11 +11,11 @@ import {
   VERTICAL_SLICE_RUNTIME_VALIDATION,
 } from './vertical-slice-runtime'
 
-describe('T048 v0.1 vertical-slice runtime integration', () => {
+describe('T048 v0.1 release-candidate runtime integration', () => {
   it('connects the balanced release catalog and an immediately playable first formation', () => {
     expect(VERTICAL_SLICE_RUNTIME_VALIDATION).toEqual({
-      releaseVersion: '0.1.0',
-      contentVersion: 'slice-v0.1.0',
+      releaseVersion: '0.1.0-rc.1',
+      contentVersion: 'slice-v0.1.0-rc.1',
       stages: 17,
       initialUnits: 5,
       initialFormationMembers: 3,
