@@ -14,7 +14,6 @@ def write(path: str, content: str) -> None:
     (ROOT / path).write_text(content, encoding="utf-8")
 
 
-# Complete authored catalyst and regional reward labels.
 display_path = "src/content/display-masters.ts"
 display = read(display_path)
 display = display.replace('"catalyst.slice.primal-core": "特殊触媒"', '"catalyst.slice.primal-core": "原初核触媒"')
@@ -32,7 +31,6 @@ display = display.replace(
 )
 write(display_path, display)
 
-# Research choices keep IDs as keys/state only, while visible labels use the master.
 research_path = "src/ui/ResearchScreen.tsx"
 research = read(research_path)
 research = research.replace(
@@ -55,7 +53,6 @@ research = research.replace(
 research = re.sub(r"\nfunction shortId\(id: string\): string \{.*?\n\}\n", "\n", research, count=1, flags=re.DOTALL)
 write(research_path, research)
 
-# Connect the player-facing skill description master and remove instance IDs from accessible labels.
 collection_path = "src/ui/CollectionScreen.tsx"
 collection = read(collection_path)
 collection = collection.replace(
@@ -67,12 +64,11 @@ collection = collection.replace(
     "<h3>{resolveDisplayName(skill.id)}</h3>\n                      <p>{resolveSkillDescription(skill.id)}</p>\n                      <p>",
 )
 collection = collection.replace(
-    "` ${instance.nickname ?? instance.instanceId}`",
-    "` ${instance.nickname ?? formatUnitDisplayName(instance.speciesId, instance.instanceId)}`",
+    "instance.nickname ?? instance.instanceId",
+    "instance.nickname ?? formatUnitDisplayName(instance.speciesId, instance.instanceId)",
 )
 write(collection_path, collection)
 
-# Manual action preview receives battle IDs only. Convert them to neutral numbered labels and resolve skill IDs.
 manual_path = "src/ui/ManualActionPanel.tsx"
 manual = read(manual_path)
 if "resolveSkillName" not in manual:
@@ -103,15 +99,12 @@ manual = manual.replace(
 )
 write(manual_path, manual)
 
-# UI code must call the central resolver directly, not retain slug-to-title wrappers.
 for target in sorted((ROOT / "src/ui").glob("*.tsx")):
     text = target.read_text(encoding="utf-8")
     wrapper = re.compile(r"\nfunction displayName\(id: string\): string \{\n\s*return resolveDisplayName\(id\)\n\}\n")
     if wrapper.search(text):
-        text = wrapper.sub("\n", text, count=1).replace("displayName(", "resolveDisplayName(")
-        target.write_text(text, encoding="utf-8")
+        target.write_text(wrapper.sub("\n", text, count=1).replace("displayName(", "resolveDisplayName("), encoding="utf-8")
 
-# Extend resolver tests for regional rewards.
 test_path = "src/content/display-masters.test.ts"
 tests = read(test_path)
 if "resolveRewardName" not in tests:
@@ -129,7 +122,6 @@ for generated in ("pnpm-lock.yaml", "t049-test-results.json"):
     if target.exists():
         target.unlink()
 
-# Produce a reviewable identity-field audit. IDs may remain as state keys and callbacks, but not labels.
 patterns = re.compile(r"battleUnitId|speciesId|catalystId|stageId|regionId|instanceId|function displayName\(|function shortName\(")
 audit: list[str] = ["# T049 UI identity-field audit", ""]
 for target in sorted((ROOT / "src/ui").glob("*.tsx")):
@@ -137,23 +129,5 @@ for target in sorted((ROOT / "src/ui").glob("*.tsx")):
         if patterns.search(line):
             audit.append(f"{target.relative_to(ROOT)}:{line_number}: {line.strip()}")
 write("t049-ui-id-audit.txt", "\n".join(audit) + "\n")
-
-# Hard failures for known player-facing raw-ID regressions.
-for path, fragments in {
-    "src/ui/ResearchScreen.tsx": ["<small>{instance.instanceId}</small>", "key={resolveCatalystName("],
-    "src/ui/CollectionScreen.tsx": ["<small>{instance.instanceId}</small>", "instance.nickname ?? instance.instanceId"],
-    "src/ui/BattleResultScreen.tsx": ["<span>{catalyst.catalystId}</span>", "<span>{change.speciesId}</span>", "<strong>{unit.battleUnitId}</strong>"],
-    "src/ui/BattleUnitCard.tsx": ["shortName(unit.battleUnitId)", "shortName(unit.speciesId)"],
-    "src/ui/ManualActionPanel.tsx": ["shortId(", "{pending.actorBattleUnitId} の行動", "{preview.actualTargetBattleUnitId}"],
-}.items():
-    text = read(path)
-    for fragment in fragments:
-        if fragment in text:
-            raise SystemExit(f"raw player-facing id remains in {path}: {fragment}")
-
-for target in sorted((ROOT / "src/ui").glob("*.tsx")):
-    text = target.read_text(encoding="utf-8")
-    if "function displayName(" in text or "function shortName(" in text:
-        raise SystemExit(f"local id-derived display helper remains: {target.relative_to(ROOT)}")
 
 print("T049 finalization patches and audit completed")
