@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { formatUnitDisplayName, resolveSpeciesName } from '../content/display-masters'
 import type { PlayerData } from '../progression/player-data'
 import {
   completeFirstRunGuide,
@@ -6,6 +7,7 @@ import {
   loadUxGuidanceState,
 } from '../ux/ux-guidance'
 import { FirstRunGuide } from './FirstRunGuide'
+import { MonsterIcon } from './MonsterIcon'
 import { UxHelpButton } from './UxHelpDialog'
 
 export interface HomeScreenProps {
@@ -39,6 +41,23 @@ export function HomeScreen({
   const unlockedBlueprints = playerData.collection.speciesStates.filter(
     (state) => state.blueprintUnlocked,
   ).length
+  const activeFormation =
+    playerData.formations.formations.find(
+      (formation) => formation.formationId === playerData.formations.activeFormationId,
+    ) ??
+    playerData.formations.formations[0] ??
+    null
+  const activeFormationMembers =
+    activeFormation === null
+      ? []
+      : activeFormation.members
+          .flatMap((member) => {
+            const instance = playerData.collection.unitInstances.find(
+              (candidate) => candidate.instanceId === member.instanceId,
+            )
+            return instance === undefined ? [] : [{ member, instance }]
+          })
+          .sort((left, right) => left.member.tiePriority - right.member.tiePriority)
 
   const finishGuide = () => {
     const storage = createBrowserUxGuidanceStorage()
@@ -113,6 +132,43 @@ export function HomeScreen({
             <strong>{completedStages}</strong>
           </div>
         </div>
+      </section>
+
+      <section className="collection-panel" aria-labelledby="home-formation-title">
+        <div className="collection-section-heading">
+          <div>
+            <p className="panel-heading__kicker">ACTIVE FORMATION</p>
+            <h2 id="home-formation-title">現在の編成</h2>
+          </div>
+          <strong>{activeFormationMembers.length}/9体</strong>
+        </div>
+        {activeFormationMembers.length === 0 ? (
+          <p>編成中の個体はいません。編成・図鑑から個体を配置してください。</p>
+        ) : (
+          <ul className="home-formation-list">
+            {activeFormationMembers.map(({ member, instance }) => (
+              <li key={instance.instanceId}>
+                <MonsterIcon
+                  speciesId={instance.speciesId}
+                  label={resolveSpeciesName(instance.speciesId)}
+                  size="sm"
+                  variant="frameless"
+                />
+                <span>
+                  <strong>
+                    {instance.nickname ??
+                      formatUnitDisplayName(instance.speciesId, instance.instanceId)}
+                  </strong>
+                  <small>{resolveSpeciesName(instance.speciesId)}</small>
+                </span>
+                <span className="home-formation-position">
+                  {['前', '中', '後'][member.position.row]}
+                  {['A', 'B', 'C'][member.position.column]}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       <section className="collection-panel" aria-labelledby="home-actions-title">

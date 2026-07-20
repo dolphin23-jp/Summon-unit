@@ -22,14 +22,24 @@ describe('monster image fallback', () => {
         imageSrc: `/monsters/${testCase.speciesId}.png`,
         showImage: true,
       })
-      expect(
-        getMonsterImagePresentation(testCase.speciesId, false, initial.imageSrc),
-      ).toEqual({
+      expect(getMonsterImagePresentation(testCase.speciesId, false, initial.imageSrc)).toEqual({
         imageSrc: `/monsters/${testCase.speciesId}.png`,
         showImage: false,
         placeholder: testCase.placeholder,
         ariaLabel: testCase.ariaLabel,
       })
     }
+  })
+
+  it('does not request concealed art and uses the supplied display label', () => {
+    expect(getMonsterImagePresentation('species.slice.cinder-fox', true, null, '燼狐')).toEqual({
+      imageSrc: '/monsters/species.slice.cinder-fox.png',
+      showImage: false,
+      placeholder: '?',
+      ariaLabel: '未開示のモンスター画像領域',
+    })
+    expect(
+      getMonsterImagePresentation('species.slice.cinder-fox', false, null, '燼狐').ariaLabel,
+    ).toBe('燼狐の画像領域')
   })
 })

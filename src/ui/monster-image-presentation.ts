@@ -20,12 +20,14 @@ export function getMonsterImagePresentation(
   speciesId: string,
   concealed: boolean,
   failedImageSrc: string | null,
+  displayLabel?: string,
 ): MonsterImagePresentation {
   const imageSrc = `/monsters/${speciesId}.png`
+  const resolvedDisplayLabel = displayLabel?.trim() || displayName(speciesId)
   return Object.freeze({
     imageSrc,
     showImage: !concealed && failedImageSrc !== imageSrc,
     placeholder: concealed ? '?' : shortId(speciesId).slice(0, 2).toUpperCase(),
-    ariaLabel: concealed ? '未開示のモンスター画像領域' : `${displayName(speciesId)}の画像領域`,
+    ariaLabel: concealed ? '未開示のモンスター画像領域' : `${resolvedDisplayLabel}の画像領域`,
   })
 }

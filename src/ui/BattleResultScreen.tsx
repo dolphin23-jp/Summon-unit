@@ -4,6 +4,7 @@ import {
   resolveSpeciesName,
 } from '../content/display-masters'
 import type { BattleResultView } from './battle-result-view'
+import { MonsterIcon } from './MonsterIcon'
 
 export type BattleResultNavigationAction = 'RETRY' | 'FORMATION' | 'RESEARCH' | 'NEXT_STAGE'
 
@@ -169,8 +170,18 @@ export function BattleResultScreen({
                     </span>
                   </td>
                   <th scope="row">
-                    <strong>{formatUnitDisplayName(unit.speciesId, unit.battleUnitId)}</strong>
-                    <small>{resolveSpeciesName(unit.speciesId)}</small>
+                    <span className="result-unit-identity">
+                      <MonsterIcon
+                        speciesId={unit.speciesId}
+                        label={resolveSpeciesName(unit.speciesId)}
+                        size="sm"
+                        variant="frameless"
+                      />
+                      <span>
+                        <strong>{formatUnitDisplayName(unit.speciesId, unit.battleUnitId)}</strong>
+                        <small>{resolveSpeciesName(unit.speciesId)}</small>
+                      </span>
+                    </span>
                   </th>
                   <td>{unit.defeated ? '戦闘不能' : '生存'}</td>
                   <td>

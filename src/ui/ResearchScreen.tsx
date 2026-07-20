@@ -16,6 +16,7 @@ import {
 } from '../progression/research-model'
 import { getResearchFacilityStageDefinition } from '../progression/research-facility-model'
 import { ConfirmDialog } from './ConfirmDialog'
+import { MonsterIcon } from './MonsterIcon'
 import { UxHelpButton } from './UxHelpDialog'
 
 const METHOD_LABELS: Readonly<Record<ResearchMethod, string>> = Object.freeze({
@@ -291,7 +292,7 @@ function FinalResearchForm({
             <p>使用可能な標本がありません。locked・編成中個体は表示されません。</p>
           )}
           {eligibleSpecimens.map((instance) => (
-            <label key={instance.instanceId}>
+            <label key={instance.instanceId} className="research-specimen-option">
               <input
                 type="checkbox"
                 checked={specimenInstanceIds.includes(instance.instanceId)}
@@ -299,7 +300,16 @@ function FinalResearchForm({
                   setSpecimenInstanceIds(toggleId(specimenInstanceIds, instance.instanceId))
                 }
               />
-              {instance.nickname ?? formatUnitDisplayName(instance.speciesId, instance.instanceId)}
+              <MonsterIcon
+                speciesId={instance.speciesId}
+                label={resolveDisplayName(instance.speciesId)}
+                size="sm"
+                variant="frameless"
+              />
+              <span>
+                {instance.nickname ??
+                  formatUnitDisplayName(instance.speciesId, instance.instanceId)}
+              </span>
             </label>
           ))}
         </fieldset>

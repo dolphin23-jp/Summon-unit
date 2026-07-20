@@ -5,6 +5,7 @@ import type { PlayerData } from '../progression/player-data'
 import type { T036ProgressionCatalog } from '../progression/t036-progression-model'
 import { calculateSummonCurrencyCost, summonUnit } from '../progression/unit-economy'
 import { ConfirmDialog } from './ConfirmDialog'
+import { MonsterIcon } from './MonsterIcon'
 import { UxHelpButton } from './UxHelpDialog'
 
 function instanceSlug(speciesId: SpeciesId): string {
@@ -130,10 +131,16 @@ export function SummonScreen({
                 <button
                   key={species.id}
                   type="button"
-                  className="research-node research-node--completed"
+                  className="research-node research-node--completed summon-species-option"
                   aria-pressed={selectedSpecies?.id === species.id}
                   onClick={() => setSelectedSpeciesId(species.id)}
                 >
+                  <MonsterIcon
+                    species={species}
+                    label={resolveDisplayName(species.id)}
+                    size="sm"
+                    variant="frameless"
+                  />
                   <span className="research-node__stage">R{species.rarity}</span>
                   <strong>{resolveDisplayName(species.id)}</strong>
                   <small>
