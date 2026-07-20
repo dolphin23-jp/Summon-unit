@@ -82,6 +82,7 @@ export interface SkillDefinition {
   readonly areaMask?: SkillAreaMask
   readonly chainTargetCount?: number
   readonly damageMultiplierPermille: number
+  readonly healingPower?: number
   readonly cooldownActions?: number
   readonly usageLimit?: number
   readonly usageConditions?: readonly SkillUsageCondition[]
@@ -253,6 +254,12 @@ export function assertValidSkillDefinition(skill: SkillDefinition): void {
     1,
     'skill.damageMultiplierPermille',
   )
+  if (skill.healingPower !== undefined) {
+    assertSafeIntegerAtLeast(skill.healingPower, 1, 'skill.healingPower')
+    if (resolveSkillTargetSelector(skill).side === 'ENEMY') {
+      throw new Error('skill.healingPower requires an ALLY or SELF target selector')
+    }
+  }
 
   if (skill.cooldownActions !== undefined) {
     assertSafeIntegerAtLeast(skill.cooldownActions, 0, 'skill.cooldownActions')

@@ -73,9 +73,15 @@ function defineTrait(
 }
 
 function defineSkill(record: VerticalSliceSkillRecord): VerticalSliceSkillRecord {
+  const healingPower = record.effectTags.includes('HEAL')
+    ? Math.max(1, Math.floor(record.definition.actionCost / 2))
+    : undefined
   return Object.freeze({
     ...record,
-    definition: Object.freeze({ ...record.definition }),
+    definition: Object.freeze({
+      ...record.definition,
+      ...(healingPower === undefined ? {} : { healingPower }),
+    }),
     effectTags: freezeStrings(record.effectTags),
   })
 }

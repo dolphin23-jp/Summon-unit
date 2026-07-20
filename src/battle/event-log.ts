@@ -21,6 +21,7 @@ export const BATTLE_EVENT_KINDS = [
   'guard_shared',
   'barrier_absorbed',
   'damage_applied',
+  'healing_applied',
   'effect_applied',
   'effect_merged',
   'effect_removed',
@@ -85,6 +86,18 @@ export interface DamageAppliedPayload {
   readonly hpAfter: number
 }
 
+export interface HealingAppliedPayload {
+  readonly sourceBattleUnitId: BattleUnitId
+  readonly targetBattleUnitId: BattleUnitId
+  readonly skillId: SkillId
+  readonly baseHealing: number
+  readonly modifiedHealing: number
+  readonly appliedHealing: number
+  readonly overheal: number
+  readonly hpBefore: number
+  readonly hpAfter: number
+}
+
 export interface EffectAppliedPayload {
   readonly activeEffectId: string
   readonly effectId: string
@@ -132,6 +145,7 @@ export type SkillUsedEvent = BattleEventBase<'skill_used', SkillUsedPayload>
 export type GuardSharedEvent = BattleEventBase<'guard_shared', GuardSharedPayload>
 export type BarrierAbsorbedEvent = BattleEventBase<'barrier_absorbed', BarrierAbsorbedPayload>
 export type DamageAppliedEvent = BattleEventBase<'damage_applied', DamageAppliedPayload>
+export type HealingAppliedEvent = BattleEventBase<'healing_applied', HealingAppliedPayload>
 export type EffectAppliedEvent = BattleEventBase<'effect_applied', EffectAppliedPayload>
 export type EffectMergedEvent = BattleEventBase<'effect_merged', EffectMergedPayload>
 export type EffectRemovedEvent = BattleEventBase<'effect_removed', EffectRemovedPayload>
@@ -146,6 +160,7 @@ export type BattleEvent =
   | GuardSharedEvent
   | BarrierAbsorbedEvent
   | DamageAppliedEvent
+  | HealingAppliedEvent
   | EffectAppliedEvent
   | EffectMergedEvent
   | EffectRemovedEvent
@@ -423,6 +438,25 @@ export function assertValidBattleEvent(event: BattleEvent): void {
       }
       if (payload.hpBefore - payload.hpAfter !== payload.appliedDamage) {
         throw new Error('hpBefore - hpAfter must equal appliedDamage')
+      }
+      return
+    }
+    case 'healing_applied': {
+      const payload = event.payload
+      assertNonEmptyId(payload.sourceBattleUnitId, 'sourceBattleUnitId')
+      assertNonEmptyId(payload.targetBattleUnitId, 'targetBattleUnitId')
+      assertNonEmptyId(payload.skillId, 'skillId')
+      assertSafeIntegerAtLeast(payload.baseHealing, 1, 'baseHealing')
+      assertSafeIntegerAtLeast(payload.modifiedHealing, 0, 'modifiedHealing')
+      assertSafeIntegerAtLeast(payload.appliedHealing, 0, 'appliedHealing')
+      assertSafeIntegerAtLeast(payload.overheal, 0, 'overheal')
+      assertSafeIntegerAtLeast(payload.hpBefore, 1, 'hpBefore')
+      assertSafeIntegerAtLeast(payload.hpAfter, 1, 'hpAfter')
+      if (payload.appliedHealing + payload.overheal !== payload.modifiedHealing) {
+        throw new Error('appliedHealing + overheal must equal modifiedHealing')
+      }
+      if (payload.hpAfter - payload.hpBefore !== payload.appliedHealing) {
+        throw new Error('hpAfter - hpBefore must equal appliedHealing')
       }
       return
     }
