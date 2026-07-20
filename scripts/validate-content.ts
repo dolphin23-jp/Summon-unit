@@ -1,3 +1,4 @@
+import { UX_GUIDANCE_VALIDATION } from '../src/ux/ux-guidance'
 import { DISPLAY_MASTER_VALIDATION } from '../src/content/display-masters'
 import {
   ACTIVE_CONTENT_VALIDATION,
@@ -14,6 +15,7 @@ console.log(
       verticalSliceWorld: AUTHORED_VERTICAL_SLICE_WORLD_VALIDATION,
       verticalSliceBalanced: BALANCED_VERTICAL_SLICE_CONTENT_VALIDATION,
       displayMasters: DISPLAY_MASTER_VALIDATION,
+      uxGuidance: UX_GUIDANCE_VALIDATION,
     },
     null,
     2,

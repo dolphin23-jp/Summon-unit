@@ -15,7 +15,9 @@ import {
 import { COLUMNS, LOCAL_ROWS } from '../battle/board'
 import type { MonsterSpecies } from '../content/monster-species'
 import type { SkillDefinition } from '../content/skill-definition'
+import { ConfirmDialog } from './ConfirmDialog'
 import { MonsterIcon } from './MonsterIcon'
+import { UxHelpButton } from './UxHelpDialog'
 import {
   moveFormationMemberPriority,
   placeFormationMember,
@@ -360,6 +362,7 @@ export function CollectionScreen({
     playerData.collection.speciesStates[0]?.speciesId ?? null,
   )
   const [notice, setNotice] = useState<string | null>(null)
+  const [pendingSkill, setPendingSkill] = useState<SkillDefinition | null>(null)
 
   const activeFormationId =
     playerData.formations.activeFormationId ??
@@ -419,6 +422,7 @@ export function CollectionScreen({
   }
 
   const learnSkill = (skill: SkillDefinition) => {
+    setPendingSkill(null)
     if (selectedInstance === null) return
     const cost = genericSkillCosts[skill.id]
     if (cost === undefined) {
@@ -456,20 +460,23 @@ export function CollectionScreen({
           <h1>Monster Research Tactics</h1>
           <p>所持個体、編成、技習得、図鑑、正式な経済状態を同じPlayerDataから編集します。</p>
         </div>
-        <dl className="collection-header__metrics">
-          <div>
-            <dt>基本通貨</dt>
-            <dd>{playerData.economy.currency}</dd>
-          </div>
-          <div>
-            <dt>研究データ</dt>
-            <dd>{playerData.economy.researchData}</dd>
-          </div>
-          <div>
-            <dt>触媒</dt>
-            <dd>{catalystTotal}</dd>
-          </div>
-        </dl>
+        <div className="ux-header-actions ux-header-actions--metrics">
+          <UxHelpButton context="COLLECTION" />
+          <dl className="collection-header__metrics">
+            <div>
+              <dt>基本通貨</dt>
+              <dd>{playerData.economy.currency}</dd>
+            </div>
+            <div>
+              <dt>研究データ</dt>
+              <dd>{playerData.economy.researchData}</dd>
+            </div>
+            <div>
+              <dt>触媒</dt>
+              <dd>{catalystTotal}</dd>
+            </div>
+          </dl>
+        </div>
       </header>
 
       <nav className="collection-tabs" aria-label="コレクション画面">
@@ -689,7 +696,7 @@ export function CollectionScreen({
                       disabled={
                         selectedInstance === null || learned || cost === undefined || insufficient
                       }
-                      onClick={() => learnSkill(skill)}
+                      onClick={() => setPendingSkill(skill)}
                     >
                       {learned ? '習得済み' : insufficient ? '通貨不足' : 'この個体が習得'}
                     </button>
@@ -700,6 +707,25 @@ export function CollectionScreen({
           </section>
         </div>
       )}
+
+      <ConfirmDialog
+        open={pendingSkill !== null && selectedInstance !== null}
+        title={`${pendingSkill === null ? '' : resolveDisplayName(pendingSkill.id)}を習得しますか？`}
+        description="選択中の個体へ汎用技を永久習得させ、基本通貨を消費します。"
+        details={
+          pendingSkill === null || selectedInstance === null
+            ? []
+            : [
+                `対象: ${selectedInstance.nickname ?? formatUnitDisplayName(selectedInstance.speciesId, selectedInstance.instanceId)}`,
+                `消費: 基本通貨 ${genericSkillCosts[pendingSkill.id] ?? '—'}`,
+              ]
+        }
+        confirmLabel="習得する"
+        onCancel={() => setPendingSkill(null)}
+        onConfirm={() => {
+          if (pendingSkill !== null) learnSkill(pendingSkill)
+        }}
+      />
 
       {tab === 'ENCYCLOPEDIA' && (
         <div className="encyclopedia-layout">

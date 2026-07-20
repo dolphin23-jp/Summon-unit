@@ -15,6 +15,8 @@ import {
   type ResearchNodeDefinition,
 } from '../progression/research-model'
 import { getResearchFacilityStageDefinition } from '../progression/research-facility-model'
+import { ConfirmDialog } from './ConfirmDialog'
+import { UxHelpButton } from './UxHelpDialog'
 
 const METHOD_LABELS: Readonly<Record<ResearchMethod, string>> = Object.freeze({
   FUSION: '融合研究',
@@ -194,6 +196,7 @@ function FinalResearchForm({
   onNotice: (notice: string) => void
 }) {
   const [specimenInstanceIds, setSpecimenInstanceIds] = useState<readonly string[]>([])
+  const [confirmOpen, setConfirmOpen] = useState(false)
   const finalDefinition = catalog.finalResearchDefinitions.find(
     (candidate) => candidate.nodeId === definition.nodeId,
   )
@@ -216,6 +219,7 @@ function FinalResearchForm({
   )
 
   const submit = () => {
+    setConfirmOpen(false)
     try {
       const result = completeFacilityFinalResearch(
         playerData,
@@ -287,10 +291,24 @@ function FinalResearchForm({
       <button
         type="button"
         className="collection-button collection-button--primary"
-        onClick={submit}
+        onClick={() => setConfirmOpen(true)}
       >
         資源を消費して設計図解放
       </button>
+      <ConfirmDialog
+        open={confirmOpen}
+        title={`${resolveDisplayName(definition.targetSpeciesId)}の設計図を解放しますか？`}
+        description="研究データ、触媒、選択した標本個体を消費します。標本消費は取り消せません。"
+        details={[
+          `研究データ ${finalDefinition.researchDataCost}`,
+          `触媒: ${finalDefinition.catalysts.length === 0 ? 'なし' : finalDefinition.catalysts.map((entry) => `${resolveDisplayName(entry.catalystId)} ×${entry.amount}`).join(' / ')}`,
+          `標本個体: ${specimenInstanceIds.length}体`,
+        ]}
+        confirmLabel="消費して設計図解放"
+        tone={specimenInstanceIds.length > 0 ? 'danger' : 'default'}
+        onCancel={() => setConfirmOpen(false)}
+        onConfirm={submit}
+      />
     </section>
   )
 }
@@ -431,6 +449,7 @@ export function ResearchScreen({
   )
   const [selectedNodeId, setSelectedNodeId] = useState(visibleStates[0]?.nodeId ?? null)
   const [notice, setNotice] = useState<string | null>(null)
+  const [upgradeConfirmOpen, setUpgradeConfirmOpen] = useState(false)
   const selectedState =
     visibleStates.find((state) => state.nodeId === selectedNodeId) ?? visibleStates[0] ?? null
   const selectedDefinition =
@@ -451,6 +470,7 @@ export function ResearchScreen({
     playerData.economy.researchData >= nextFacility.upgradeResearchDataCost
 
   const upgrade = () => {
+    setUpgradeConfirmOpen(false)
     try {
       const result = upgradeResearchFacility(playerData, catalog)
       onPlayerDataChange(result.playerData)
@@ -470,9 +490,12 @@ export function ResearchScreen({
           <h1>研究網・研究施設</h1>
           <p>ヒントから候補を絞り、試験研究で照合し、確定研究で設計図を永久解放します。</p>
         </div>
-        <button type="button" className="collection-button" onClick={onOpenCollection}>
-          編成・図鑑へ戻る
-        </button>
+        <div className="ux-header-actions">
+          <UxHelpButton context="RESEARCH" />
+          <button type="button" className="collection-button" onClick={onOpenCollection}>
+            編成・図鑑へ戻る
+          </button>
+        </div>
       </header>
 
       <section className="research-facility collection-panel" aria-labelledby="facility-title">
@@ -507,7 +530,7 @@ export function ResearchScreen({
                 type="button"
                 className="collection-button collection-button--primary"
                 disabled={!canAffordUpgrade}
-                onClick={upgrade}
+                onClick={() => setUpgradeConfirmOpen(true)}
               >
                 {canAffordUpgrade ? `段階${nextFacility.stage}へ更新` : '施設更新資源が不足'}
               </button>
@@ -515,6 +538,24 @@ export function ResearchScreen({
           )}
         </div>
       </section>
+
+      <ConfirmDialog
+        open={upgradeConfirmOpen && nextFacility !== undefined}
+        title={`研究施設を段階${nextFacility?.stage ?? ''}へ更新しますか？`}
+        description="施設更新は基本通貨と研究データを消費し、研究可能レア度を拡張します。"
+        details={
+          nextFacility === undefined
+            ? []
+            : [
+                `基本通貨 ${nextFacility.upgradeCurrencyCost}`,
+                `研究データ ${nextFacility.upgradeResearchDataCost}`,
+                `更新後: R${nextFacility.maxResearchableRarity}まで`,
+              ]
+        }
+        confirmLabel="施設を更新"
+        onCancel={() => setUpgradeConfirmOpen(false)}
+        onConfirm={upgrade}
+      />
 
       {notice !== null && (
         <p className="collection-notice research-notice" role="status">

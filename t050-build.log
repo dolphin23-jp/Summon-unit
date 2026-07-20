@@ -1,0 +1,7 @@
+
+> summon-unit@0.1.0-rc.2 build /home/runner/work/Summon-unit/Summon-unit
+> tsc -b && vite build
+
+src/ui/SaveSlotScreen.tsx(65,30): error TS2339: Property 'json' does not exist on type 'PendingSaveAction'.
+  Property 'json' does not exist on type '{ readonly kind: "OVERWRITE" | "LOAD" | "DELETE"; readonly slotId: "slot-1" | "slot-2" | "slot-3"; }'.
+ ELIFECYCLE  Command failed with exit code 2.
