@@ -2,13 +2,74 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, agent/t050-ux-guidance-confirmation]
   pull_request:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
+  materialize-t050:
+    if: github.ref == 'refs/heads/agent/t050-ux-guidance-confirmation' && github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: agent/t050-ux-guidance-confirmation
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Enable pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.13.1 --activate
+
+      - name: Materialize T050
+        run: python3 scripts/t050_materialize.py
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Remove generated lockfile
+        run: rm -f pnpm-lock.yaml
+
+      - name: Format changed files
+        shell: bash
+        run: |
+          git diff --name-only --diff-filter=ACM -z | xargs -0 -r pnpm exec prettier --write --ignore-unknown
+
+      - name: Content validation
+        run: pnpm validate:content
+
+      - name: Test
+        run: pnpm test
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Build
+        run: pnpm build
+
+      - name: Commit materialized T050
+        shell: bash
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No T050 changes to commit"
+            exit 0
+          fi
+          git commit -m "T050: materialize UX guidance and confirmations"
+          git push origin HEAD:agent/t050-ux-guidance-confirmation
+
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 10
