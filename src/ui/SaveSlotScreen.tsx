@@ -20,7 +20,9 @@ function slotNumber(slotId: SaveSlotId): string {
 }
 
 type PendingSaveAction =
-  | { readonly kind: 'OVERWRITE' | 'LOAD' | 'DELETE'; readonly slotId: SaveSlotId }
+  | { readonly kind: 'OVERWRITE'; readonly slotId: SaveSlotId }
+  | { readonly kind: 'LOAD'; readonly slotId: SaveSlotId }
+  | { readonly kind: 'DELETE'; readonly slotId: SaveSlotId }
   | { readonly kind: 'IMPORT'; readonly json: string }
 
 export interface SaveSlotScreenProps {
