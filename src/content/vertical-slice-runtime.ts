@@ -59,8 +59,8 @@ export function validateVerticalSliceRuntime(): VerticalSliceRuntimeValidationSu
       )?.members.length ?? 0,
     unlockedInitialStages: unlockedStageIds.length,
     onboardingCues: VERTICAL_SLICE_RUNTIME_ONBOARDING_CUES.length,
-    firstBattleAllies: battle.units.filter((unit) => unit.side === 'ALLY').length,
-    firstBattleEnemies: battle.units.filter((unit) => unit.side === 'ENEMY').length,
+    firstBattleAllies: battle.units.filter((unit) => unit.position.side === 'ALLY').length,
+    firstBattleEnemies: battle.units.filter((unit) => unit.position.side === 'ENEMY').length,
   })
 }
 
