@@ -46,5 +46,6 @@
 - [x] T044 — [スライスモンスター・技一式](T044_VERTICAL_SLICE_MONSTERS_SKILLS.md)
 - [x] T045 — [研究網スライス・地域A/B制作](T045_RESEARCH_REGIONS_A_B.md)
 - [x] T046 — [バランスシミュレーション・調整・導入](T046_BALANCE_SIMULATION_ONBOARDING.md)
+- [x] T047 — [通し結合・堅牢化](T047_FULL_LOOP_HARDENING.md)
 
-T001～T046 complete. Next: T047.
+T001～T047 complete. Next: T048.

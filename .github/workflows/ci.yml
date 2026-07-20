@@ -34,7 +34,19 @@ jobs:
         run: pnpm validate:content
 
       - name: Test
-        run: pnpm test
+        id: test
+        run: |
+          set -o pipefail
+          pnpm test 2>&1 | tee /tmp/vitest.log
+
+      - name: Upload test diagnostics
+        if: failure() && steps.test.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: vitest-diagnostics
+          path: /tmp/vitest.log
+          if-no-files-found: error
+          retention-days: 3
 
       - name: Headless demo
         run: pnpm demo:headless > /tmp/headless-battle-demo.json

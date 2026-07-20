@@ -4,11 +4,12 @@ import type {
   InteractiveBattleStableSnapshot,
 } from './battle/headless-battle-runner'
 import {
-  T039_FOREST_NORMAL,
-  T039_GENERIC_SKILL_COSTS,
-  T039_INITIAL_PLAYER_DATA,
-  T039_PLAYER_CATALOG,
-} from './demo/region-ui-demo'
+  VERTICAL_SLICE_RUNTIME_CATALOG,
+  VERTICAL_SLICE_RUNTIME_FIRST_STAGE_ID,
+  VERTICAL_SLICE_RUNTIME_GENERIC_SKILL_COSTS,
+  VERTICAL_SLICE_RUNTIME_INITIAL_PLAYER_DATA,
+  VERTICAL_SLICE_RUNTIME_ONBOARDING_CUES,
+} from './content/vertical-slice-runtime'
 import { STANDARD_INTERACTIVE_BATTLE } from './demo/standard-headless-battle'
 import type { PlayerData } from './progression/player-data'
 import {
@@ -49,15 +50,17 @@ import {
   savePlayerDataAtomic,
 } from './save/save-repository'
 import { CollectionScreen } from './ui/CollectionScreen'
+import { HomeScreen } from './ui/HomeScreen'
 import { MinimalBattleScreen } from './ui/MinimalBattleScreen'
 import { T040RegionScreen as RegionScreen } from './ui/T040RegionScreen'
 import { ResearchScreen } from './ui/ResearchScreen'
 import { SaveSlotScreen } from './ui/SaveSlotScreen'
+import { SummonScreen } from './ui/SummonScreen'
 
 const BROWSER_SAVE_REPOSITORY = createBrowserSaveRepository()
 let browserBootstrapPromise: Promise<BrowserSaveBootstrapResult> | null = null
 
-type AppScreen = 'REGION' | 'COLLECTION' | 'RESEARCH' | 'SAVE'
+type AppScreen = 'HOME' | 'REGION' | 'COLLECTION' | 'RESEARCH' | 'SUMMON' | 'SAVE'
 type SaveBootState = 'LOADING' | 'READY' | 'UNAVAILABLE'
 
 interface BattleSession {
@@ -100,8 +103,8 @@ function getBrowserBootstrap(): Promise<BrowserSaveBootstrapResult> | null {
   browserBootstrapPromise ??= bootstrapBrowserSaveSystem({
     repository: BROWSER_SAVE_REPOSITORY,
     storage,
-    initialPlayerData: T039_INITIAL_PLAYER_DATA,
-    catalog: T039_PLAYER_CATALOG,
+    initialPlayerData: VERTICAL_SLICE_RUNTIME_INITIAL_PLAYER_DATA,
+    catalog: VERTICAL_SLICE_RUNTIME_CATALOG,
   })
   return browserBootstrapPromise
 }
@@ -122,16 +125,21 @@ function emptySaveSummaries(): readonly SaveSlotSummary[] {
 }
 
 function App() {
-  const [playerData, setPlayerData] = useState<PlayerData>(T039_INITIAL_PLAYER_DATA)
-  const [screen, setScreen] = useState<AppScreen>('REGION')
-  const [screenBeforeSave, setScreenBeforeSave] = useState<Exclude<AppScreen, 'SAVE'>>('REGION')
+  const [playerData, setPlayerData] = useState<PlayerData>(
+    VERTICAL_SLICE_RUNTIME_INITIAL_PLAYER_DATA,
+  )
+  const [screen, setScreen] = useState<AppScreen>('HOME')
+  const [screenBeforeSave, setScreenBeforeSave] = useState<Exclude<AppScreen, 'SAVE'>>('HOME')
   const [battleSession, setBattleSession] = useState<BattleSession | null>(null)
   const [nextBattleSerial, setNextBattleSerial] = useState(1)
   const [selectedStageId, setSelectedStageId] = useState<string | null>(
-    T039_FOREST_NORMAL.stageId,
+    VERTICAL_SLICE_RUNTIME_FIRST_STAGE_ID,
   )
   const [notifications, setNotifications] = useState<readonly ProgressionNotification[]>(() =>
-    createCurrentProgressionNotifications(T039_INITIAL_PLAYER_DATA, T039_PLAYER_CATALOG),
+    createCurrentProgressionNotifications(
+      VERTICAL_SLICE_RUNTIME_INITIAL_PLAYER_DATA,
+      VERTICAL_SLICE_RUNTIME_CATALOG,
+    ),
   )
   const [saveBootState, setSaveBootState] = useState<SaveBootState>('LOADING')
   const [saveSummaries, setSaveSummaries] = useState<readonly SaveSlotSummary[]>(
@@ -149,6 +157,26 @@ function App() {
   const activeBattleRef = useRef<SavedBattleSession | null>(null)
 
   useEffect(() => {
+    const reportWindowError = (event: ErrorEvent) => {
+      setSaveNotice(`実行時エラーを検出しました: ${event.message || '不明なエラー'}`)
+    }
+    const reportUnhandledRejection = (event: PromiseRejectionEvent) => {
+      const reason = event.reason
+      setSaveNotice(
+        reason instanceof Error
+          ? `未処理の非同期エラーを検出しました: ${reason.message}`
+          : '未処理の非同期エラーを検出しました。',
+      )
+    }
+    window.addEventListener('error', reportWindowError)
+    window.addEventListener('unhandledrejection', reportUnhandledRejection)
+    return () => {
+      window.removeEventListener('error', reportWindowError)
+      window.removeEventListener('unhandledrejection', reportUnhandledRejection)
+    }
+  }, [])
+
+  useEffect(() => {
     const bootstrap = getBrowserBootstrap()
     if (bootstrap === null) {
       setSaveBootState('UNAVAILABLE')
@@ -161,13 +189,21 @@ function App() {
         if (cancelled) return
         setPlayerData(result.playerData)
         setNotifications(
-          createCurrentProgressionNotifications(result.playerData, T039_PLAYER_CATALOG),
+          createCurrentProgressionNotifications(
+            result.playerData,
+            VERTICAL_SLICE_RUNTIME_CATALOG,
+          ),
         )
         setActiveSlotId(result.settings.activeSlotId)
         setAutosaveEnabled(result.settings.autosaveEnabled)
         setSaveSummaries(result.summaries)
         setSaveBootState('READY')
         activeBattleRef.current = result.activeBattle
+        const unlockedStageIds = getUnlockedStageIds(
+          result.playerData,
+          VERTICAL_SLICE_RUNTIME_CATALOG,
+        )
+        setSelectedStageId(unlockedStageIds[0] ?? null)
         if (result.activeBattle !== null) {
           setBattleSession({
             stageId: result.activeBattle.stageId,
@@ -182,16 +218,17 @@ function App() {
         } else if (result.recoveredFromBackup) {
           setSaveNotice('現在世代を検証できなかったため、バックアップ世代から復元しました。')
         } else if (result.createdInitialSave) {
-          setSaveNotice('スロット1を作成し、初期進行を保存しました。')
+          setSaveNotice('T047垂直スライスの初期進行を保存しました。')
         }
       })
       .catch((error) => {
         if (cancelled) return
         setSaveBootState('UNAVAILABLE')
+        setScreen('HOME')
         setSaveNotice(
           error instanceof Error
-            ? `セーブの初期化に失敗しました: ${error.message}`
-            : 'セーブの初期化に失敗しました。',
+            ? `セーブの初期化に失敗したため、初期進行で継続します: ${error.message}`
+            : 'セーブの初期化に失敗したため、初期進行で継続します。',
         )
       })
     return () => {
@@ -211,7 +248,10 @@ function App() {
   const refreshSaveSummaries = async (): Promise<void> => {
     if (BROWSER_SAVE_REPOSITORY === null) return
     setSaveSummaries(
-      await listSaveSlotSummaries(BROWSER_SAVE_REPOSITORY, T039_PLAYER_CATALOG),
+      await listSaveSlotSummaries(
+        BROWSER_SAVE_REPOSITORY,
+        VERTICAL_SLICE_RUNTIME_CATALOG,
+      ),
     )
   }
 
@@ -226,7 +266,7 @@ function App() {
     await savePlayerDataAtomic(
       BROWSER_SAVE_REPOSITORY,
       nextPlayerData,
-      T039_PLAYER_CATALOG,
+      VERTICAL_SLICE_RUNTIME_CATALOG,
       {
         slotId,
         generationId: createRuntimeSaveGenerationId(slotId, savedAtEpochMs),
@@ -247,24 +287,32 @@ function App() {
   }
 
   const updatePlayerData = (next: PlayerData) => {
-    const normalized = createStagePlayerData(
-      {
-        ...next,
-        facilities: next.facilities ?? playerData.facilities,
-        stageProgress: next.stageProgress ?? playerData.stageProgress,
-      },
-      T039_PLAYER_CATALOG,
-    )
-    const derived = deriveProgressionNotifications(
-      playerData,
-      normalized,
-      T039_PLAYER_CATALOG,
-    )
-    setPlayerData(normalized)
-    if (derived.length > 0) {
-      setNotifications((current) => mergeNotifications(current, derived))
+    try {
+      const normalized = createStagePlayerData(
+        {
+          ...next,
+          facilities: next.facilities ?? playerData.facilities,
+          stageProgress: next.stageProgress ?? playerData.stageProgress,
+        },
+        VERTICAL_SLICE_RUNTIME_CATALOG,
+      )
+      const derived = deriveProgressionNotifications(
+        playerData,
+        normalized,
+        VERTICAL_SLICE_RUNTIME_CATALOG,
+      )
+      setPlayerData(normalized)
+      if (derived.length > 0) {
+        setNotifications((current) => mergeNotifications(current, derived))
+      }
+      queueAutosave(normalized)
+    } catch (error) {
+      setSaveNotice(
+        error instanceof Error
+          ? `進行データの更新を拒否しました: ${error.message}`
+          : '進行データの更新を拒否しました。',
+      )
     }
-    queueAutosave(normalized)
   }
 
   const openSaveScreen = (from: Exclude<AppScreen, 'SAVE'>): void => {
@@ -304,13 +352,16 @@ function App() {
       const loaded = await loadSaveSlot(
         BROWSER_SAVE_REPOSITORY,
         slotId,
-        T039_PLAYER_CATALOG,
+        VERTICAL_SLICE_RUNTIME_CATALOG,
       )
-      if (loaded === null) throw new Error(`${slotId}に保存データがありません。`)
+      if (loaded === null) throw new Error(`${slotId}に有効な保存データがありません。`)
       setPlayerData(loaded.playerData)
       activeBattleRef.current = loaded.activeBattle
       setNotifications(
-        createCurrentProgressionNotifications(loaded.playerData, T039_PLAYER_CATALOG),
+        createCurrentProgressionNotifications(
+          loaded.playerData,
+          VERTICAL_SLICE_RUNTIME_CATALOG,
+        ),
       )
       setActiveSlotId(slotId)
       const storage = getBrowserLocalSettingsStorage()
@@ -318,7 +369,10 @@ function App() {
         storeLocalSaveSettings(storage, { activeSlotId: slotId, autosaveEnabled })
       }
       await refreshSaveSummaries()
-      const unlockedStageIds = getUnlockedStageIds(loaded.playerData, T039_PLAYER_CATALOG)
+      const unlockedStageIds = getUnlockedStageIds(
+        loaded.playerData,
+        VERTICAL_SLICE_RUNTIME_CATALOG,
+      )
       setSelectedStageId((current) =>
         current !== null && unlockedStageIds.includes(current)
           ? current
@@ -336,7 +390,7 @@ function App() {
         setNextBattleSerial((current) => Math.max(current, loaded.activeBattle!.serial + 1))
       } else {
         setBattleSession(null)
-        setScreen('REGION')
+        setScreen('HOME')
       }
       setSaveNotice(
         loaded.activeBattle !== null
@@ -387,24 +441,29 @@ function App() {
   }
 
   const startBattle = (stageId: string, formationId: string) => {
-    const definition = createStageBattleDefinition(
-      playerData,
-      stageId,
-      formationId,
-      T039_PLAYER_CATALOG,
-      BATTLE_DEFAULTS,
-    )
-    setSelectedStageId(stageId)
-    activeBattleRef.current = null
-    setBattleSession({
-      stageId,
-      definition,
-      serial: nextBattleSerial,
-      fastModeAvailable:
-        playerData.stageProgress?.completedStageIds.includes(stageId) ?? false,
-      initialAttempt: 0,
-    })
-    setNextBattleSerial((current) => current + 1)
+    try {
+      const definition = createStageBattleDefinition(
+        playerData,
+        stageId,
+        formationId,
+        VERTICAL_SLICE_RUNTIME_CATALOG,
+        BATTLE_DEFAULTS,
+      )
+      setSelectedStageId(stageId)
+      activeBattleRef.current = null
+      setBattleSession({
+        stageId,
+        definition,
+        serial: nextBattleSerial,
+        fastModeAvailable:
+          playerData.stageProgress?.completedStageIds.includes(stageId) ?? false,
+        initialAttempt: 0,
+      })
+      setNextBattleSerial((current) => current + 1)
+    } catch (error) {
+      setSaveNotice(error instanceof Error ? error.message : '戦闘を開始できませんでした。')
+      setScreen('REGION')
+    }
   }
 
   const instantSimulate = (
@@ -414,7 +473,7 @@ function App() {
     const serial = nextBattleSerial
     const result = runInstantStageSimulation(
       playerData,
-      T039_PLAYER_CATALOG,
+      VERTICAL_SLICE_RUNTIME_CATALOG,
       {
         stageId,
         formationId,
@@ -428,7 +487,6 @@ function App() {
     updatePlayerData(result.settlement.playerData)
     return result
   }
-
 
   const leaveBattle = (nextScreen: Exclude<AppScreen, 'SAVE'>): void => {
     activeBattleRef.current = null
@@ -450,7 +508,7 @@ function App() {
     try {
       const json = exportSaveTransferJson(
         { playerData, activeBattle: activeBattleRef.current },
-        T039_PLAYER_CATALOG,
+        VERTICAL_SLICE_RUNTIME_CATALOG,
       )
       const blob = new Blob([json], { type: 'application/json' })
       const url = URL.createObjectURL(blob)
@@ -472,13 +530,13 @@ function App() {
     }
     setSaveBusy(true)
     try {
-      const imported = importSaveTransferJson(json, T039_PLAYER_CATALOG)
+      const imported = importSaveTransferJson(json, VERTICAL_SLICE_RUNTIME_CATALOG)
       const savedAtEpochMs = Date.now()
       const saved = await enqueueSaveTask(() =>
         savePlayerDataAtomic(
           BROWSER_SAVE_REPOSITORY,
           imported.playerData,
-          T039_PLAYER_CATALOG,
+          VERTICAL_SLICE_RUNTIME_CATALOG,
           {
             slotId: activeSlotId,
             generationId: createRuntimeSaveGenerationId(activeSlotId, savedAtEpochMs),
@@ -490,7 +548,10 @@ function App() {
       setPlayerData(saved.playerData)
       activeBattleRef.current = saved.activeBattle
       setNotifications(
-        createCurrentProgressionNotifications(saved.playerData, T039_PLAYER_CATALOG),
+        createCurrentProgressionNotifications(
+          saved.playerData,
+          VERTICAL_SLICE_RUNTIME_CATALOG,
+        ),
       )
       await refreshSaveSummaries()
       if (saved.activeBattle !== null) {
@@ -505,7 +566,7 @@ function App() {
         setNextBattleSerial((current) => Math.max(current, saved.activeBattle!.serial + 1))
       } else {
         setBattleSession(null)
-        setScreen('REGION')
+        setScreen('HOME')
       }
       setSaveNotice(
         imported.appliedMigrations.length > 0
@@ -562,7 +623,7 @@ function App() {
           }
         }}
         settleResult={(result, attempt) =>
-          settleStageBattle(playerData, result, T039_PLAYER_CATALOG, {
+          settleStageBattle(playerData, result, VERTICAL_SLICE_RUNTIME_CATALOG, {
             settlementId: `${battleSession.stageId}:run-${battleSession.serial}:attempt-${attempt}`,
             stageId: battleSession.stageId,
             bonusRollBasisPoints:
@@ -604,10 +665,28 @@ function App() {
     )
   }
 
+  if (screen === 'HOME') {
+    return (
+      <HomeScreen
+        playerData={playerData}
+        notice={saveNotice}
+        persistenceAvailable={saveBootState === 'READY'}
+        onOpenRegion={() => setScreen('REGION')}
+        onOpenCollection={() => setScreen('COLLECTION')}
+        onOpenResearch={() => setScreen('RESEARCH')}
+        onOpenSummon={() => setScreen('SUMMON')}
+        onOpenSave={() => openSaveScreen('HOME')}
+      />
+    )
+  }
+
   if (screen === 'RESEARCH') {
     return (
       <div className="t039-research-shell">
         <nav className="t039-screen-navigation" aria-label="主要画面">
+          <button type="button" className="collection-button" onClick={() => setScreen('HOME')}>
+            ホーム
+          </button>
           <button
             type="button"
             className="collection-button collection-button--primary"
@@ -615,17 +694,16 @@ function App() {
           >
             地域・ステージ
           </button>
-          <button
-            type="button"
-            className="collection-button"
-            onClick={() => openSaveScreen('RESEARCH')}
-          >
+          <button type="button" className="collection-button" onClick={() => setScreen('SUMMON')}>
+            召喚
+          </button>
+          <button type="button" className="collection-button" onClick={() => openSaveScreen('RESEARCH')}>
             セーブスロット
           </button>
         </nav>
         <ResearchScreen
           playerData={playerData}
-          catalog={T039_PLAYER_CATALOG}
+          catalog={VERTICAL_SLICE_RUNTIME_CATALOG}
           onPlayerDataChange={updatePlayerData}
           onOpenCollection={() => setScreen('COLLECTION')}
         />
@@ -633,10 +711,26 @@ function App() {
     )
   }
 
+  if (screen === 'SUMMON') {
+    return (
+      <SummonScreen
+        playerData={playerData}
+        catalog={VERTICAL_SLICE_RUNTIME_CATALOG}
+        onPlayerDataChange={updatePlayerData}
+        onOpenHome={() => setScreen('HOME')}
+        onOpenCollection={() => setScreen('COLLECTION')}
+        onOpenResearch={() => setScreen('RESEARCH')}
+      />
+    )
+  }
+
   if (screen === 'COLLECTION') {
     return (
       <div className="t039-collection-shell">
         <nav className="t039-screen-navigation" aria-label="主要画面">
+          <button type="button" className="collection-button" onClick={() => setScreen('HOME')}>
+            ホーム
+          </button>
           <button
             type="button"
             className="collection-button collection-button--primary"
@@ -644,34 +738,33 @@ function App() {
           >
             地域・ステージ
           </button>
-          <button
-            type="button"
-            className="collection-button"
-            onClick={() => setScreen('RESEARCH')}
-          >
+          <button type="button" className="collection-button" onClick={() => setScreen('RESEARCH')}>
             研究網・施設
           </button>
-          <button
-            type="button"
-            className="collection-button"
-            onClick={() => openSaveScreen('COLLECTION')}
-          >
+          <button type="button" className="collection-button" onClick={() => setScreen('SUMMON')}>
+            召喚
+          </button>
+          <button type="button" className="collection-button" onClick={() => openSaveScreen('COLLECTION')}>
             セーブスロット
           </button>
         </nav>
         <CollectionScreen
           playerData={playerData}
-          catalog={T039_PLAYER_CATALOG}
-          genericSkillCosts={T039_GENERIC_SKILL_COSTS}
+          catalog={VERTICAL_SLICE_RUNTIME_CATALOG}
+          genericSkillCosts={VERTICAL_SLICE_RUNTIME_GENERIC_SKILL_COSTS}
           onPlayerDataChange={updatePlayerData}
           onStartBattle={(formationId) => {
-            const unlockedStageIds = getUnlockedStageIds(playerData, T039_PLAYER_CATALOG)
+            const unlockedStageIds = getUnlockedStageIds(
+              playerData,
+              VERTICAL_SLICE_RUNTIME_CATALOG,
+            )
             const stageId =
               selectedStageId !== null && unlockedStageIds.includes(selectedStageId)
                 ? selectedStageId
                 : unlockedStageIds[0]
             if (stageId === undefined) {
-              throw new Error('出撃可能なステージがありません。')
+              setSaveNotice('出撃可能なステージがありません。')
+              return
             }
             startBattle(stageId, formationId)
           }}
@@ -680,27 +773,49 @@ function App() {
     )
   }
 
+  const onboardingCue = VERTICAL_SLICE_RUNTIME_ONBOARDING_CUES.find(
+    (cue) => cue.stageId === selectedStageId,
+  )
+
   return (
-    <RegionScreen
-      playerData={playerData}
-      catalog={T039_PLAYER_CATALOG}
-      selectedStageId={selectedStageId}
-      notifications={notifications}
-      onSelectStage={setSelectedStageId}
-      onStartBattle={startBattle}
-      onInstantSimulate={instantSimulate}
-      onOpenCollection={() => setScreen('COLLECTION')}
-      onOpenResearch={() => setScreen('RESEARCH')}
-      onOpenSave={() => openSaveScreen('REGION')}
-      onDismissNotification={(notificationId) =>
-        setNotifications((current) =>
-          Object.freeze(
-            current.filter((notification) => notification.id !== notificationId),
-          ),
-        )
-      }
-      onDismissAllNotifications={() => setNotifications(Object.freeze([]))}
-    />
+    <div className="t040-region-shell">
+      <nav className="t039-screen-navigation" aria-label="主要画面">
+        <button type="button" className="collection-button" onClick={() => setScreen('HOME')}>
+          ホーム
+        </button>
+        <button type="button" className="collection-button" onClick={() => setScreen('SUMMON')}>
+          召喚
+        </button>
+      </nav>
+      {onboardingCue !== undefined && (
+        <aside className="collection-panel" aria-live="polite">
+          <p className="panel-heading__kicker">FIELD GUIDANCE</p>
+          <h2>{onboardingCue.headline}</h2>
+          <p>{onboardingCue.prompt}</p>
+          <small>{onboardingCue.tip}</small>
+        </aside>
+      )}
+      <RegionScreen
+        playerData={playerData}
+        catalog={VERTICAL_SLICE_RUNTIME_CATALOG}
+        selectedStageId={selectedStageId}
+        notifications={notifications}
+        onSelectStage={setSelectedStageId}
+        onStartBattle={startBattle}
+        onInstantSimulate={instantSimulate}
+        onOpenCollection={() => setScreen('COLLECTION')}
+        onOpenResearch={() => setScreen('RESEARCH')}
+        onOpenSave={() => openSaveScreen('REGION')}
+        onDismissNotification={(notificationId) =>
+          setNotifications((current) =>
+            Object.freeze(
+              current.filter((notification) => notification.id !== notificationId),
+            ),
+          )
+        }
+        onDismissAllNotifications={() => setNotifications(Object.freeze([]))}
+      />
+    </div>
   )
 }
 
