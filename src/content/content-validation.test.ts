@@ -8,28 +8,39 @@ import {
   type ContentValidationCatalog,
 } from './content-validation'
 import { ACTIVE_CONTENT_VALIDATION } from './runtime-content-validation'
+import {
+  VERTICAL_SLICE_RUNTIME_CATALOG,
+  VERTICAL_SLICE_RUNTIME_GENERIC_SKILL_COSTS,
+} from './vertical-slice-runtime'
 
 const OPTIONS = Object.freeze({ genericSkillCosts: T039_GENERIC_SKILL_COSTS })
+const ACTIVE_OPTIONS = Object.freeze({
+  genericSkillCosts: VERTICAL_SLICE_RUNTIME_GENERIC_SKILL_COSTS,
+})
 
 function validate(catalog: ContentValidationCatalog = T039_PLAYER_CATALOG) {
   return validateContentCatalog(catalog, OPTIONS)
 }
 
+function validateActive() {
+  return validateContentCatalog(VERTICAL_SLICE_RUNTIME_CATALOG, ACTIVE_OPTIONS)
+}
+
 describe('content validation pipeline', () => {
   it('validates the active content catalog and returns a stable summary', () => {
-    expect(validate()).toEqual({
-      species: 6,
-      skills: 10,
-      genericSkillCosts: 3,
-      researchNodes: 4,
-      finalResearchDefinitions: 4,
-      bloomResearchDefinitions: 6,
+    expect(validateActive()).toEqual({
+      species: 16,
+      skills: 42,
+      genericSkillCosts: 10,
+      researchNodes: 10,
+      finalResearchDefinitions: 10,
+      bloomResearchDefinitions: 16,
       researchFacilityStages: 3,
       regions: 2,
-      stages: 5,
-      bossStages: 1,
+      stages: 17,
+      bossStages: 2,
     })
-    expect(ACTIVE_CONTENT_VALIDATION).toEqual(validate())
+    expect(ACTIVE_CONTENT_VALIDATION).toEqual(validateActive())
   })
 
   it('rejects a species whose innate skill reference is missing', () => {
@@ -120,9 +131,9 @@ describe('content validation pipeline', () => {
   })
 
   it('produces byte-identical output across repeated validation', () => {
-    const baseline = JSON.stringify(validate())
+    const baseline = JSON.stringify(validateActive())
     for (let run = 0; run < 100; run += 1) {
-      expect(JSON.stringify(validate())).toBe(baseline)
+      expect(JSON.stringify(validateActive())).toBe(baseline)
     }
   })
 })
