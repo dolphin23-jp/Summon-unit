@@ -21,6 +21,41 @@ jobs:
       - name: Materialize T051 implementation
         run: python scripts/t051_materialize.py
 
+      - name: Apply static-analysis fixes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          icon = Path('src/ui/MonsterIcon.tsx')
+          content = icon.read_text(encoding='utf-8')
+          content = content.replace(
+              """}: MonsterIconProps) {
+            const resolvedSpeciesId = species?.id ?? speciesId
+            if (resolvedSpeciesId === undefined || resolvedSpeciesId.trim().length === 0) {
+              throw new Error('MonsterIcon requires species or speciesId')
+            }
+
+            const [failedImageSrc, setFailedImageSrc] = useState<string | null>(null)
+          """,
+              """}: MonsterIconProps) {
+            const [failedImageSrc, setFailedImageSrc] = useState<string | null>(null)
+            const resolvedSpeciesId = species?.id ?? speciesId
+            if (resolvedSpeciesId === undefined || resolvedSpeciesId.trim().length === 0) {
+              throw new Error('MonsterIcon requires species or speciesId')
+            }
+
+          """,
+          )
+          icon.write_text(content, encoding='utf-8')
+
+          decision = Path('src/ui/BattleDecisionPanel.tsx')
+          content = decision.read_text(encoding='utf-8').replace(
+              'export function getBattleEventActorId',
+              'function getBattleEventActorId',
+          )
+          decision.write_text(content, encoding='utf-8')
+          PY
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -56,27 +91,6 @@ jobs:
             tasks/STATUS.md \
             docs/12_UI_UX.md
 
-      - name: Content validation
-        run: pnpm validate:content
-
-      - name: Test
-        run: pnpm test
-
-      - name: Headless demo
-        run: pnpm demo:headless > /tmp/headless-battle-demo.json
-
-      - name: AI regression benchmark
-        run: pnpm benchmark:ai
-
-      - name: Vertical slice balance benchmark
-        run: pnpm benchmark:balance > /tmp/vertical-slice-balance.json
-
-      - name: Lint
-        run: pnpm lint
-
-      - name: Build
-        run: pnpm build
-
       - name: Commit materialized implementation
         run: |
           if git diff --quiet && git diff --cached --quiet; then
@@ -106,3 +120,24 @@ jobs:
             docs/12_UI_UX.md
           git commit -m "T051: モンスター画像を全面活用"
           git push origin HEAD:${{ github.head_ref }}
+
+      - name: Content validation
+        run: pnpm validate:content
+
+      - name: Test
+        run: pnpm test
+
+      - name: Headless demo
+        run: pnpm demo:headless > /tmp/headless-battle-demo.json
+
+      - name: AI regression benchmark
+        run: pnpm benchmark:ai
+
+      - name: Vertical slice balance benchmark
+        run: pnpm benchmark:balance > /tmp/vertical-slice-balance.json
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Build
+        run: pnpm build
