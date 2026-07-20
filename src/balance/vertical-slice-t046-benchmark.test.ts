@@ -21,7 +21,11 @@ describe('T046 vertical slice balance benchmark', () => {
   })
 
   it('removes action-limit timeouts and keeps every introductory stage at two wins or better', () => {
-    expect(REPORT.overall.timeoutRateBasisPoints).toBe(0)
+    const timeoutStages = REPORT.stages.filter((stage) => stage.timeoutRateBasisPoints > 0)
+    expect(
+      REPORT.overall.timeoutRateBasisPoints,
+      `timeout stages: ${JSON.stringify(timeoutStages)}`,
+    ).toBe(0)
     for (const stage of REPORT.stages.filter((candidate) => candidate.band === 'INTRO')) {
       expect(stage.allyVictories).toBeGreaterThanOrEqual(2)
     }
