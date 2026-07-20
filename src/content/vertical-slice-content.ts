@@ -80,7 +80,12 @@ function defineSkill(record: VerticalSliceSkillRecord): VerticalSliceSkillRecord
     ...record,
     definition: Object.freeze({
       ...record.definition,
-      ...(healingPower === undefined ? {} : { healingPower }),
+      ...(healingPower === undefined
+        ? {}
+        : {
+            healingPower,
+            cooldownActions: record.definition.cooldownActions ?? 2,
+          }),
     }),
     effectTags: freezeStrings(record.effectTags),
   })
