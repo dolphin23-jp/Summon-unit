@@ -1,0 +1,53 @@
+name: T049 Materialize
+
+on:
+  push:
+    branches:
+      - agent/t049-display-name-masters
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/t049-display-name-masters
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.13.1
+      - name: Materialize T049 changes
+        run: python3 scripts/t049_materialize.py
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Format changed files
+        shell: bash
+        run: |
+          git diff --name-only --diff-filter=ACM -z | xargs -0 -r pnpm exec prettier --write --ignore-unknown
+      - name: Validate content
+        run: pnpm validate:content
+      - name: Run tests
+        run: pnpm test
+      - name: Lint
+        run: pnpm lint
+      - name: Build
+        run: pnpm build
+      - name: Commit materialized changes
+        shell: bash
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No materialized changes"
+            exit 0
+          fi
+          git commit -m "T049: materialize display name masters"
+          git push origin HEAD:agent/t049-display-name-masters
