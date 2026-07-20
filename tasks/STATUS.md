@@ -51,7 +51,7 @@
 - [x] T049 — [表示名・説明文マスター](T049_DISPLAY_NAME_MASTERS.md)
 - [x] T050 — [初回導線・用語ヘルプ・確認統一](T050_UX_GUIDANCE_AND_CONFIRM.md)
 - [x] T051 — [モンスター画像の全面活用](T051_MONSTER_ART_EVERYWHERE.md)
-- [ ] T052 — [ビジュアルテーマ・戦闘レイアウト](T052_VISUAL_THEME_AND_BATTLE_LAYOUT.md)
+- [x] T052 — [ビジュアルテーマ・戦闘レイアウト](T052_VISUAL_THEME_AND_BATTLE_LAYOUT.md)
 - [ ] T053 — [戦闘演出フレームワーク](T053_BATTLE_FX_FRAMEWORK.md)
 
-T001～T047 complete. T048 external production verification remains. T049～T051 complete; next T052.
+T001～T047 complete. T048 external production verification remains. T049～T052 complete; next T053.

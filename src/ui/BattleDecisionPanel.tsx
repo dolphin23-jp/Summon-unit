@@ -86,7 +86,9 @@ export function BattleDecisionPanel({
                     : (speciesIdByBattleUnitId[actorBattleUnitId] ?? null)
                 return (
                   <li key={event.id}>
-                    <span className="event-log__time">t={event.virtualTime}</span>
+                    <span className="event-log__time">
+                      {detailed ? `t=${event.virtualTime}` : `#${event.sequence + 1}`}
+                    </span>
                     {actorSpeciesId === null ? (
                       <span className="monster-mini-placeholder" aria-hidden="true">
                         •

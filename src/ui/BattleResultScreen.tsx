@@ -4,6 +4,7 @@ import {
   resolveSpeciesName,
 } from '../content/display-masters'
 import type { BattleResultView } from './battle-result-view'
+import { GameIcon } from './GameIcon'
 import { MonsterIcon } from './MonsterIcon'
 
 export type BattleResultNavigationAction = 'RETRY' | 'FORMATION' | 'RESEARCH' | 'NEXT_STAGE'
@@ -58,32 +59,32 @@ export function BattleResultScreen({
           <dl className="result-reward-list">
             <div>
               <dt>
-                <span aria-hidden="true">C</span> 基本通貨
+                <GameIcon name="currency" /> 基本通貨
               </dt>
               <dd>+{view.rewards.currency}</dd>
             </div>
             <div>
               <dt>
-                <span aria-hidden="true">R</span> 研究データ
+                <GameIcon name="research" /> 研究データ
               </dt>
               <dd>+{view.rewards.researchData}</dd>
             </div>
             <div>
               <dt>
-                <span aria-hidden="true">K</span> 触媒
+                <GameIcon name="catalyst" /> 触媒
               </dt>
               <dd>+{view.rewards.catalyst}</dd>
             </div>
             <div>
               <dt>
-                <span aria-hidden="true">−</span> 修復費目安
+                <GameIcon name="repair" /> 修復費目安
               </dt>
               <dd>{view.repairCost}</dd>
             </div>
             {view.regionalPoints !== null && (
               <div>
                 <dt>
-                  <span aria-hidden="true">P</span> 地域ポイント
+                  <GameIcon name="region" /> 地域ポイント
                 </dt>
                 <dd>
                   {view.regionalPoints.before} → {view.regionalPoints.after}
