@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react'
 import type { BattleMotionLevel } from '../battle-accessibility'
 import type { FxCommand } from './fx-mapper'
+import './fx.css'
 
 interface PositionPercent {
   readonly left: number
