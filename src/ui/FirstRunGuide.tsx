@@ -22,15 +22,28 @@ export function FirstRunGuide({
   const last = stepIndex === FIRST_RUN_STEPS.length - 1
 
   useEffect(() => {
-    if (!open) return
+    if (!open) return undefined
     setStepIndex(0)
-    window.setTimeout(() => firstButtonRef.current?.focus(), 0)
-  }, [open])
+    const focusTimer = window.setTimeout(() => firstButtonRef.current?.focus(), 0)
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onDismiss()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => {
+      window.clearTimeout(focusTimer)
+      window.removeEventListener('keydown', onKeyDown)
+    }
+  }, [onDismiss, open])
 
   if (!open || step === undefined) return null
 
   return (
-    <div className="ux-modal-backdrop">
+    <div
+      className="ux-modal-backdrop"
+      onMouseDown={(event) => {
+        if (event.currentTarget === event.target) onDismiss()
+      }}
+    >
       <section
         className="ux-dialog ux-first-run-dialog"
         role="dialog"
@@ -38,22 +51,36 @@ export function FirstRunGuide({
         aria-labelledby="first-run-title"
       >
         <p className="panel-heading__kicker">FIRST EXPEDITION GUIDE</p>
-        <div className="ux-step-count">{stepIndex + 1} / {FIRST_RUN_STEPS.length}</div>
+        <div className="ux-step-count">
+          {stepIndex + 1} / {FIRST_RUN_STEPS.length}
+        </div>
         <h2 id="first-run-title">{step.title}</h2>
         <strong className="ux-first-run-summary">{step.summary}</strong>
         <p>{step.detail}</p>
-        <div className="ux-step-track" aria-label={`初回ガイド ${stepIndex + 1}/${FIRST_RUN_STEPS.length}`}>
+        <div
+          className="ux-step-track"
+          aria-label={`初回ガイド ${stepIndex + 1}/${FIRST_RUN_STEPS.length}`}
+        >
           {FIRST_RUN_STEPS.map((candidate, index) => (
             <span key={candidate.title} className={index <= stepIndex ? 'is-active' : ''} />
           ))}
         </div>
         {!last ? (
           <div className="ux-dialog-actions">
-            <button ref={firstButtonRef} type="button" className="collection-button" onClick={onDismiss}>
-              後で見る
+            <button
+              ref={firstButtonRef}
+              type="button"
+              className="collection-button"
+              onClick={onDismiss}
+            >
+              閉じる
             </button>
             {stepIndex > 0 && (
-              <button type="button" className="collection-button" onClick={() => setStepIndex((current) => current - 1)}>
+              <button
+                type="button"
+                className="collection-button"
+                onClick={() => setStepIndex((current) => current - 1)}
+              >
                 戻る
               </button>
             )}
@@ -67,10 +94,19 @@ export function FirstRunGuide({
           </div>
         ) : (
           <div className="ux-first-run-destinations">
-            <button ref={firstButtonRef} type="button" className="collection-button" onClick={onOpenCollection}>
+            <button
+              ref={firstButtonRef}
+              type="button"
+              className="collection-button"
+              onClick={onOpenCollection}
+            >
               編成から始める
             </button>
-            <button type="button" className="collection-button collection-button--primary" onClick={onOpenRegion}>
+            <button
+              type="button"
+              className="collection-button collection-button--primary"
+              onClick={onOpenRegion}
+            >
               地域観測へ出る
             </button>
             <button type="button" className="collection-button" onClick={onOpenResearch}>
