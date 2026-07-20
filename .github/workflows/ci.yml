@@ -31,8 +31,15 @@ jobs:
           corepack enable
           corepack prepare pnpm@10.13.1 --activate
 
-      - name: Materialize T050
-        run: python3 scripts/t050_materialize.py
+      - name: Materialize or repair T050
+        shell: bash
+        run: |
+          if [ -f src/ux/ux-guidance.ts ]; then
+            python3 scripts/t050_fix.py
+          else
+            python3 scripts/t050_materialize.py
+            python3 scripts/t050_fix.py
+          fi
 
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
