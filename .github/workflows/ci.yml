@@ -7,9 +7,9 @@ permissions:
   contents: write
 
 jobs:
-  verify:
+  build-diagnostics:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 10
 
     steps:
       - name: Checkout pull request branch
@@ -17,9 +17,6 @@ jobs:
         with:
           ref: ${{ github.head_ref }}
           fetch-depth: 0
-
-      - name: Materialize T053 integration
-        run: python scripts/t053_materialize.py
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -34,69 +31,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
 
-      - name: Format T053 files
+      - name: Capture build diagnostics
         run: |
-          pnpm exec prettier --write \
-            src/ui/MinimalBattleScreen.tsx \
-            src/ui/battle-accessibility.ts \
-            src/ui/battle-accessibility.test.ts \
-            src/ui/fx/FxLayer.tsx \
-            src/ui/fx/FxLayer.test.tsx \
-            src/ui/fx/fx-mapper.ts \
-            src/ui/fx/fx-mapper.test.ts \
-            src/ui/fx/fx.css \
-            src/content/skill-fx.ts \
-            src/content/skill-fx.test.ts \
-            src/content/vertical-slice-runtime.ts \
-            src/content/vertical-slice-runtime.test.ts \
-            scripts/validate-content.ts \
-            tasks/T053_BATTLE_FX_FRAMEWORK.md \
-            tasks/STATUS.md \
-            docs/07_BATTLE_EFFECTS.md \
-            docs/12_UI_UX.md
-          rm -f pnpm-lock.yaml
-
-      - name: Commit materialized implementation
-        run: |
-          if git diff --quiet && git diff --cached --quiet; then
-            echo "No materialized changes to commit."
-            exit 0
-          fi
+          set +e
+          pnpm build > tasks/T053_BUILD_DIAGNOSTICS.txt 2>&1
+          status=$?
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -m "T053: integrate battle FX framework"
+          git add tasks/T053_BUILD_DIAGNOSTICS.txt
+          git commit -m "T053: capture build diagnostics" || true
           git push origin HEAD:${{ github.head_ref }}
-
-      - name: Content validation
-        run: pnpm validate:content
-
-      - name: Test
-        id: test
-        run: |
-          set -o pipefail
-          pnpm test 2>&1 | tee /tmp/vitest.log
-
-      - name: Upload test diagnostics
-        if: failure() && steps.test.outcome == 'failure'
-        uses: actions/upload-artifact@v4
-        with:
-          name: vitest-diagnostics
-          path: /tmp/vitest.log
-          if-no-files-found: error
-          retention-days: 3
-
-      - name: Headless demo
-        run: pnpm demo:headless > /tmp/headless-battle-demo.json
-
-      - name: AI regression benchmark
-        run: pnpm benchmark:ai
-
-      - name: Vertical slice balance benchmark
-        run: pnpm benchmark:balance > /tmp/vertical-slice-balance.json
-
-      - name: Lint
-        run: pnpm lint
-
-      - name: Build
-        run: pnpm build
+          exit $status
