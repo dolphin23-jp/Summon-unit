@@ -18,22 +18,35 @@ jobs:
           ref: ${{ github.head_ref }}
           fetch-depth: 0
 
-      - name: Apply demo region theme compatibility
+      - name: Update T052 regression expectations
         run: |
           python - <<'PY'
           from pathlib import Path
-          path = Path('src/demo/region-ui-demo.ts')
-          content = path.read_text(encoding='utf-8')
-          content = content.replace(
-              "    summary: '遮蔽、射線、優先撃破を学ぶ導入地域です。',\n    order: 1,",
-              "    summary: '遮蔽、射線、優先撃破を学ぶ導入地域です。',\n    themeColor: '#55b889',\n    order: 1,",
+
+          runtime_test = Path('src/content/vertical-slice-runtime.test.ts')
+          content = runtime_test.read_text(encoding='utf-8').replace(
+              "contentVersion: 'slice-v0.1.0-rc.2-t049'",
+              "contentVersion: 'slice-v0.1.0-rc.2-t052'",
           )
-          content = content.replace(
-              "    summary: '地域ボス撃破後に開く、次地域の先行観測区画です。',\n    order: 2,",
-              "    summary: '地域ボス撃破後に開く、次地域の先行観測区画です。',\n    themeColor: '#a97962',\n    order: 2,",
-          )
-          path.write_text(content, encoding='utf-8')
-          Path('tasks/T052_VALIDATION_DIAGNOSTICS.txt').unlink(missing_ok=True)
+          runtime_test.write_text(content, encoding='utf-8')
+
+          battle_test = Path('src/ui/battle-screen-view.test.ts')
+          content = battle_test.read_text(encoding='utf-8')
+          old = """    expect([...sameTime].map((entry) => entry.id)).toEqual(
+      [...sameTime].map((entry) => entry.id).sort((left, right) => left.localeCompare(right, 'en')),
+    )
+"""
+          new = """    const repeated = createBattleScreenView(STANDARD_HEADLESS_BATTLE, runner.getSnapshot())
+    expect(sameTime.length).toBeGreaterThan(1)
+    expect(view.timeline.map((entry) => `${entry.time}:${entry.id}`)).toEqual(
+      repeated.timeline.map((entry) => `${entry.time}:${entry.id}`),
+    )
+"""
+          if old not in content:
+              raise RuntimeError('relative timeline assertion was not found')
+          battle_test.write_text(content.replace(old, new, 1), encoding='utf-8')
+
+          Path('pnpm-lock.yaml').unlink(missing_ok=True)
           PY
 
       - name: Set up Node.js
@@ -49,19 +62,23 @@ jobs:
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
 
-      - name: Format compatibility file
-        run: pnpm exec prettier --write src/demo/region-ui-demo.ts
+      - name: Remove generated lockfile and format tests
+        run: |
+          rm -f pnpm-lock.yaml
+          pnpm exec prettier --write \
+            src/content/vertical-slice-runtime.test.ts \
+            src/ui/battle-screen-view.test.ts
 
-      - name: Commit compatibility fix
+      - name: Commit regression fixes
         run: |
           if git diff --quiet && git diff --cached --quiet; then
-            echo "No compatibility changes to commit."
+            echo "No regression changes to commit."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/demo/region-ui-demo.ts tasks/T052_VALIDATION_DIAGNOSTICS.txt
-          git commit -m "T052: add demo region theme colors"
+          git add -A
+          git commit -m "T052: align relative timeline and runtime tests"
           git push origin HEAD:${{ github.head_ref }}
 
       - name: Content validation
