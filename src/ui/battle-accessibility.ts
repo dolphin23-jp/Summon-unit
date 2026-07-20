@@ -12,8 +12,11 @@ export function resolveInitialBattleMotionLevel(
   storedValue: unknown,
   prefersReducedMotion: boolean,
 ): BattleMotionLevel {
+  if (prefersReducedMotion) {
+    return 'MINIMAL'
+  }
   if (isBattleMotionLevel(storedValue)) {
     return storedValue
   }
-  return prefersReducedMotion ? 'REDUCED' : 'STANDARD'
+  return 'STANDARD'
 }
