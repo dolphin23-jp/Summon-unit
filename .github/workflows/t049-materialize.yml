@@ -4,13 +4,16 @@ on:
   push:
     branches:
       - agent/t049-display-name-masters
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: write
 
 jobs:
   materialize:
-    if: github.actor != 'github-actions[bot]'
+    if: github.actor != 'github-actions[bot]' && (github.event_name == 'push' || github.head_ref == 'agent/t049-display-name-masters')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
