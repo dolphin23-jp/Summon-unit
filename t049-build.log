@@ -1,7 +1,0 @@
-
-> summon-unit@0.1.0-rc.2 build /home/runner/work/Summon-unit/Summon-unit
-> tsc -b && vite build
-
-src/ui/CollectionScreen.tsx(823,64): error TS2304: Cannot find name 'displayName'.
-src/ui/ResearchScreen.tsx(364,49): error TS2304: Cannot find name 'displayName'.
- ELIFECYCLE  Command failed with exit code 2.
