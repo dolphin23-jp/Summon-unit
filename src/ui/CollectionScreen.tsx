@@ -1,4 +1,8 @@
-import { formatUnitDisplayName, resolveDisplayName } from '../content/display-masters'
+import {
+  formatUnitDisplayName,
+  resolveDisplayName,
+  resolveSkillDescription,
+} from '../content/display-masters'
 import { useMemo, useState } from 'react'
 import {
   AI_INDIVIDUAL_STRATEGIES,
@@ -62,10 +66,6 @@ const TAB_LABELS: Readonly<Record<CollectionTab, string>> = Object.freeze({
   ENCYCLOPEDIA: '図鑑',
 })
 
-function displayName(id: string): string {
-  return resolveDisplayName(id)
-}
-
 function basisPointsLabel(value: number): string {
   return `${Math.floor(value / 100)}.${String(value % 100).padStart(2, '0')}%`
 }
@@ -120,7 +120,7 @@ function RosterCard({
         <strong>
           {instance.nickname ?? formatUnitDisplayName(species.id, instance.instanceId)}
         </strong>
-        <small>{displayName(species.id)}</small>
+        <small>{resolveDisplayName(species.id)}</small>
         <span>
           {member === null
             ? '未配置'
@@ -190,7 +190,7 @@ function FormationMemberEditor({
             <option value="">装備なし</option>
             {instance.learnedGenericSkillIds.map((skillId) => (
               <option key={skillId} value={skillId}>
-                {displayName(skillId)}
+                {resolveDisplayName(skillId)}
               </option>
             ))}
           </select>
@@ -206,7 +206,7 @@ function FormationMemberEditor({
             <option value="">装備なし</option>
             {speciesState.bloomSkillIds.map((skillId) => (
               <option key={skillId} value={skillId}>
-                {displayName(skillId)}
+                {resolveDisplayName(skillId)}
               </option>
             ))}
           </select>
@@ -268,7 +268,7 @@ function FormationMemberEditor({
             'STANDARD'
           return (
             <label key={skillId}>
-              <span>{displayName(skillId)}</span>
+              <span>{resolveDisplayName(skillId)}</span>
               <select
                 value={current}
                 onChange={(event) =>
@@ -434,7 +434,7 @@ export function CollectionScreen({
         catalog,
       )
       onPlayerDataChange(result.playerData)
-      setNotice(`${displayName(skill.id)}を基本通貨${result.spentCurrency}で習得しました。`)
+      setNotice(`${resolveDisplayName(skill.id)}を基本通貨${result.spentCurrency}で習得しました。`)
     } catch (error) {
       setNotice(error instanceof Error ? error.message : '習得に失敗しました。')
     }
@@ -572,7 +572,7 @@ export function CollectionScreen({
                       <strong>
                         {instance === null
                           ? '空き'
-                          : (instance.nickname ?? displayName(instance.speciesId))}
+                          : (instance.nickname ?? resolveDisplayName(instance.speciesId))}
                       </strong>
                       {member !== undefined && <small>優先 {member.tiePriority}</small>}
                     </button>
@@ -676,7 +676,8 @@ export function CollectionScreen({
                   <article key={skill.id} className="skill-learning-card">
                     <div>
                       <span className="skill-slot-badge">GENERIC</span>
-                      <h3>{displayName(skill.id)}</h3>
+                      <h3>{resolveDisplayName(skill.id)}</h3>
+                      <p>{resolveSkillDescription(skill.id)}</p>
                       <p>
                         コスト {skill.actionCost} / 威力 {skill.damageMultiplierPermille}
                       </p>
@@ -729,7 +730,7 @@ export function CollectionScreen({
                     onClick={() => setSelectedSpeciesId(state.speciesId)}
                   >
                     <MonsterIcon species={species} concealed={stage < 2} />
-                    <strong>{stage < 2 ? '???' : displayName(species.id)}</strong>
+                    <strong>{stage < 2 ? '???' : resolveDisplayName(species.id)}</strong>
                     <span>開示 {stage}/5</span>
                     <small>解析 {basisPointsLabel(state.analysisBasisPoints)}</small>
                   </button>
@@ -752,7 +753,7 @@ export function CollectionScreen({
                 <h2 id="species-detail-title">
                   {encyclopediaStage(selectedSpeciesState.encyclopediaStageId) < 2
                     ? '未解析種'
-                    : displayName(selectedSpecies.id)}
+                    : resolveDisplayName(selectedSpecies.id)}
                 </h2>
               </div>
               <dl className="species-detail__facts">
@@ -782,7 +783,7 @@ export function CollectionScreen({
                   <>
                     <div>
                       <dt>属性</dt>
-                      <dd>{displayName(selectedSpecies.attributeId)}</dd>
+                      <dd>{resolveDisplayName(selectedSpecies.attributeId)}</dd>
                     </div>
                     <div>
                       <dt>レア度</dt>
@@ -814,7 +815,7 @@ export function CollectionScreen({
               {encyclopediaStage(selectedSpeciesState.encyclopediaStageId) >= 4 && (
                 <section className="species-detail__skills">
                   <h3>技情報</h3>
-                  <p>固有: {displayName(selectedSpecies.innateSkillId)}</p>
+                  <p>固有: {resolveDisplayName(selectedSpecies.innateSkillId)}</p>
                   <p>
                     開花:{' '}
                     {selectedSpeciesState.bloomSkillIds.length === 0
@@ -828,7 +829,7 @@ export function CollectionScreen({
                   <h3>観測統計</h3>
                   {Object.entries(selectedSpeciesState.statistics).map(([key, value]) => (
                     <p key={key}>
-                      <span>{displayName(key)}</span>
+                      <span>{resolveDisplayName(key)}</span>
                       <strong>{value}</strong>
                     </p>
                   ))}

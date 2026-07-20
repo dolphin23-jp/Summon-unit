@@ -4,6 +4,7 @@ import {
   formatUnitDisplayName,
   resolveCatalystName,
   resolveDisplayName,
+  resolveRewardName,
   resolveSkillDescription,
   resolveSkillName,
   resolveSpeciesName,
@@ -18,6 +19,7 @@ describe('display masters', () => {
     expect(resolveSkillDescription('skill.slice.moss-drop')).toContain('回復')
     expect(resolveStageName('stage.slice.a-01-order')).not.toContain('.')
     expect(resolveCatalystName('catalyst.slice.wind')).toBe('風触媒')
+    expect(resolveRewardName('regional.slice-a.wind-30')).toBe('風触媒補給')
     expect(resolveDisplayName('unknown.value')).toBe('不明な項目')
     expect(formatUnitDisplayName('species.slice.grassfang-rat', 'unit.slice.grassfang-01')).toBe(
       '草牙ネズミ #1',

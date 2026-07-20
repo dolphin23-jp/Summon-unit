@@ -5,10 +5,6 @@ import type { PlayerData } from '../progression/player-data'
 import type { T037ProgressionCatalog } from '../progression/research-facility'
 import { ResearchScreen } from './ResearchScreen'
 
-function displayName(id: string): string {
-  return resolveDisplayName(id)
-}
-
 export interface T048ResearchScreenProps {
   readonly playerData: PlayerData
   readonly catalog: T037ProgressionCatalog
@@ -95,7 +91,7 @@ export function T048ResearchScreen({
                   )
                   onPlayerDataChange(result.playerData)
                   setNotice(
-                    `${displayName(result.speciesId)}の開花技${displayName(result.skillId)}を解放しました。`,
+                    `${resolveDisplayName(result.speciesId)}の開花技${resolveDisplayName(result.skillId)}を解放しました。`,
                   )
                 } catch (error) {
                   setNotice(error instanceof Error ? error.message : '開花研究に失敗しました。')
@@ -115,8 +111,8 @@ export function T048ResearchScreen({
                   className="research-node"
                 >
                   <span className="research-node__stage">R{species?.rarity ?? '—'}</span>
-                  <strong>{displayName(definition.speciesId)}</strong>
-                  <small>{displayName(definition.skillId)}</small>
+                  <strong>{resolveDisplayName(definition.speciesId)}</strong>
+                  <small>{resolveDisplayName(definition.skillId)}</small>
                   <dl className="research-requirements">
                     <div>
                       <dt>解析度</dt>

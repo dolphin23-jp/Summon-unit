@@ -5,10 +5,6 @@ import type { PlayerData } from '../progression/player-data'
 import type { T036ProgressionCatalog } from '../progression/t036-progression-model'
 import { calculateSummonCurrencyCost, summonUnit } from '../progression/unit-economy'
 
-function displayName(id: string): string {
-  return resolveDisplayName(id)
-}
-
 function instanceSlug(speciesId: SpeciesId): string {
   return speciesId.split('.').at(-1) ?? speciesId
 }
@@ -73,7 +69,7 @@ export function SummonScreen({
       const result = summonUnit(playerData, { instanceId, speciesId: selectedSpecies.id }, catalog)
       onPlayerDataChange(result.playerData)
       setNotice(
-        `${displayName(result.speciesId)}を召喚しました。基本通貨を${result.currencySpent}消費しました。`,
+        `${resolveDisplayName(result.speciesId)}を召喚しました。基本通貨を${result.currencySpent}消費しました。`,
       )
     } catch (error) {
       setNotice(error instanceof Error ? error.message : '召喚に失敗しました。')
@@ -134,7 +130,7 @@ export function SummonScreen({
                   onClick={() => setSelectedSpeciesId(species.id)}
                 >
                   <span className="research-node__stage">R{species.rarity}</span>
-                  <strong>{displayName(species.id)}</strong>
+                  <strong>{resolveDisplayName(species.id)}</strong>
                   <small>
                     所持 {owned} / 通貨 {cost}
                   </small>
@@ -150,7 +146,7 @@ export function SummonScreen({
           <div className="collection-section-heading">
             <div>
               <p className="panel-heading__kicker">CONFIRM SUMMON</p>
-              <h2 id="summon-confirm-title">{displayName(selectedSpecies.id)}</h2>
+              <h2 id="summon-confirm-title">{resolveDisplayName(selectedSpecies.id)}</h2>
             </div>
             <strong>R{selectedSpecies.rarity}</strong>
           </div>

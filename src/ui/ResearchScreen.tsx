@@ -1,4 +1,4 @@
-import { resolveCatalystName, resolveDisplayName } from '../content/display-masters'
+import { formatUnitDisplayName, resolveDisplayName } from '../content/display-masters'
 import { useMemo, useState } from 'react'
 import type { MonsterSpecies } from '../content/monster-species'
 import type { PlayerData } from '../progression/player-data'
@@ -30,14 +30,6 @@ const STATUS_LABELS = Object.freeze({
   known: 'レシピ確定',
   completed: '研究完了',
 })
-
-function shortId(id: string): string {
-  return id.split('.').at(-1) ?? id
-}
-
-function displayName(id: string): string {
-  return resolveDisplayName(id)
-}
 
 function speciesForNode(
   definition: ResearchNodeDefinition,
@@ -156,7 +148,7 @@ function TrialResearchForm({
                 checked={materialSpeciesIds.includes(speciesId)}
                 onChange={() => setMaterialSpeciesIds(toggleId(materialSpeciesIds, speciesId))}
               />
-              {displayName(speciesId)}
+              {resolveDisplayName(speciesId)}
             </label>
           ))}
         </fieldset>
@@ -166,13 +158,13 @@ function TrialResearchForm({
             {definition.candidateRange.maximumCatalystCount}
           </legend>
           {definition.candidateRange.catalystIds.map((catalystId) => (
-            <label key={resolveCatalystName(catalystId)}>
+            <label key={catalystId}>
               <input
                 type="checkbox"
                 checked={catalystIds.includes(catalystId)}
                 onChange={() => setCatalystIds(toggleId(catalystIds, catalystId))}
               />
-              {displayName(catalystId)}
+              {resolveDisplayName(catalystId)}
             </label>
           ))}
         </fieldset>
@@ -231,7 +223,7 @@ function FinalResearchForm({
         catalog,
       )
       onPlayerDataChange(result.playerData)
-      onNotice(`${displayName(result.targetSpeciesId)}の設計図を永久解放しました。`)
+      onNotice(`${resolveDisplayName(result.targetSpeciesId)}の設計図を永久解放しました。`)
     } catch (error) {
       onNotice(error instanceof Error ? error.message : '確定研究に失敗しました。')
     }
@@ -257,7 +249,7 @@ function FinalResearchForm({
             {finalDefinition.catalysts.length === 0
               ? 'なし'
               : finalDefinition.catalysts
-                  .map((entry) => `${displayName(entry.catalystId)} ×${entry.amount}`)
+                  .map((entry) => `${resolveDisplayName(entry.catalystId)} ×${entry.amount}`)
                   .join(' / ')}
           </dd>
         </div>
@@ -267,7 +259,7 @@ function FinalResearchForm({
             {finalDefinition.specimenRequirements.length === 0
               ? 'なし'
               : finalDefinition.specimenRequirements
-                  .map((entry) => `${displayName(entry.speciesId)} ×${entry.amount}`)
+                  .map((entry) => `${resolveDisplayName(entry.speciesId)} ×${entry.amount}`)
                   .join(' / ')}
           </dd>
         </div>
@@ -287,8 +279,7 @@ function FinalResearchForm({
                   setSpecimenInstanceIds(toggleId(specimenInstanceIds, instance.instanceId))
                 }
               />
-              {instance.nickname ?? displayName(instance.speciesId)}{' '}
-              <small>{instance.instanceId}</small>
+              {instance.nickname ?? formatUnitDisplayName(instance.speciesId, instance.instanceId)}
             </label>
           ))}
         </fieldset>
@@ -333,12 +324,12 @@ function ResearchNodeDetail({
           className={`research-orb research-orb--stage-${state.disclosureStage}`}
           aria-hidden="true"
         >
-          {state.disclosureStage < 2 ? '?' : shortId(species.id).slice(0, 2).toUpperCase()}
+          {state.disclosureStage < 2 ? '?' : resolveDisplayName(species.id).slice(0, 1)}
         </div>
         <div>
           <p className="panel-heading__kicker">RESEARCH NODE</p>
           <h2 id="research-detail-title">
-            {state.disclosureStage < 2 ? '未解析ノード' : displayName(species.id)}
+            {state.disclosureStage < 2 ? '未解析ノード' : resolveDisplayName(species.id)}
           </h2>
           <p>
             {STATUS_LABELS[state.status]} / 開示 {state.disclosureStage}/5
@@ -358,11 +349,11 @@ function ResearchNodeDetail({
         <dl className="research-facts">
           <div>
             <dt>対象種</dt>
-            <dd>{displayName(species.id)}</dd>
+            <dd>{resolveDisplayName(species.id)}</dd>
           </div>
           <div>
             <dt>属性</dt>
-            <dd>{displayName(species.attributeId)}</dd>
+            <dd>{resolveDisplayName(species.attributeId)}</dd>
           </div>
           <div>
             <dt>レア度</dt>
@@ -556,7 +547,9 @@ export function ResearchScreen({
                   onClick={() => setSelectedNodeId(state.nodeId)}
                 >
                   <span className="research-node__stage">{state.disclosureStage}/5</span>
-                  <strong>{state.disclosureStage < 2 ? '?' : displayName(species.id)}</strong>
+                  <strong>
+                    {state.disclosureStage < 2 ? '?' : resolveDisplayName(species.id)}
+                  </strong>
                   <small>{STATUS_LABELS[state.status]}</small>
                   <span className="research-node__links">
                     ↔ {definition.adjacentNodeIds.length}

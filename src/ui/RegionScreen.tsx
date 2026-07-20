@@ -23,10 +23,6 @@ const STAGE_KIND_LABELS: Readonly<Record<StageKind, string>> = Object.freeze({
   HIDDEN: '隠し戦闘',
 })
 
-function displayName(id: string): string {
-  return resolveDisplayName(id)
-}
-
 function regionalRewardsForStages(
   stages: readonly StageDefinition[],
 ): readonly RegionalPointRewardDefinition[] {
@@ -319,7 +315,7 @@ export function RegionScreen({
                         className={`regional-reward${claimed ? ' is-claimed' : reached ? ' is-reached' : ''}`}
                       >
                         <span>{reward.requiredPoints}P</span>
-                        <strong>{displayName(reward.rewardId)}</strong>
+                        <strong>{resolveDisplayName(reward.rewardId)}</strong>
                         <small>
                           {claimed ? '受取済み' : reached ? '次回精算で受取' : '未到達'}
                         </small>
@@ -346,7 +342,7 @@ export function RegionScreen({
                         onClick={() => onSelectStage(stage.stageId)}
                       >
                         <span className="stage-card__kind">{STAGE_KIND_LABELS[stage.kind]}</span>
-                        <strong>{displayName(stage.stageId)}</strong>
+                        <strong>{resolveDisplayName(stage.stageId)}</strong>
                         <small>{completed ? 'CLEAR' : access.unlocked ? 'OPEN' : 'LOCKED'}</small>
                       </button>
                       <div className="stage-card__body">
