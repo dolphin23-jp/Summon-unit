@@ -1,7 +1,0 @@
-
-> summon-unit@0.1.0-rc.2 build /home/runner/work/Summon-unit/Summon-unit
-> tsc -b && vite build
-
-src/ui/MonsterIconMarkup.test.tsx(34,11): error TS2739: Type '{ battleUnitId: string; speciesId: string; side: "ALLY"; position: { side: "ALLY"; row: 0; column: 0; }; positionId: string; hp: number; maxHp: number; barrierTotal: number; attributeId: string; attributeLabel: string; ... 5 more ...; defeated: false; }' is missing the following properties from type 'BattleScreenUnitView': nextActionRank, nextActionLabel
-src/ui/theme-contract.test.ts(1,30): error TS2307: Cannot find module 'node:fs' or its corresponding type declarations.
- ELIFECYCLE  Command failed with exit code 2.
